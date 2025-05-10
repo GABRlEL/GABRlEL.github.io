@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- sponsored by ChatGPT o3 -->
+<head>
+<meta charset="utf-8">
+<title>Not A Plain TXT</title>
+<style>
+/* --- Color themes ----------------------------------------------------- */
+:root{
+  color-scheme:dark;/* default dark */
+  --bg:#181a1b;
+  --fg:#e8e6e3;
+  --border:#444;
+  --accent:#0a84ff;
+  --surface:#242628;
+}
+/* Light palette – applied when <html> has class="light" */
+.light{
+  color-scheme:light;
+  --bg:#ffffff;
+  --fg:#222222;
+  --border:#aaaaaa;
+  --accent:#0066cc;
+  --surface:#f7f7f7;
+}
+/* --- Base styles ------------------------------------------------------ */
+html,body{margin:0;padding:0;height:100%}
+body{font-family:system-ui,Arial,Helvetica,sans-serif;margin:2rem;line-height:1.4;background:var(--bg);color:var(--fg);}
+header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}
+h1{font-size:1.6rem;margin:0}
+/* simple toggle */
+.toggle{user-select:none;cursor:pointer;font-size:.9rem;display:flex;align-items:center;gap:.4rem;color:var(--accent)}
+.toggle input{accent-color:var(--accent);width:1rem;height:1rem;cursor:pointer}
+
+#drop{border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;transition:border-color .2s,background .2s;color:var(--fg);background:var(--surface)}
+#drop.hover{border-color:var(--accent)}
+
+#note{font-size:.9rem;margin-top:.75rem;line-height:1.35;color:var(--fg);max-width:70ch}
+#note code{font-family:monospace;color:var(--accent);}
+
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;margin-top:1.5rem;font-size:.95rem;min-width:320px}
+th,td{border:1px solid var(--border);padding:.4rem .6rem;text-align:left}
+th{background:var(--surface)}
+
+#raw{white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1rem;margin-top:2rem;font-size:.9rem;display:none;color:var(--fg)}
+#rawToggle{margin-left:.5rem;font-size:.8rem;cursor:pointer;color:var(--accent);text-decoration:underline}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Not A Plain TXT - A Wii <code>setting.txt</code> Viewer</h1>
+  <label class="toggle" title="Toggle light/dark mode">
+    <input type="checkbox" id="modeToggle">
+    <span>Light&nbsp;mode</span>
+  </label>
+</header>
+
+<div id="drop">Drop <code>setting.txt</code> here or click to pick a file</div>
+<p id="note">It can be found in:<br>
+  <code>(Dolphin Emulator\Wii\)title\00000001\00000002\data\setting.txt</code><br><br>
+  The Dolphin Emulator folder can be found in either: <code>Documents</code>, <code>%appdata%</code> or in the <code>User</code> folder of your Dolphin install when using portable
+</p>
+<div id="output"></div>
+<pre id="raw"></pre>
+
+<script>
+(function(){
+  /* ------------------ Theme toggle ------------------ */
+  const modeToggle=document.getElementById('modeToggle');
+  modeToggle.addEventListener('change',()=>{
+    document.documentElement.classList.toggle('light',modeToggle.checked);
+  });
+
+  /* ------------- File drag‑and‑drop handling -------- */
+  const drop=document.getElementById('drop');
+  const output=document.getElementById('output');
+  const raw=document.getElementById('raw');
+  const note=document.getElementById('note');
+
+  const prevent=e=>{e.preventDefault();e.stopPropagation();};
+  ['dragenter','dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,prevent,false));
+  ['dragenter','dragover'].forEach(()=>drop.classList.add('hover'));
+  ['dragleave','drop'].forEach(()=>drop.classList.remove('hover'));
+
+  drop.addEventListener('click',()=>{
+    const inp=document.createElement('input');
+    inp.type='file';
+    inp.accept='.txt';
+    inp.onchange=()=>handleFiles(inp.files);
+    inp.click();
+  });
+  drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+
+  function handleFiles(files){
+    if(!files.length) return;
+    note.style.display='none'; // hide note on first file action
+    const file=files[0];
+    const fr=new FileReader();
+    fr.onload=e=>{
+      const buf=e.target.result;
+      const text=decryptSetting(buf);
+      if(!text){output.innerHTML='<p style="color:#e33">Failed to decrypt/parse file.</p>';return;}
+      render(text);
+    };
+    fr.readAsArrayBuffer(file);
+  }
+
+  /**
+   * Decrypts the 256‑byte Wii setting.txt using rolling‑XOR algorithm.
+   * Key rotates left 1 bit each byte, initial 0x73B5DBFA.
+   */
+  function decryptSetting(buffer){
+    const data=new Uint8Array(buffer);
+    let key=0x73B5DBFA>>>0;
+    const out=[];
+    for(let i=0;i<data.length;i++){
+      const dec=data[i] ^ (key & 0xFF);
+      if(dec===0) break; // stop at first NUL
+      out.push(dec);
+      key=((key<<1)|(key>>>31))>>>0; // rol1
+    }
+    return new TextDecoder('ascii').decode(new Uint8Array(out));
+  }
+
+  function render(txt){
+    const lines=txt.split(/\r?\n/).map(l=>l.trim());
+    const kvLines=lines.filter(l=>/^[A-Z0-9_]+=.[ -~]*$/.test(l));
+
+    raw.textContent=kvLines.join('\n');
+
+    const toggle=document.createElement('span');
+    toggle.id='rawToggle';
+    toggle.textContent='(show raw)';
+    toggle.onclick=()=>{
+      const vis=raw.style.display==='block';
+      raw.style.display=vis?'none':'block';
+      toggle.textContent=vis?'(show raw)' : '(hide raw)';
+    };
+
+    const tbody=kvLines.map(l=>{
+      const [k,v]=l.split('=',2);
+      return `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`;
+    }).join('');
+    const table=`<div class="table-wrap"><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>${tbody}</tbody></table></div>`;
+
+    output.innerHTML='';
+    output.appendChild(toggle);
+    output.insertAdjacentHTML('beforeend',table);
+  }
+
+  function escapeHtml(str){
+    return str.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
