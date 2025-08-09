@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wii SYSCONF — IPL.SADR Editor</title>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial; margin: 18px; background:#f7f9fb; color:#111 }
+    h1 { margin-top:0 }
+    .card { background: white; border-radius:8px; padding:16px; box-shadow: 0 6px 18px rgba(20,30,40,0.06); margin-bottom:16px }
+    label { display:block; margin:8px 0 4px; font-weight:600 }
+    input[type=file] { margin-bottom:8px }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px }
+    .row { margin-bottom:8px }
+    textarea { width:100%; min-height:48px; font-family: monospace; font-size:13px }
+    table { width:100%; border-collapse:collapse }
+    td, th { padding:6px 8px; border-bottom:1px solid #eee }
+    .small { font-size:13px; color:#666 }
+    .muted { color:#666 }
+    button { padding:8px 12px; border-radius:8px; border:1px solid #ddd; background: #fff; cursor:pointer }
+    button.primary { background:#0b79ff; color:white; border-color: #0b79ff }
+    .controls { display:flex; gap:8px; align-items:center }
+    .hex { font-family: monospace; font-size:13px; background:#f3f6f9; padding:8px; border-radius:6px; overflow:auto }
+    .lang-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:8px }
+    .notice { background:#fff6d7; padding:10px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <h1>Wii SYSCONF — <small class="small">IPL.SADR editor (browser)</small></h1>
+  <div class="card">
+    <div class="row">
+      <label for="file">Load SYSCONF file (usually <code>/shared2/sys/SYSCONF</code>)</label>
+      <input id="file" type="file" accept="*/*"> 
+    </div>
+    <div class="row controls">
+      <button id="parseBtn" class="primary">Parse</button>
+      <button id="downloadBtn" disabled>Download modified SYSCONF</button>
+      <span id="status" class="muted">No file loaded.</span>
+    </div>
+    <div id="summary" class="muted" style="margin-top:10px"></div>
+  </div>
+
+  <div id="editor" style="display:none">
+    <div class="card">
+      <h3>IPL.SADR — parsed fields</h3>
+      <div class="grid">
+        <div>
+          <label>Country code (raw)</label>
+          <input id="countryCode" type="number" min="0" max="255">
+        </div>
+        <div>
+          <label>Region code (raw)</label>
+          <input id="regionCode" type="number" min="0" max="255">
+        </div>
+        <div>
+          <label>City code (raw)</label>
+          <input id="cityCode" type="number" min="0" max="65535">
+        </div>
+        <div>
+          <label>City code (hex)</label>
+          <input id="cityCodeHex" type="text" readonly>
+        </div>
+      </div>
+
+      <div style="margin-top:8px" class="controls">
+        <button id="applyCodesBtn">Apply codes to file</button>
+        <button id="revertCodesBtn">Revert codes from file</button>
+        <div style="flex:1"></div>
+        <div class="small muted">Country/Region are 1 byte each, City is 2 bytes (u16 BE).</div>
+      </div>
+
+      <hr/>
+      <div style="display:flex; gap:12px; align-items:center">
+        <div style="flex:1">
+          <label>Latitude (degrees)</label>
+          <input id="latDeg" type="number" step="any" min="-180" max="180">
+        </div>
+        <div style="flex:1">
+          <label>Longitude (degrees)</label>
+          <input id="lonDeg" type="number" step="any" min="-180" max="180">
+        </div>
+        <div style="min-width:170px">
+          <label>Stored (s16) — lat / lon</label>
+          <div id="storedPair" class="small"></div>
+        </div>
+      </div>
+      <div style="margin-top:8px" class="controls">
+        <button id="applyCoords">Apply coordinates to file</button>
+        <button id="revertCoords">Revert inputs from file</button>
+        <div style="flex:1"></div>
+        <div class="small muted">Conversion factor: degrees = stored × (45 / 8192)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Country / Region names (editable)</h3>
+      <div class="notice small">Each name slot is fixed 0x80 bytes (UTF-16BE). Editing will be padded/truncated to fit.</div>
+      <div style="margin-top:8px; display:flex; gap:12px">
+        <div style="flex:1">
+          <h4 class="small">Country names (16)</h4>
+          <div id="countryNames" class="lang-grid"></div>
+        </div>
+        <div style="flex:1">
+          <h4 class="small">Region names (16)</h4>
+          <div id="regionNames" class="lang-grid"></div>
+        </div>
+      </div>
+      <div style="margin-top:8px" class="controls">
+        <button id="applyNames">Write names to file</button>
+        <button id="refreshNames">Reload names from file</button>
+        <div style="flex:1"></div>
+        <div class="small muted">UTF-16BE encoding; 0x80 bytes per slot.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Debug / hex view</h3>
+      <div class="small muted">Showing bytes around the IPL.SADR data area (hex)</div>
+      <pre id="hexView" class="hex"></pre>
+    </div>
+  </div>
+
+  <script>
+  // --- Helper primitives ---
+  function readAscii(dataview, offset, length) {
+    let s = '';
+    for (let i=0;i<length;i++) {
+      const b = dataview.getUint8(offset + i);
+      if (b === 0) break;
+      s += String.fromCharCode(b);
+    }
+    return s;
+  }
+
+  function decodeUTF16BE(u8arr) {
+    // read 16-bit units big-endian until first 0x0000 or end
+    const dv = new DataView(u8arr.buffer, u8arr.byteOffset, u8arr.byteLength);
+    let out = '';
+    for (let i=0;i+1 < u8arr.length; i += 2) {
+      const code = dv.getUint16(i, false);
+      if (code === 0) break;
+      out += String.fromCharCode(code);
+    }
+    return out;
+  }
+
+  function encodeUTF16BE(str, fixedBytes) {
+    // produce Uint8Array of fixedBytes length, padded with zeros or truncated
+    const bytes = [];
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      // handle surrogate pairs: if this code is a high surrogate and next is low, emit both
+      if (code >= 0xD800 && code <= 0xDBFF && i+1 < str.length) {
+        const low = str.charCodeAt(i+1);
+        bytes.push((code >> 8) & 0xFF, code & 0xFF, (low >> 8) & 0xFF, low & 0xFF);
+        i++; // skip low surrogate
+      } else {
+        bytes.push((code >> 8) & 0xFF, code & 0xFF);
+      }
+      if (bytes.length >= fixedBytes) break;
+    }
+    // truncate or pad
+    if (bytes.length > fixedBytes) bytes.length = fixedBytes;
+    while (bytes.length < fixedBytes) bytes.push(0x00);
+    return new Uint8Array(bytes);
+  }
+
+  function toHex(u8, group=1) {
+    const parts = [];
+    for (let i=0;i<u8.length;i++) {
+      let h = u8[i].toString(16).padStart(2,'0');
+      parts.push(h);
+    }
+    if (group <= 1) return parts.join(' ');
+    const lines = [];
+    for (let i=0;i<parts.length;i+=group) lines.push(parts.slice(i,i+group).join(' '));
+    return lines.join(' ');
+  }
+
+  // Conversion constants
+  const FACTOR = 45.0 / 8192.0; // degrees per stored unit
+  function storedToDegrees(s) { return s * FACTOR; }
+  function degreesToStored(d) { return Math.round(d / FACTOR); }
+
+  // --- Main parser logic ---
+  let fileBuf = null;
+  let dv = null;
+  let found = null; // info about IPL.SADR inside file
+  const EXPECTED_LOOKUP_SLOTS = 39;
+  const SLOT_SIZE = 2; // u16
+
+  function parseSYSCONF(buffer, fileName) {
+    fileBuf = buffer;
+    dv = new DataView(fileBuf);
+    found = null;
+
+    const fileLen = fileBuf.byteLength;
+    if (fileLen < 0x100) throw new Error('File too small to be valid SYSCONF');
+
+    const magic = String.fromCharCode(
+      dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)
+    );
+    if (magic !== 'SCv0') throw new Error('Missing SCv0 header (not a SYSCONF file?)');
+
+    // items
+    const N = dv.getUint16(4, false);
+    const offsetsStart = 6;
+    const offsets = [];
+    for (let i=0;i<N;i++) {
+      const off = dv.getUint16(offsetsStart + i*2, false);
+      offsets.push(off);
+    }
+
+    const offsetsArrayEnd = offsetsStart + N*2;
+    let endOfItemsOffset = null;
+    if (offsetsArrayEnd + 2 <= fileLen) {
+      endOfItemsOffset = dv.getUint16(offsetsArrayEnd, false);
+    }
+
+    // helper to parse an item at offset
+    function parseItemAt(itemOffset) {
+      if (itemOffset <= 0 || itemOffset + 1 >= fileLen) return null;
+      const header = dv.getUint8(itemOffset);
+      const type = header >> 5;
+      const nameLen = (header & 0x1F) + 1;
+      if (itemOffset + 1 + nameLen > fileLen) return null;
+      const name = readAscii(dv, itemOffset + 1, nameLen);
+      const dataStart = itemOffset + 1 + nameLen;
+      // handle BIGARRAY
+      if (type === 1) {
+        if (dataStart + 2 > fileLen) return null;
+        const lenMinusOne = dv.getUint16(dataStart, false);
+        const arrLen = lenMinusOne + 1;
+        const arrStart = dataStart + 2;
+        if (arrStart + arrLen > fileLen) return null;
+        return { itemOffset, type, nameLen, name, dataStart, arrStart, arrLen };
+      } else if (type === 2) {
+        if (dataStart + 1 > fileLen) return null;
+        const lenMinusOne = dv.getUint8(dataStart);
+        const arrLen = lenMinusOne + 1;
+        const arrStart = dataStart + 1;
+        if (arrStart + arrLen > fileLen) return null;
+        return { itemOffset, type, nameLen, name, dataStart, arrStart, arrLen };
+      } else {
+        // other basic types
+        const sizeMap = {3:1, 4:2, 5:4, 6:8, 7:1};
+        const s = sizeMap[type] || 0;
+        if (dataStart + s > fileLen) return null;
+        return { itemOffset, type, nameLen, name, dataStart, arrStart: dataStart, arrLen: s };
+      }
+    }
+
+    // 1) try scanning offsets[] for IPL.SADR
+    for (let i=0;i<offsets.length;i++) {
+      const off = offsets[i];
+      if (!off) continue;
+      const it = parseItemAt(off);
+      if (it && it.name === 'IPL.SADR') {
+        it.offsetsIndex = i; // optional info
+        found = it; break;
+      }
+    }
+
+    // 2) try lookup table near end (robust attempt)
+    if (!found) {
+      const lookupStart = fileLen - 4 - (EXPECTED_LOOKUP_SLOTS * SLOT_SIZE);
+      if (lookupStart > 0) {
+        try {
+          for (let i=0;i<EXPECTED_LOOKUP_SLOTS;i++) {
+            const v = dv.getUint16(lookupStart + i*SLOT_SIZE, false);
+            if (v === 0) continue;
+            // try interpret as 1) index into offsets list (1-based?) and 2) direct offset
+            // we'll attempt both
+            // A: index interpretation (1-based or 0-based ambiguity)
+            const candidates = [];
+            // try as 1-based index
+            if (v >= 1 && v <= offsets.length) candidates.push(offsets[v-1]);
+            // try as 0-based index
+            if (v >= 0 && v < offsets.length) candidates.push(offsets[v]);
+            // try as direct offset
+            if (v < fileLen) candidates.push(v);
+            for (const cand of candidates) {
+              if (!cand) continue;
+              const it = parseItemAt(cand);
+              if (it && it.name === 'IPL.SADR') { found = it; break; }
+            }
+            if (found) break;
+          }
+        } catch (e) { console.warn('lookup parse error', e); }
+      }
+    }
+
+    if (!found) throw new Error('IPL.SADR not found in SYSCONF');
+
+    // return rich info
+    return { fileName, fileLen, N, offsets, found };
+  }
+
+  // --- Functions to read/write IPL.SADR fields ---
+  function readIPLSADR(found) {
+    // we expect a BIGARRAY; arrStart and arrLen point to the raw blob (arrStart points to payload start)
+    const arrStart = found.arrStart;
+    const arrLen = found.arrLen;
+    const u8 = new Uint8Array(fileBuf, arrStart, arrLen);
+    // first two bytes of the bigarray data are lengthMinusOne (we already read arrLen via container; still read from blob for diagnostic)
+    const bDv = new DataView(fileBuf, arrStart - 2, arrLen + 2);
+    const lengthMinusOne = bDv.getUint16(0, false);
+    const blobLen = lengthMinusOne + 1;
+
+    // fields at fixed offsets if large enough
+    const canDecodeNames = (blobLen >= 0x100A);
+
+    // Note: arrStart points at blob payload start (country at arrStart)
+    const country = bDv.getUint8(2); // arrStart
+    const region = bDv.getUint8(3);  // arrStart+1
+    const city = bDv.getUint16(4, false); // arrStart+2
+
+    const countryNames = [];
+    const regionNames = [];
+
+    if (canDecodeNames) {
+      // country names start at offset 6, each 0x80 bytes, 16 entries
+      let base = 6;
+      for (let i=0;i<16;i++) {
+        const slice = new Uint8Array(fileBuf, arrStart + base + i*0x80, 0x80);
+        countryNames.push(decodeUTF16BE(slice));
+      }
+      const regionBase = 6 + (16 * 0x80);
+      for (let i=0;i<16;i++) {
+        const slice = new Uint8Array(fileBuf, arrStart + regionBase + i*0x80, 0x80);
+        regionNames.push(decodeUTF16BE(slice));
+      }
+      // lat/lon at 0x1006 and 0x1008 relative to arrStart
+      const lat = bDv.getInt16(0x1006, false);
+      const lon = bDv.getInt16(0x1008, false);
+      return { arrStart, arrLen, blobLen, country, region, city, countryNames, regionNames, lat, lon };
+    } else {
+      // fallback: try to extract as much as possible
+      const available = arrLen;
+      // compute how many full 0x80 slots we have after offset 6
+      const base = 6;
+      const remaining = Math.max(0, available - base);
+      const fullSlots = Math.floor(remaining / 0x80);
+      for (let i=0;i<Math.min(fullSlots,16);i++) {
+        const len = Math.min(0x80, available - (base + i*0x80));
+        if (len <= 0) break;
+        const slice = new Uint8Array(fileBuf, arrStart + base + i*0x80, len);
+        countryNames.push(decodeUTF16BE(slice));
+      }
+      // region names may follow if we have enough
+      const regionBase = base + fullSlots*0x80;
+      const regionAvailable = Math.max(0, available - (regionBase - base));
+      const regionSlots = Math.floor(regionAvailable / 0x80);
+      for (let i=0;i<Math.min(regionSlots,16);i++) {
+        const len = Math.min(0x80, available - ((regionBase - base) + i*0x80));
+        if (len <= 0) break;
+        const slice = new Uint8Array(fileBuf, arrStart + (regionBase - base) + i*0x80, len);
+        regionNames.push(decodeUTF16BE(slice));
+      }
+      // lat/lon fallback: last 4 bytes of blob if possible
+      let lat = null, lon = null;
+      if (available >= 4) {
+        const last = arrStart + available - 4;
+        lat = (new DataView(fileBuf)).getInt16(last, false);
+        lon = (new DataView(fileBuf)).getInt16(last + 2, false);
+      }
+      return { arrStart, arrLen, blobLen, country, region, city, countryNames, regionNames, lat, lon };
+    }
+  }
+
+  function writeLatLonToFile(found, latStored, lonStored) {
+    const arrStart = found.arrStart;
+    const dv2 = new DataView(fileBuf);
+    const offLat = arrStart + 0x1006;
+    const offLon = arrStart + 0x1008;
+    if (offLat + 2 > fileBuf.byteLength || offLon + 2 > fileBuf.byteLength) {
+      throw new Error('Not enough room in IPL.SADR blob to write lat/lon at expected offsets');
+    }
+    dv2.setInt16(offLat, latStored, false);
+    dv2.setInt16(offLon, lonStored, false);
+  }
+
+  function writeNameSlot(found, slotIndex, isCountry, newText) {
+    const arrStart = found.arrStart;
+    const slotSize = 0x80;
+    const base = 6 + (isCountry ? 0 : (16 * slotSize));
+    const start = arrStart + base + slotIndex * slotSize;
+    if (start + slotSize > fileBuf.byteLength) throw new Error('Not enough space to write name slot');
+    const enc = encodeUTF16BE(newText, slotSize);
+    const u8 = new Uint8Array(fileBuf, start, slotSize);
+    u8.set(enc);
+  }
+
+  function writeCodesToFile(found, country, region, city) {
+    const arrStart = found.arrStart;
+    const dv2 = new DataView(fileBuf);
+    const offCountry = arrStart + 0; // country at payload start
+    const offRegion = arrStart + 1;
+    const offCity = arrStart + 2; // u16 BE
+    if (offCity + 2 > fileBuf.byteLength) throw new Error('Not enough room in IPL.SADR blob to write city code');
+    dv2.setUint8(offCountry, country);
+    dv2.setUint8(offRegion, region);
+    dv2.setUint16(offCity, city, false);
+  }
+
+  function updateHexViewAround(arrStart, arrLen) {
+    const start = Math.max(0, arrStart - 32);
+    const end = Math.min(fileBuf.byteLength, arrStart + Math.min(arrLen, 0x1020) + 32);
+    const slice = new Uint8Array(fileBuf, start, end - start);
+    document.getElementById('hexView').textContent = `arrStart = 0x${arrStart.toString(16)}
+
+` + toHex(slice, 16);
+  }
+
+  // --- UI wiring ---
+  const fileInput = document.getElementById('file');
+  const parseBtn = document.getElementById('parseBtn');
+  const status = document.getElementById('status');
+  const summary = document.getElementById('summary');
+  const editor = document.getElementById('editor');
+  const countryCodeEl = document.getElementById('countryCode');
+  const regionCodeEl = document.getElementById('regionCode');
+  const cityCodeEl = document.getElementById('cityCode');
+  const cityCodeHex = document.getElementById('cityCodeHex');
+  const latDegEl = document.getElementById('latDeg');
+  const lonDegEl = document.getElementById('lonDeg');
+  const storedPair = document.getElementById('storedPair');
+  const applyCoords = document.getElementById('applyCoords');
+  const revertCoords = document.getElementById('revertCoords');
+  const applyCodesBtn = document.getElementById('applyCodesBtn');
+  const revertCodesBtn = document.getElementById('revertCodesBtn');
+  const countryNamesDiv = document.getElementById('countryNames');
+  const regionNamesDiv = document.getElementById('regionNames');
+  const applyNamesBtn = document.getElementById('applyNames');
+  const refreshNamesBtn = document.getElementById('refreshNames');
+  const hexView = document.getElementById('hexView');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let parseResult = null;
+  let ipls = null;
+  let currentFileName = null;
+
+  parseBtn.addEventListener('click', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) { alert('Please choose a SYSCONF file first'); return; }
+    currentFileName = f.name;
+    const ab = await f.arrayBuffer();
+    try {
+      parseResult = parseSYSCONF(ab, f.name);
+      ipls = readIPLSADR(parseResult.found);
+      fileBuf = ab; dv = new DataView(fileBuf); // update global
+      status.textContent = `Parsed OK: found IPL.SADR at byte offset 0x${parseResult.found.itemOffset.toString(16)}`;
+      summary.textContent = `File: ${parseResult.fileName} — size ${parseResult.fileLen} bytes`;
+      downloadBtn.disabled = false;
+      editor.style.display = 'block';
+      // populate UI
+      countryCodeEl.value = ipls.country;
+      regionCodeEl.value = ipls.region;
+      cityCodeEl.value = ipls.city;
+      cityCodeHex.value = '0x' + ipls.city.toString(16).padStart(4,'0');
+      if (ipls.lat !== null && ipls.lon !== null) {
+        latDegEl.value = storedToDegrees(ipls.lat).toFixed(6);
+        lonDegEl.value = storedToDegrees(ipls.lon).toFixed(6);
+        storedPair.textContent = `${ipls.lat} / ${ipls.lon}`;
+      } else {
+        latDegEl.value = '';
+        lonDegEl.value = '';
+        storedPair.textContent = 'N/A';
+      }
+
+      // names
+      countryNamesDiv.innerHTML = '';
+      for (let i=0;i<16;i++) {
+        const ta = document.createElement('textarea');
+        ta.dataset.idx = i;
+        ta.value = ipls.countryNames[i] || '';
+        const label = document.createElement('div');
+        label.textContent = `${i}:`;
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(label);
+        wrapper.appendChild(ta);
+        countryNamesDiv.appendChild(wrapper);
+      }
+      regionNamesDiv.innerHTML = '';
+      for (let i=0;i<16;i++) {
+        const ta = document.createElement('textarea');
+        ta.dataset.idx = i;
+        ta.value = ipls.regionNames[i] || '';
+        const label = document.createElement('div');
+        label.textContent = `${i}:`;
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(label);
+        wrapper.appendChild(ta);
+        regionNamesDiv.appendChild(wrapper);
+      }
+
+      // hex view around arrStart
+      updateHexViewAround(ipls.arrStart, ipls.arrLen);
+
+    } catch (e) {
+      console.error(e);
+      alert('Error parsing SYSCONF: ' + e.message);
+      status.textContent = 'Parse failed: ' + e.message;
+    }
+  });
+
+  applyCoords.addEventListener('click', () => {
+    if (!parseResult || !ipls) return alert('No parsed data');
+    let latDeg = parseFloat(latDegEl.value);
+    let lonDeg = parseFloat(lonDegEl.value);
+    if (Number.isNaN(latDeg) || Number.isNaN(lonDeg)) return alert('Enter valid decimal degrees');
+    // clamp to [-180,180]
+    if (latDeg < -180 || latDeg > 180 || lonDeg < -180 || lonDeg > 180) {
+      if (!confirm('Coordinates outside -180..180. Continue?')) return;
+    }
+    const latStored = degreesToStored(latDeg);
+    const lonStored = degreesToStored(lonDeg);
+    // clamp to signed 16 range
+    const clamp = (v) => Math.max(-32768, Math.min(32767, v));
+    const latCl = clamp(latStored); const lonCl = clamp(lonStored);
+    try {
+      writeLatLonToFile(parseResult.found, latCl, lonCl);
+      storedPair.textContent = `${latCl} / ${lonCl}`;
+      updateHexViewAround(parseResult.found.arrStart, parseResult.found.arrLen);
+      alert('Coordinates written into file buffer. Click Download to save modified SYSCONF.');
+    } catch (e) { alert('Write failed: ' + e.message); }
+  });
+
+  revertCoords.addEventListener('click', () => {
+    if (!parseResult || !ipls) return;
+    if (ipls.lat === null) return alert('No lat/lon present in the parsed blob');
+    latDegEl.value = storedToDegrees(ipls.lat).toFixed(6);
+    lonDegEl.value = storedToDegrees(ipls.lon).toFixed(6);
+    storedPair.textContent = `${ipls.lat} / ${ipls.lon}`;
+  });
+
+  applyCodesBtn.addEventListener('click', () => {
+    if (!parseResult || !ipls) return alert('No parsed data');
+    const country = parseInt(countryCodeEl.value, 10);
+    const region = parseInt(regionCodeEl.value, 10);
+    const city = parseInt(cityCodeEl.value, 10);
+    if (Number.isNaN(country) || country < 0 || country > 255) return alert('Country code must be 0..255');
+    if (Number.isNaN(region) || region < 0 || region > 255) return alert('Region code must be 0..255');
+    if (Number.isNaN(city) || city < 0 || city > 65535) return alert('City code must be 0..65535');
+    try {
+      writeCodesToFile(parseResult.found, country, region, city);
+      // update local ipls snapshot
+      ipls.country = country; ipls.region = region; ipls.city = city;
+      cityCodeHex.value = '0x' + city.toString(16).padStart(4,'0');
+      updateHexViewAround(parseResult.found.arrStart, parseResult.found.arrLen);
+      alert('Country/Region/City codes written into file buffer. Click Download to save modified SYSCONF.');
+    } catch (e) { alert('Write failed: ' + e.message); }
+  });
+
+  revertCodesBtn.addEventListener('click', () => {
+    if (!parseResult || !ipls) return;
+    countryCodeEl.value = ipls.country;
+    regionCodeEl.value = ipls.region;
+    cityCodeEl.value = ipls.city;
+    cityCodeHex.value = '0x' + (ipls.city || 0).toString(16).padStart(4,'0');
+  });
+
+  cityCodeEl.addEventListener('input', () => {
+    const v = parseInt(cityCodeEl.value, 10);
+    if (!Number.isNaN(v)) cityCodeHex.value = '0x' + (v & 0xFFFF).toString(16).padStart(4,'0');
+    else cityCodeHex.value = '';
+  });
+
+  applyNamesBtn.addEventListener('click', () => {
+    if (!parseResult || !ipls) return;
+    // country names
+    const countryTAs = countryNamesDiv.querySelectorAll('textarea');
+    for (const ta of countryTAs) {
+      const idx = parseInt(ta.dataset.idx, 10);
+      const txt = ta.value;
+      try { writeNameSlot(parseResult.found, idx, true, txt); } catch(e) { alert('Write error: ' + e.message); return; }
+    }
+    const regionTAs = regionNamesDiv.querySelectorAll('textarea');
+    for (const ta of regionTAs) {
+      const idx = parseInt(ta.dataset.idx, 10);
+      const txt = ta.value;
+      try { writeNameSlot(parseResult.found, idx, false, txt); } catch(e) { alert('Write error: ' + e.message); return; }
+    }
+    updateHexViewAround(parseResult.found.arrStart, parseResult.found.arrLen);
+    alert('Names written into file buffer. Click Download to save modified SYSCONF.');
+  });
+
+  refreshNamesBtn.addEventListener('click', () => {
+    if (!parseResult || !ipls) return;
+    try {
+      ipls = readIPLSADR(parseResult.found);
+      // update textareas
+      const countryTAs = countryNamesDiv.querySelectorAll('textarea');
+      for (const ta of countryTAs) {
+        const idx = parseInt(ta.dataset.idx, 10);
+        ta.value = ipls.countryNames[idx] || '';
+      }
+      const regionTAs = regionNamesDiv.querySelectorAll('textarea');
+      for (const ta of regionTAs) {
+        const idx = parseInt(ta.dataset.idx, 10);
+        ta.value = ipls.regionNames[idx] || '';
+      }
+      alert('Reloaded names from modified buffer');
+    } catch (e) { alert('Reload failed: ' + e.message); }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if (!fileBuf) return;
+    const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentFileName ? (currentFileName.replace(/\.[^.]+$/, '') + '-modified' + (currentFileName.match(/\.[^.]+$/) || ['.bin'])[0]) : 'SYSCONF-mod.bin';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // convenience: update stored display when degrees edited
+  latDegEl.addEventListener('input', () => {
+    const lat = parseFloat(latDegEl.value);
+    const lon = parseFloat(lonDegEl.value);
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      const latS = degreesToStored(lat); const lonS = degreesToStored(lon);
+      storedPair.textContent = `${latS} / ${lonS}`;
+    }
+  });
+  lonDegEl.addEventListener('input', () => {
+    const lat = parseFloat(latDegEl.value);
+    const lon = parseFloat(lonDegEl.value);
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      const latS = degreesToStored(lat); const lonS = degreesToStored(lon);
+      storedPair.textContent = `${latS} / ${lonS}`;
+    }
+  });
+
+  </script>
+
+  <!-- SheetJS for .xlsx parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+  (function(){
+    // Utility: find a column by a set of candidate names (case/space insensitive)
+    function pickKey(row, candidates) {
+      const keys = Object.keys(row);
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'').trim();
+      const want = candidates.map(norm);
+      for (const k of keys) {
+        const nk = norm(k);
+        if (want.includes(nk)) return k;
+      }
+      return null;
+    }
+    function clampByte(n) { n = Number(n); if (!Number.isFinite(n)) return null; n = Math.floor(n); return Math.min(255, Math.max(0, n)); }
+    function clampDeg(n) { n = Number(n); if (!Number.isFinite(n)) return null; return Math.max(-180, Math.min(180, n)); }
+
+    function ensureExcelCard() {
+      const editor = document.getElementById('editor');
+      if (!editor) return;
+      // Create card
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.id = 'excelPresetCard';
+      card.innerHTML = `
+        <h3>Preset regions (auto-loaded)</h3>
+        <div class="small muted" style="margin-bottom:8px">
+          This dropdown auto-loads from <code>region.xlsx</code> (same folder). You can override with <code>?xlsx=&lt;url&gt;</code>.
+          <span id="xlsxStatus" style="margin-left:8px"></span>
+        </div>
+        <div class="row">
+          <label for="presetFilter">Filter</label>
+          <input id="presetFilter" type="text" placeholder="Type to filter by country/area/coords">
+        </div>
+        <div class="row">
+          <label for="presetSelect">Regions</label>
+          <select id="presetSelect" size="10" style="width:100%"></select>
+        </div>
+        <div class="controls" style="margin-top:8px; display:flex; gap:8px; align-items:center">
+          <button id="applyPresetBtn" class="primary">Apply selection to 4 fields</button>
+          <button id="reloadXlsxBtn">Reload list</button>
+          <div style="flex:1"></div>
+          <label class="small"><input type="checkbox" id="autoApplyChk" checked> Auto-apply on selection</label>
+        </div>
+      `;
+      // Insert at top of #editor
+      editor.insertBefore(card, editor.firstElementChild || null);
+    }
+
+    // Reads region.xlsx from same origin (or ?xlsx=...), fills dropdown, wires events
+    async function loadXlsxAndPopulate() {
+      const status = document.getElementById('xlsxStatus');
+      const sel = document.getElementById('presetSelect');
+      const filter = document.getElementById('presetFilter');
+      const applyBtn = document.getElementById('applyPresetBtn');
+      const reloadBtn = document.getElementById('reloadXlsxBtn');
+      const autoApply = document.getElementById('autoApplyChk');
+      if (!status || !sel) return;
+
+      const params = new URLSearchParams(location.search);
+      const url = params.get('xlsx') || './region.xlsx';
+
+      sel.disabled = true;
+      applyBtn.disabled = true;
+      status.textContent = 'Loading ' + url + ' …';
+
+      try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const buf = await resp.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) throw new Error('No sheets');
+        const ws = wb.Sheets[sheetName];
+
+        // Convert to JSON rows; defval keeps empty cells as null
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+        // Build dataset with resilient column mapping
+        const items = [];
+        for (const row of rows) {
+          // Try to pick likely columns (multiple aliases)
+          const keyCountryCode = pickKey(row, ['Region ID','Country ID','Country Code','CountryCode','Country Byte','RegionID','CountryByte']);
+          const keyCountryName = pickKey(row, ['Region name (English)','Country','Country Name','Region Name','Region (English)']);
+          const keyRegionCode  = pickKey(row, ['Subregion ID','Region code','RegionCode','Area ID','Area Code','SubregionID']);
+          const keyRegionName  = pickKey(row, ['English name','Area','Area Name','Region','Subregion Name','Area (English)']);
+          const keyLat         = pickKey(row, ['Latitude','Lat','LAT']);
+          const keyLon         = pickKey(row, ['Longitude','Lon','LON','Long']);
+
+          let cCode = keyCountryCode ? row[keyCountryCode] : null;
+          let rCode = keyRegionCode ? row[keyRegionCode] : null;
+          let lat   = keyLat ? row[keyLat] : null;
+          let lon   = keyLon ? row[keyLon] : null;
+
+          // Skip entries without essential numeric fields
+          cCode = clampByte(cCode);
+          rCode = clampByte(rCode);
+          lat   = clampDeg(lat);
+          lon   = clampDeg(lon);
+          if (cCode === null || rCode === null || lat === null || lon === null) continue;
+
+          const cName = keyCountryName ? row[keyCountryName] : '';
+          const rName = keyRegionName ? row[keyRegionName] : '';
+          const label = `${(cName||'CC'+cCode)} › ${(rName||'RG'+rCode)} — ${lat}, ${lon}`;
+          items.push({ label, cCode, rCode, lat, lon, cName, rName });
+        }
+
+        // Populate select
+        sel.innerHTML = '';
+        for (let i=0;i<items.length;i++) {
+          const it = items[i];
+          const opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = it.label;
+          sel.appendChild(opt);
+        }
+        status.textContent = `Loaded ${items.length} rows from “${sheetName}”.`;
+        sel.disabled = items.length === 0;
+        applyBtn.disabled = items.length === 0;
+
+        function applyFromSelection() {
+          const idx = Number(sel.value);
+          if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) return;
+          const it = items[idx];
+          // Wire to existing inputs
+          const cc = document.getElementById('countryCode');
+          const rc = document.getElementById('regionCode');
+          const la = document.getElementById('latDeg');
+          const lo = document.getElementById('lonDeg');
+          if (!cc || !rc || !la || !lo) return;
+          cc.value = String(it.cCode);
+          rc.value = String(it.rCode);
+          la.value = String(it.lat);
+          lo.value = String(it.lon);
+          // Give users a hint something changed
+          cc.dispatchEvent(new Event('input'));
+          rc.dispatchEvent(new Event('input'));
+          la.dispatchEvent(new Event('input'));
+          lo.dispatchEvent(new Event('input'));
+        }
+
+        sel.addEventListener('change', () => {
+          if (autoApply && autoApply.checked) applyFromSelection();
+        });
+        applyBtn.addEventListener('click', applyFromSelection);
+        reloadBtn.addEventListener('click', loadXlsxAndPopulate);
+
+        // Filter logic
+        function refilter() {
+          const q = (filter.value || '').toLowerCase().trim();
+          sel.innerHTML = '';
+          for (let i=0;i<items.length;i++) {
+            const it = items[i];
+            if (q && !it.label.toLowerCase().includes(q)) continue;
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = it.label;
+            sel.appendChild(opt);
+          }
+          // auto-select first option after filtering
+          if (sel.options.length > 0) {
+            sel.selectedIndex = 0;
+            if (autoApply && autoApply.checked) {
+              sel.dispatchEvent(new Event('change'));
+            }
+          }
+          applyBtn.disabled = sel.options.length === 0;
+        }
+        filter.addEventListener('input', refilter);
+        refilter();
+      } catch (err) {
+        status.textContent = 'Failed to load: ' + (err && err.message ? err.message : err);
+        console.error(err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      ensureExcelCard();
+      // Delay a tick to ensure base UI is present
+      setTimeout(loadXlsxAndPopulate, 0);
+    });
+  })();
+  </script>
+
+</body>
+</html>
