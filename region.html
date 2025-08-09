@@ -606,7 +606,51 @@
 
   downloadBtn.addEventListener('click', () => {
     if (!fileBuf) return;
-    const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
+    
+    // Auto-apply codes & coordinates before saving (direct, no synthetic clicks)
+    if (parseResult && ipls) {
+      let abortDownload = false;
+
+      // Apply codes (validations preserved)
+      (function(){
+        const country = parseInt(countryCodeEl.value, 10);
+        const region  = parseInt(regionCodeEl.value, 10);
+        const city    = parseInt(cityCodeEl.value, 10);
+        if (Number.isNaN(country) || country < 0 || country > 255) { alert('Country code must be 0..255'); abortDownload = true; return; }
+        if (Number.isNaN(region)  || region  < 0 || region  > 255) { alert('Region code must be 0..255');  abortDownload = true; return; }
+        if (Number.isNaN(city)    || city    < 0 || city    > 65535) { alert('City code must be 0..65535'); abortDownload = true; return; }
+        try {
+          writeCodesToFile(parseResult.found, country, region, city);
+          // mirror original UI updates
+          ipls.country = country; ipls.region = region; ipls.city = city;
+          cityCodeHex.value = '0x' + city.toString(16).padStart(4,'0');
+          updateHexViewAround(parseResult.found.arrStart, parseResult.found.arrLen);
+        } catch (e) { alert('Write failed (codes): ' + e.message); abortDownload = true; return; }
+      })();
+
+      // Apply coordinates (validations preserved)
+      (function(){
+        let latDeg = parseFloat(latDegEl.value);
+        let lonDeg = parseFloat(lonDegEl.value);
+        if (Number.isNaN(latDeg) || Number.isNaN(lonDeg)) { alert('Enter valid decimal degrees'); abortDownload = true; return; }
+        // clamp prompt as in original
+        if (latDeg < -180 || latDeg > 180 || lonDeg < -180 || lonDeg > 180) {
+          if (!confirm('Coordinates outside -180..180. Continue?')) { abortDownload = true; return; }
+        }
+        const latStored = degreesToStored(latDeg);
+        const lonStored = degreesToStored(lonDeg);
+        const clamp = (v) => Math.max(-32768, Math.min(32767, v));
+        const latCl = clamp(latStored); const lonCl = clamp(lonStored);
+        try {
+          writeLatLonToFile(parseResult.found, latCl, lonCl);
+          storedPair.textContent = `${latCl} / ${lonCl}`;
+          updateHexViewAround(parseResult.found.arrStart, parseResult.found.arrLen);
+        } catch (e) { alert('Write failed (coords): ' + e.message); abortDownload = true; return; }
+      })();
+
+      if (abortDownload) return;
+    }
+const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
