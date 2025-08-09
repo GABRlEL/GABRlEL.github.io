@@ -27,6 +27,9 @@
 </head>
 <body>
   <h1>Can't put down the CONF — <small class="small">a Wii SYSCONF IPL.SADR editor, sponsored by ChatGPT 5 Thinking</small></h1>
+ <div class="notice small">Note: Please always backup your original <code>SYSCONF</code> file. Modifying the <code>SYSCONF</code> file on real hardware is highly risky, if you do so, <b>please proceed with caution.</b></div>
+
+
   <div class="card">
     <div class="row">
       <label for="file">Load SYSCONF file (found in <code>(Dolphin Emulator\Wii\)shared2\sys\SYSCONF</code>)</label>
@@ -96,7 +99,7 @@
 
     <div class="card">
       <h3>Country / Region names (editable)</h3>
-      <div class="notice small">Each name slot is fixed 0x80 bytes (UTF-16BE). Editing will be padded/truncated to fit. <b>This feature is untested & changes here don't get applied automatically on download. Instead they have to be applied with the Write button below.</b></div>
+      <div class="notice small">Note: Each name slot is fixed 0x80 bytes (UTF-16BE). Editing will be padded/truncated to fit. <b>This feature is untested & changes here don't get applied automatically on download. Instead they have to be applied with the Write button below.</b></div>
       <div style="margin-top:8px; display:flex; gap:12px">
         <div style="flex:1">
           <h4 class="small">Country names (16)</h4>
