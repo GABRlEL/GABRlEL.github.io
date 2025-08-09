@@ -30,6 +30,7 @@
  <div class="notice small">Note: Please always backup your original <code>SYSCONF</code> file. Modifying the <code>SYSCONF</code> file on real hardware is highly risky, if you do so, <b>please proceed with caution.</b></div>
 
 
+
   <div class="card">
     <div class="row">
       <label for="file">Load SYSCONF file (found in <code>(Dolphin Emulator\Wii\)shared2\sys\SYSCONF</code>)</label>
@@ -125,6 +126,8 @@
     </div>
 </details>
   </div>
+      <div class="small muted">Powered by <a href=https://git.sheetjs.com/sheetjs/sheetjs>SheetJS</a></div>
+
 
   <script>
   // --- Helper primitives ---
@@ -728,7 +731,7 @@ const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
       card.innerHTML = `
         <h3>Preset regions (auto-loaded)</h3>
         <div class="small muted" style="margin-bottom:8px">
-          This dropdown auto-loads from <code>region.xlsx</code> (credits to Atlas).
+          This dropdown auto-loads from <code>region.xlsx</code> (credits to <a href=https://wiki.tockdom.com/wiki/User:Atlas>Atlas</a>).
           <span id="xlsxStatus" style="margin-left:8px"></span>
         </div>
         <div class="row">
