@@ -605,9 +605,7 @@
   });
 
   downloadBtn.addEventListener('click', () => {
-        try { if (applyCodesBtn) applyCodesBtn.click(); } catch(e) {}
-    try { if (applyCoords) applyCoords.click(); } catch(e) {}
-if (!fileBuf) return;
+    if (!fileBuf) return;
     const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
