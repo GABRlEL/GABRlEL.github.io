@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Wii SYSCONF — IPL.SADR Editor</title>
+  <title>Can't put down the CONF</title>
   <style>
     body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial; margin: 18px; background:#f7f9fb; color:#111 }
     h1 { margin-top:0 }
@@ -26,15 +26,16 @@
   </style>
 </head>
 <body>
-  <h1>Wii SYSCONF — <small class="small">IPL.SADR editor (browser)</small></h1>
+  <h1>Can't put down the CONF — <small class="small">a Wii SYSCONF IPL.SADR editor, sponsored by ChatGPT 5 Thinking</small></h1>
   <div class="card">
     <div class="row">
-      <label for="file">Load SYSCONF file (usually <code>/shared2/sys/SYSCONF</code>)</label>
+      <label for="file">Load SYSCONF file (found in <code>(Dolphin Emulator\Wii\)shared2\sys\SYSCONF</code>)</label>
+      <span class="small">The Dolphin Emulator folder can be found in either Documents, %appdata% or in the User folder of your Dolphin install when using portable.</span><br>
       <input id="file" type="file" accept="*/*"> 
     </div>
     <div class="row controls">
-      <button id="parseBtn" class="primary">Parse</button>
-      <button id="downloadBtn" disabled>Download modified SYSCONF</button>
+      <button id="parseBtn" class="primary">Load SYSCONF</button>
+      <button id="downloadBtn" disabled>Apply & Download modified SYSCONF</button>
       <span id="status" class="muted">No file loaded.</span>
     </div>
     <div id="summary" class="muted" style="margin-top:10px"></div>
@@ -95,7 +96,7 @@
 
     <div class="card">
       <h3>Country / Region names (editable)</h3>
-      <div class="notice small">Each name slot is fixed 0x80 bytes (UTF-16BE). Editing will be padded/truncated to fit.</div>
+      <div class="notice small">Each name slot is fixed 0x80 bytes (UTF-16BE). Editing will be padded/truncated to fit. <b>This feature is untested & changes here don't get applied automatically on download. Instead they have to be applied with the Write button below.</b></div>
       <div style="margin-top:8px; display:flex; gap:12px">
         <div style="flex:1">
           <h4 class="small">Country names (16)</h4>
@@ -656,7 +657,7 @@ const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = currentFileName ? (currentFileName.replace(/\.[^.]+$/, '') + '-modified' + (currentFileName.match(/\.[^.]+$/) || ['.bin'])[0]) : 'SYSCONF-mod.bin';
+    a.download = 'SYSCONF';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -724,7 +725,7 @@ const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
       card.innerHTML = `
         <h3>Preset regions (auto-loaded)</h3>
         <div class="small muted" style="margin-bottom:8px">
-          This dropdown auto-loads from <code>region.xlsx</code> (same folder). You can override with <code>?xlsx=&lt;url&gt;</code>.
+          This dropdown auto-loads from <code>region.xlsx</code> (credits to Atlas).
           <span id="xlsxStatus" style="margin-left:8px"></span>
         </div>
         <div class="row">
