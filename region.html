@@ -765,8 +765,8 @@
           if (cCode === null || rCode === null || lat === null || lon === null) continue;
 
           // Update last-seen country when present on this row
-          if (!isBlank(row[keyCountryCode] if keyCountryCode else null)) lastCCode = cCode;
-          if (!isBlank(row[keyCountryName] if keyCountryName else null)) lastCName = String(rawCName || '');
+          if (keyCountryCode && !isBlank(row[keyCountryCode])) lastCCode = cCode;
+          if (keyCountryName && !isBlank(row[keyCountryName])) lastCName = String(rawCName || '');
 
           const cName = String(rawCName || '');
           const label = `${(cName||('CC'+cCode))} › ${(rName||('RG'+rCode))} — ${lat}, ${lon}`;
