@@ -637,6 +637,7 @@
 
   </script>
 
+  
   <!-- SheetJS for .xlsx parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
@@ -652,22 +653,218 @@
       }
       return null;
     }
-    function clampByte(n) {
-      // Treat null/undefined/empty as missing (do NOT coerce to 0)
-      if (n === null || n === undefined) return null;
-      if (typeof n === 'string' && n.trim() === '') return null;
-      const num = Number(n);
-      if (!Number.isFinite(num)) return null;
-      const i = Math.floor(num);
-      return Math.min(255, Math.max(0, i));
+    function isBlank(v){ return v === null || v === undefined || (typeof v === 'string' && v.trim() === ''); }
+    function clampByte(n) { 
+      if (isBlank(n)) return null; 
+      const v = Number(n); 
+      if (!Number.isFinite(v)) return null; 
+      const iv = Math.floor(v); 
+      return Math.min(255, Math.max(0, iv)); 
     }
-    function clampDeg(n) {
-      if (n === null || n === undefined) return null;
-      if (typeof n === 'string' && n.trim() === '') return null;
-      const num = Number(n);
-      if (!Number.isFinite(num)) return null;
-      return Math.max(-180, Math.min(180, num));
+    function clampDeg(n) { 
+      if (isBlank(n)) return null; 
+      const v = Number(n); 
+      if (!Number.isFinite(v)) return null; 
+      return Math.max(-180, Math.min(180, v)); 
     }
+
+    function ensureExcelCard() {
+      const editor = document.getElementById('editor');
+      if (!editor) return;
+      // Create card
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.id = 'excelPresetCard';
+      card.innerHTML = `
+        <h3>Preset regions (auto-loaded)</h3>
+        <div class="small muted" style="margin-bottom:8px">
+          This dropdown auto-loads from <code>region.xlsx</code> (same folder). You can override with <code>?xlsx=&lt;url&gt;</code>.
+          <span id="xlsxStatus" style="margin-left:8px"></span>
+        </div>
+        <div class="row">
+          <label for="presetFilter">Filter</label>
+          <input id="presetFilter" type="text" placeholder="Type to filter by country/area/coords">
+        </div>
+        <div class="row">
+          <label for="presetSelect">Regions</label>
+          <select id="presetSelect" size="10" style="width:100%"></select>
+        </div>
+        <div class="controls" style="margin-top:8px; display:flex; gap:8px; align-items:center">
+          <button id="applyPresetBtn" class="primary">Apply selection to 4 fields</button>
+          <button id="reloadXlsxBtn">Reload list</button>
+          <div style="flex:1"></div>
+          <label class="small"><input type="checkbox" id="autoApplyChk" checked> Auto-apply on selection</label>
+        </div>
+      `;
+      // Insert at top of #editor
+      editor.insertBefore(card, editor.firstElementChild || null);
+    }
+
+    // Reads region.xlsx from same origin (or ?xlsx=...), fills dropdown, wires events
+    async function loadXlsxAndPopulate() {
+      const status = document.getElementById('xlsxStatus');
+      const sel = document.getElementById('presetSelect');
+      const filter = document.getElementById('presetFilter');
+      const applyBtn = document.getElementById('applyPresetBtn');
+      const reloadBtn = document.getElementById('reloadXlsxBtn');
+      const autoApply = document.getElementById('autoApplyChk');
+      if (!status || !sel) return;
+
+      const params = new URLSearchParams(location.search);
+      const url = params.get('xlsx') || './region.xlsx';
+
+      sel.disabled = true;
+      applyBtn.disabled = true;
+      status.textContent = 'Loading ' + url + ' …';
+
+      try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const buf = await resp.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) throw new Error('No sheets');
+        const ws = wb.Sheets[sheetName];
+
+        // Convert to JSON rows; defval keeps empty cells as null
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+
+        // Forward-fill country code/name for grouped rows (fixes CC0 labels)
+        let lastCCode = null, lastCName = '';
+
+        // Build dataset with resilient column mapping
+        const items = [];
+        for (const row of rows) {
+          // Try to pick likely columns (multiple aliases)
+          const keyCountryCode = pickKey(row, ['Region ID','Country ID','Country Code','CountryCode','Country Byte','RegionID','CountryByte']);
+          const keyCountryName = pickKey(row, ['Region name (English)','Country','Country Name','Region Name','Region (English)']);
+          const keyRegionCode  = pickKey(row, ['Subregion ID','Region code','RegionCode','Area ID','Area Code','SubregionID']);
+          const keyRegionName  = pickKey(row, ['English name','Area','Area Name','Region','Subregion Name','Area (English)']);
+          const keyLat         = pickKey(row, ['Latitude','Lat','LAT']);
+          const keyLon         = pickKey(row, ['Longitude','Lon','LON','Long']);
+
+          // Raw values from the row
+          let rawCCode = keyCountryCode ? row[keyCountryCode] : null;
+          let rawCName = keyCountryName ? row[keyCountryName] : null;
+          let rCode    = keyRegionCode ? row[keyRegionCode] : null;
+          let rName    = keyRegionName ? row[keyRegionName] : '';
+          let lat      = keyLat ? row[keyLat] : null;
+          let lon      = keyLon ? row[keyLon] : null;
+
+          // Forward-fill when blank
+          if (isBlank(rawCCode)) rawCCode = lastCCode;
+          if (isBlank(rawCName)) rawCName = lastCName;
+
+          // Clamp/validate
+          const cCode = clampByte(rawCCode);
+          rCode = clampByte(rCode);
+          lat   = clampDeg(lat);
+          lon   = clampDeg(lon);
+
+          // Skip entries without essential numeric fields
+          if (cCode === null || rCode === null || lat === null || lon === null) continue;
+
+          // Update last-seen country when present on this row
+          if (!isBlank(row[keyCountryCode] if keyCountryCode else null)) lastCCode = cCode;
+          if (!isBlank(row[keyCountryName] if keyCountryName else null)) lastCName = String(rawCName || '');
+
+          const cName = String(rawCName || '');
+          const label = `${(cName||('CC'+cCode))} › ${(rName||('RG'+rCode))} — ${lat}, ${lon}`;
+          items.push({ label, cCode, rCode, lat, lon, cName, rName });
+        }
+
+        // Populate select
+        sel.innerHTML = '';
+        for (let i=0;i<items.length;i++) {
+          const it = items[i];
+          const opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = it.label;
+          sel.appendChild(opt);
+        }
+        status.textContent = `Loaded ${items.length} rows from “${sheetName}”.`;
+        sel.disabled = items.length === 0;
+        applyBtn.disabled = items.length === 0;
+
+        function applyFromSelection() {
+          const idx = Number(sel.value);
+          if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) return;
+          const it = items[idx];
+          // Wire to existing inputs
+          const cc = document.getElementById('countryCode');
+          const rc = document.getElementById('regionCode');
+          const la = document.getElementById('latDeg');
+          const lo = document.getElementById('lonDeg');
+          if (!cc || !rc || !la || !lo) return;
+          cc.value = String(it.cCode);
+          rc.value = String(it.rCode);
+          la.value = String(it.lat);
+          lo.value = String(it.lon);
+          // Trigger change
+          cc.dispatchEvent(new Event('input'));
+          rc.dispatchEvent(new Event('input'));
+          la.dispatchEvent(new Event('input'));
+          lo.dispatchEvent(new Event('input'));
+        }
+
+        sel.addEventListener('change', () => {
+          if (autoApply && autoApply.checked) applyFromSelection();
+        });
+        applyBtn.addEventListener('click', applyFromSelection);
+        reloadBtn.addEventListener('click', loadXlsxAndPopulate);
+
+        // Filter logic
+        function refilter() {
+          const q = (filter.value || '').toLowerCase().trim();
+          sel.innerHTML = '';
+          for (let i=0;i<items.length;i++) {
+            const it = items[i];
+            if (q && !it.label.toLowerCase().includes(q)) continue;
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = it.label;
+            sel.appendChild(opt);
+          }
+          // auto-select first option after filtering
+          if (sel.options.length > 0) {
+            sel.selectedIndex = 0;
+            if (autoApply && autoApply.checked) {
+              sel.dispatchEvent(new Event('change'));
+            }
+          }
+          applyBtn.disabled = sel.options.length === 0;
+        }
+        filter.addEventListener('input', refilter);
+        refilter();
+      } catch (err) {
+        status.textContent = 'Failed to load: ' + (err && err.message ? err.message : err);
+        console.error(err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      ensureExcelCard();
+      // Delay a tick to ensure base UI is present
+      setTimeout(loadXlsxAndPopulate, 0);
+    });
+  })();
+  </script>
+
+  <script>
+  (function(){
+    // Utility: find a column by a set of candidate names (case/space insensitive)
+    function pickKey(row, candidates) {
+      const keys = Object.keys(row);
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'').trim();
+      const want = candidates.map(norm);
+      for (const k of keys) {
+        const nk = norm(k);
+        if (want.includes(nk)) return k;
+      }
+      return null;
+    }
+    function clampByte(n) { n = Number(n); if (!Number.isFinite(n)) return null; n = Math.floor(n); return Math.min(255, Math.max(0, n)); }
+    function clampDeg(n) { n = Number(n); if (!Number.isFinite(n)) return null; return Math.max(-180, Math.min(180, n)); }
 
     function ensureExcelCard() {
       const editor = document.getElementById('editor');
@@ -731,8 +928,6 @@
         const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
         // Build dataset with resilient column mapping
         const items = [];
-        let lastCCode = null;
-        let lastCName = '';
         for (const row of rows) {
           // Try to pick likely columns (multiple aliases)
           const keyCountryCode = pickKey(row, ['Region ID','Country ID','Country Code','CountryCode','Country Byte','RegionID','CountryByte']);
@@ -742,31 +937,21 @@
           const keyLat         = pickKey(row, ['Latitude','Lat','LAT']);
           const keyLon         = pickKey(row, ['Longitude','Lon','LON','Long']);
 
-          let rawCCode = keyCountryCode ? row[keyCountryCode] : null;
-          let cCode = clampByte(rawCCode);
-          let rCode = keyRegionCode ? clampByte(row[keyRegionCode]) : null;
-          let lat   = keyLat ? clampDeg(row[keyLat]) : null;
-          let lon   = keyLon ? clampDeg(row[keyLon]) : null;
+          let cCode = keyCountryCode ? row[keyCountryCode] : null;
+          let rCode = keyRegionCode ? row[keyRegionCode] : null;
+          let lat   = keyLat ? row[keyLat] : null;
+          let lon   = keyLon ? row[keyLon] : null;
 
-          // Forward-fill country code and name when cells are blank in subrows
-          let cName = keyCountryName ? row[keyCountryName] : '';
-          if (cCode === null && lastCCode !== null) cCode = lastCCode;
-          if (!cName || String(cName).trim() === '') cName = lastCName;
-
-          // Skip entries without essentials
+          // Skip entries without essential numeric fields
+          cCode = clampByte(cCode);
+          rCode = clampByte(rCode);
+          lat   = clampDeg(lat);
+          lon   = clampDeg(lon);
           if (cCode === null || rCode === null || lat === null || lon === null) continue;
 
-          // Persist forward-fill state for next rows
-          lastCCode = cCode;
-          lastCName = cName;
-
+          const cName = keyCountryName ? row[keyCountryName] : '';
           const rName = keyRegionName ? row[keyRegionName] : '';
-          const labelCountry = (cName && String(cName).trim() !== '') ? cName : ('CC' + cCode);
-          const labelRegion = (rName && String(rName).trim() !== '') ? rName : ('RG' + rCode);
-          const label = `${labelCountry} › ${labelRegion} — ${lat}, ${lon}`;
-          items.push({ label, cCode, rCode, lat, lon, cName, rName });
-        }
-    › ${(rName||'RG'+rCode)} — ${lat}, ${lon}`;
+          const label = `${(cName||'CC'+cCode)} › ${(rName||'RG'+rCode)} — ${lat}, ${lon}`;
           items.push({ label, cCode, rCode, lat, lon, cName, rName });
         }
 
