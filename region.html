@@ -374,8 +374,8 @@
   function writeLatLonToFile(found, latStored, lonStored) {
     const arrStart = found.arrStart;
     const dv2 = new DataView(fileBuf);
-    const offLat = arrStart + 0x1006;
-    const offLon = arrStart + 0x1008;
+    const offLat = arrStart + 0x1004;
+    const offLon = arrStart + 0x1006;
     if (offLat + 2 > fileBuf.byteLength || offLon + 2 > fileBuf.byteLength) {
       throw new Error('Not enough room in IPL.SADR blob to write lat/lon at expected offsets');
     }
