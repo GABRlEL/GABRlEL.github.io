@@ -7,3 +7,5 @@
 [Godviewer — rksys.dat Viewer (based on the private Godtool)](https://gabrlel.github.io/godviewer.html)
 
 [Lunacy in License Land – Duplicate Pseudo/Authentic Player ID Checker (rksys.dat version)](https://gabrlel.github.io/dupecheckfull.html)
+
+[Lunacy in License Land – Duplicate Pseudo/Authentic Player ID Checker (RKP version)](https://gabrlel.github.io/dupechecksingle.html)
