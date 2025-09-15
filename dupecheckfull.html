@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lunacy in License Land (rksys) – PID Duplicate Checker</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel:#121822; --muted:#8aa0b6; --text:#e6eef8; --accent:#4cc3ff; --warn:#ff6b6b;
+    --ok:#2ecc71; --border:#1b2430; --chip:#1a2533; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin:0; font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell,
+    Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--text); background: radial-gradient(1400px 1400px at 10% -10%, #152033 0%, #0b0f14 60%) fixed, #0b0f14;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: 1400px 1400px, auto;
+  }
+  header { padding: 20px 24px; position: sticky; top:0; background: linear-gradient(180deg, rgba(11,15,20,.95), rgba(11,15,20,.85)); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 3; }
+  h1 { margin: 0; font-weight: 700; letter-spacing: .3px; font-size: 18px; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  main { max-width: 1100px; margin: 24px auto; padding: 0 20px 40px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px; }
+  .card .hd { display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .card .hd h2 { margin:0; font-size: 14px; letter-spacing:.2px; }
+  .card .bd { padding: 14px 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .files { border: 1px dashed #29405c; background: #0e141e; padding: 14px; border-radius: 12px; }
+  input[type="file"] { color: var(--muted); }
+  button { appearance: none; border:1px solid var(--border); background: linear-gradient(180deg, #1a2533, #141c28); color: var(--text); padding: 10px 14px; border-radius: 10px; cursor: pointer; transition: transform .04s ease; font-weight:600; }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  .btn-quiet { background: #0f1622; }
+  .btn-warn { background: #2a0f14; border-color: #3a141c; color: #ffb4b4; }
+  .stat { display:inline-flex; gap:8px; align-items:center; padding:6px 10px; background: var(--chip); border:1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 12px; }
+  .grid { overflow: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { position: sticky; top: 0; background: #111824; z-index: 2; font-size:12px; color: #a0b5cc; text-transform: uppercase; letter-spacing: .06em; }
+  tr:hover td { background: #0e1622; }
+  .muted { color: var(--muted); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0e1622; font-size:12px; }
+  .warn { color: #ffc9c9; }
+  .ok { color: #a6f3c6; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  details > summary { cursor: pointer; }
+  .footer { color: var(--muted); font-size: 12px; padding: 14px 16px; border-top: 1px solid var(--border); background: #0f1520; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Lunacy in License Land – Duplicate Pseudo/Authentic Player ID Checker <span class="mono">(rksys.dat version)</span> </h1>
+    <div class="sub">Client-side. No dependencies. Reads multiple <span class="mono">rksys.dat</span> files and flags duplicate PID pairs across licenses & uploads. Sponsored by ChatGPT 5 Thinking.</div>
+  </header>
+  <main>
+    <div class="card">
+      <div class="hd"><h2>Upload save files</h2></div>
+      <div class="bd">
+        <div class="controls">
+          <label class="files">
+            <input id="fileInput" type="file" multiple accept=".dat,.bin,.sav,.rksys,.RKSYS" />
+          </label>
+          <button id="scanBtn">Scan for duplicates</button>
+          <button id="clearBtn" class="btn-quiet">Clear</button>
+          <span class="stat" id="fileCount">No files loaded</span>
+          <label class="stat"><input id="ignoreZeros" type="checkbox" checked> Ignore (0,0) pairs</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="dupesCard" style="display:none">
+      <div class="hd">
+        <h2>Duplicate PID pairs</h2>
+        <div class="row">
+          <span class="stat"><span id="dupeCount">0</span> groups</span>
+          <details><summary class="pill">How duplicates are defined</summary>
+            <div class="muted" style="margin-top:8px">A duplicate is when both the <em>Pseudo Player ID</em> and <em>Authentic Player ID</em> are exactly equal between two or more licenses. Single‑field matches are not reported.</div>
+          </details>
+        </div>
+      </div>
+      <div class="bd" id="dupesList"></div>
+      <div class="footer ok" id="noDupesMsg" style="display:none">No duplicate PID pairs found across the uploaded files. Nice!</div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none">
+      <div class="hd"><h2>Licenses parsed</h2><span class="stat"><span id="licenseCount">0</span> licenses</span></div>
+      <div class="bd grid">
+        <table id="licenseTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Upload</th>
+              <th>File</th>
+              <th>License</th>
+              <th>RKPD @</th>
+              <th>Pseudo Player ID</th>
+              <th>Authentic Player ID</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="footer">Numbers are parsed as big‑endian 32‑bit unsigned integers from each license's DWC block.</div>
+    </div>
+  </main>
+
+<script>
+(function(){
+  const LICENSE_OFFSETS = [0x08, 0x8CC8, 0x11988, 0x1A648];
+  const LICENSE_SIZE = 0x8CC0;
+  const DWC_OFFSET = 0x40;
+  const PSEUDO_PLAYER_ID_OFF = 0x0C;
+  const AUTH_PLAYER_ID_OFF   = 0x18;
+
+  function $(id){ return document.getElementById(id); }
+  const fileInput = $("fileInput");
+  const fileCount = $("fileCount");
+  const scanBtn = $("scanBtn");
+  const clearBtn = $("clearBtn");
+  const ignoreZeros = $("ignoreZeros");
+  const licenseTableBody = document.querySelector('#licenseTable tbody');
+  const licenseCount = $("licenseCount");
+  const resultsCard = $("resultsCard");
+  const dupesCard = $("dupesCard");
+  const dupesList = $("dupesList");
+  const dupeCount = $("dupeCount");
+  const noDupesMsg = $("noDupesMsg");
+
+  let selectedFiles = [];
+
+  fileInput.addEventListener('change', function(){
+    selectedFiles = Array.from(fileInput.files || []);
+    if (selectedFiles.length) {
+      fileCount.textContent = String(selectedFiles.length) + ' file' + (selectedFiles.length>1?'s':'') + ' ready';
+    } else {
+      fileCount.textContent = 'No files loaded';
+    }
+  });
+
+  clearBtn.addEventListener('click', function(){
+    fileInput.value = '';
+    selectedFiles = [];
+    fileCount.textContent = 'No files loaded';
+    resultsCard.style.display = 'none';
+    dupesCard.style.display = 'none';
+    licenseTableBody.innerHTML = '';
+    dupesList.innerHTML = '';
+  });
+
+  scanBtn.addEventListener('click', async function(){
+    if (!selectedFiles.length) { alert('Choose one or more rksys.dat files first.'); return; }
+    const parsed = await parseAll(selectedFiles);
+    renderLicenses(parsed.entries);
+    renderDupes(parsed.entries);
+  });
+
+  async function parseAll(files){
+    const entries = [];
+    let uploadIdx = 0;
+    for (const f of files){
+      uploadIdx++;
+      const buf = new Uint8Array(await f.arrayBuffer());
+      const view = new DataView(buf.buffer);
+      const filename = f.name;
+
+      for (let lic=0; lic<4; lic++){
+        const base = LICENSE_OFFSETS[lic];
+        if (base + 4 > buf.length) continue;
+        // check magic
+        const magic = String.fromCharCode(buf[base+0]) + String.fromCharCode(buf[base+1]) + String.fromCharCode(buf[base+2]) + String.fromCharCode(buf[base+3]);
+        if (magic !== 'RKPD') continue;
+
+        const ppid = view.getUint32(base + DWC_OFFSET + PSEUDO_PLAYER_ID_OFF, false);
+        const apid = view.getUint32(base + DWC_OFFSET + AUTH_PLAYER_ID_OFF, false);
+
+        const ignored = !!(ignoreZeros.checked && ppid===0 && apid===0);
+        entries.push({ uploadIdx: uploadIdx, filename: filename, licenseIdx: lic+1, baseOff: base, ppid: ppid, apid: apid, ignored: ignored });
+      }
+    }
+    return { entries: entries };
+  }
+
+  function renderLicenses(entries){
+    resultsCard.style.display = '';
+    licenseTableBody.innerHTML = '';
+    let idx = 0;
+    for (const e of entries){
+      idx++;
+      const tr = document.createElement('tr');
+
+      const tdIdx = document.createElement('td'); tdIdx.className = 'mono muted'; tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
+      const tdUp = document.createElement('td'); tdUp.innerHTML = '<span class="pill">Upload ' + e.uploadIdx + '</span>'; tr.appendChild(tdUp);
+      const tdFile = document.createElement('td'); tdFile.className = 'mono'; tdFile.textContent = e.filename; tr.appendChild(tdFile);
+      const tdLic = document.createElement('td'); tdLic.textContent = 'License ' + e.licenseIdx; tr.appendChild(tdLic);
+      const tdOff = document.createElement('td'); tdOff.className = 'mono muted'; tdOff.textContent = '0x' + e.baseOff.toString(16).toUpperCase(); tr.appendChild(tdOff);
+      const tdP = document.createElement('td'); tdP.className = 'mono'; tdP.textContent = String(e.ppid); tr.appendChild(tdP);
+      const tdA = document.createElement('td'); tdA.className = 'mono'; tdA.textContent = String(e.apid); tr.appendChild(tdA);
+
+      licenseTableBody.appendChild(tr);
+    }
+    licenseCount.textContent = String(entries.length);
+  }
+
+  function renderDupes(entries){
+    dupesCard.style.display = '';
+    dupesList.innerHTML = '';
+
+    const valid = entries.filter(function(e){ return !e.ignored; });
+
+    // exact duplicates
+    const exactMap = new Map();
+    for (const e of valid){
+      const key = String(e.ppid) + '|' + String(e.apid);
+      if (!exactMap.has(key)) exactMap.set(key, []);
+      exactMap.get(key).push(e);
+    }
+    const exactGroups = [];
+    for (const kv of exactMap.entries()){
+      const arr = kv[1];
+      if (arr.length >= 2) exactGroups.push({ key: kv[0], arr: arr });
+    }
+    exactGroups.sort(function(a,b){ return b.arr.length - a.arr.length; });
+    dupeCount.textContent = String(exactGroups.length);
+
+    // same APID different PPID
+    const apidMap = new Map();
+    for (const e of valid){
+      const key = String(e.apid);
+      if (!apidMap.has(key)) apidMap.set(key, []);
+      apidMap.get(key).push(e);
+    }
+    const sameAuthGroups = [];
+    for (const kv of apidMap.entries()){
+      const apid = kv[0];
+      const arr = kv[1];
+      if (arr.length < 2) continue;
+      const setP = new Set(arr.map(function(x){ return x.ppid; }));
+      if (setP.size >= 2) sameAuthGroups.push({ apid: apid, arr: arr, distinctCount: setP.size });
+    }
+    sameAuthGroups.sort(function(a,b){ return b.arr.length - a.arr.length; });
+
+    // same PPID different APID
+    const ppidMap = new Map();
+    for (const e of valid){
+      const key = String(e.ppid);
+      if (!ppidMap.has(key)) ppidMap.set(key, []);
+      ppidMap.get(key).push(e);
+    }
+    const samePseudoGroups = [];
+    for (const kv of ppidMap.entries()){
+      const ppid = kv[0];
+      const arr = kv[1];
+      if (arr.length < 2) continue;
+      const setA = new Set(arr.map(function(x){ return x.apid; }));
+      if (setA.size >= 2) samePseudoGroups.push({ ppid: ppid, arr: arr, distinctCount: setA.size });
+    }
+    samePseudoGroups.sort(function(a,b){ return b.arr.length - a.arr.length; });
+
+    const anyGroups = exactGroups.length + sameAuthGroups.length + samePseudoGroups.length;
+    if (!anyGroups){
+      noDupesMsg.style.display = '';
+      return;
+    }
+    noDupesMsg.style.display = 'none';
+
+    // helpers
+    function sectionHeader(label, count){
+      const h = document.createElement('div');
+      h.className = 'bd muted';
+      h.style.marginTop = '6px';
+      const pill = document.createElement('div');
+      pill.className = 'pill';
+      pill.innerHTML = label + ': <b>' + count + '</b> group' + (count===1?'':'s');
+      h.appendChild(pill);
+      return h;
+    }
+
+    function makeCard(title, chips, arr){
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.style.margin = '8px 0';
+
+      const head = document.createElement('div');
+      head.className = 'hd';
+      const h2 = document.createElement('h2');
+      h2.className = 'warn';
+      h2.textContent = title;
+      head.appendChild(h2);
+
+      const body = document.createElement('div');
+      body.className = 'bd';
+
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.marginBottom = '8px';
+      for (const chip of chips){
+        const s = document.createElement('span');
+        s.className = chip.mono ? 'pill mono' : 'pill';
+        s.textContent = chip.text;
+        row.appendChild(s);
+      }
+
+      const list = document.createElement('div');
+      for (let i=0; i<arr.length; i++){
+        const e = arr[i];
+        const item = document.createElement('span');
+        const fileSpan = document.createElement('span'); fileSpan.className = 'mono'; fileSpan.textContent = e.filename; item.appendChild(fileSpan);
+        const up = document.createElement('span'); up.className = 'muted'; up.textContent = ' (Upload ' + e.uploadIdx + ')'; item.appendChild(document.createTextNode(' ')); item.appendChild(up);
+        item.appendChild(document.createTextNode(', License ' + e.licenseIdx));
+        list.appendChild(item);
+        if (i !== arr.length - 1){
+          const sep = document.createElement('span'); sep.className = 'muted'; sep.textContent = ' • ';
+          list.appendChild(document.createTextNode(' '));
+          list.appendChild(sep);
+          list.appendChild(document.createTextNode(' '));
+        }
+      }
+
+      body.appendChild(row);
+      body.appendChild(list);
+
+      div.appendChild(head);
+      div.appendChild(body);
+      return div;
+    }
+
+    // render sections
+    if (exactGroups.length){
+      dupesList.appendChild(sectionHeader('Exact duplicates (both IDs match)', exactGroups.length));
+      for (const g of exactGroups){
+        const parts = g.key.split('|');
+        const ppid = parts[0];
+        const apid = parts[1];
+        dupesList.appendChild(
+          makeCard(
+            'Duplicate Pseudo & Authentic Player ID pair',
+            [
+              {text: 'Pseudo Player ID = ' + ppid, mono: true},
+              {text: 'Authentic Player ID = ' + apid, mono: true},
+              {text: String(g.arr.length) + ' occurrences', mono: false}
+            ],
+            g.arr
+          )
+        );
+      }
+    }
+
+    if (sameAuthGroups.length){
+      dupesList.appendChild(sectionHeader('Same Authentic Player ID (different Pseudo)', sameAuthGroups.length));
+      for (const g of sameAuthGroups){
+        dupesList.appendChild(
+          makeCard(
+            'Shared Authentic Player ID across different licenses',
+            [
+              {text: 'Authentic Player ID = ' + g.apid, mono: true},
+              {text: String(g.arr.length) + ' occurrences', mono: false},
+              {text: String(g.distinctCount) + ' distinct Pseudo IDs', mono: false}
+            ],
+            g.arr
+          )
+        );
+      }
+    }
+
+    if (samePseudoGroups.length){
+      dupesList.appendChild(sectionHeader('Same Pseudo Player ID (different Authentic)', samePseudoGroups.length));
+      for (const g of samePseudoGroups){
+        dupesList.appendChild(
+          makeCard(
+            'Shared Pseudo Player ID across different licenses',
+            [
+              {text: 'Pseudo Player ID = ' + g.ppid, mono: true},
+              {text: String(g.arr.length) + ' occurrences', mono: false},
+              {text: String(g.distinctCount) + ' distinct Authentic IDs', mono: false}
+            ],
+            g.arr
+          )
+        );
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>
