@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Godviewer – RKP License Viewer</title>
+<style>
+  :root { --bg:#0b0e13; --panel:#121722; --muted:#9aa4b2; --text:#e8ecf1; --accent:#6ad3ff; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font:14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+  header { padding:18px 16px; background:linear-gradient(180deg, #141b29, #0d1320); border-bottom:1px solid #1f2a3a; position:sticky; top:0; z-index:5; }
+  h1 { font-size:18px; margin:0 0 8px; font-weight:700; letter-spacing:.4px; }
+  .hint { color:var(--muted); font-size:12px; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid #1f2a3a; border-radius:14px; padding:14px; box-shadow:0 5px 20px rgba(0,0,0,.25); }
+  input[type=file] { appearance:none; background:#0f1524; color:var(--text); border:1px dashed #324159; padding:9px 12px; border-radius:10px; }
+  #dropzone { border:1px dashed #374151; border-radius:12px; padding:10px 12px; color:var(--muted); }
+  #dropzone.drag { border-color:var(--accent); color:var(--accent); background:#0f172a; }
+  .accent { color:var(--accent); }
+  main { padding:16px; max-width:1200px; margin:0 auto; }
+  .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
+  .span-12{ grid-column: span 12; }
+  .muted { color: var(--muted); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#182132; border:1px solid #263247; font-size:12px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .tabbtn { background:#0f1524; border:1px solid #24324a; color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer; }
+  .tabbtn[aria-selected="true"]{ background:#162034; border-color:#2c3f66; box-shadow:inset 0 0 0 1px #2f4f7a; }
+  .section { margin:12px 0 20px; }
+  .section h3 { margin:0 0 8px; font-size:15px; }
+  table { width:100%; border-collapse: collapse; }
+  th, td { border-bottom:1px solid #1f2a3a; padding:8px 10px; text-align:left; vertical-align:top; }
+  th { position:sticky; top:0; background:#111827; z-index:1; }
+  .scroll { overflow:auto; max-height:380px; border:1px solid #1f2a3a; border-radius:12px; }
+  code { background:#0f1524; border:1px solid #1f293b; padding:1px 6px; border-radius:6px; }
+  details { border:1px solid #22314a; border-radius:10px; padding:8px 10px; }
+  summary { cursor:pointer; color:var(--accent); }
+  .kv { display:grid; grid-template-columns: 220px 1fr; gap:8px 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Godviewer — <span class="accent">RKP</span> License Viewer <font size=2>(based on the private Godtool, sponsored by ChatGPT 5 Thinking)</font></h1>
+    <div class="row">
+      <input id="file" type="file" multiple accept=".rkp" />
+      <div id="dropzone" class="card">Drop <code>.rkp</code> files here (multi-file)</div>
+      <button id="clear" class="tabbtn" title="Remove all loaded files">Clear</button>
+      <div id="meta" class="hint"></div>
+    </div>
+  </header>
+  <main>
+    <div class="grid">
+      <div id="tabsCard" class="span-12 card" style="padding-top:10px;">
+        <div class="tabs" id="tabs"></div>
+        <div id="tabpanes"></div>
+      </div>
+
+      <div class="span-12">
+        <details>
+          <summary>About & Format Notes</summary>
+          <div class="section">
+            <p>This is an offline, single-file viewer for standalone <code>.rkp</code> license files (one <code>RKPD</code> each). It shows DWC data, friends, records, cups, unlock flags, and favorite counts. No data is ever uploaded; all parsing happens in your browser.</p>
+            <ul>
+              <li>Expected license size: <code>0x8CC0</code> (36,032) bytes, magic <code>RKPD</code> at <code>0x00</code>.</li>
+              <li>All multibyte fields are read in <strong>big-endian</strong> unless noted.</li>
+              <li>Friend Codes are derived from Profile ID using the MKW MD5 checksum scheme (PID <em>little-endian</em> + <code>"JCMR"</code>).</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </main>
+
+<script>
+(() => {
+  // ===== Constants for RKPD (license-local) =====
+  const LICENSE_SIZE    = 0x8CC0;    // size of a single RKPD
+  const DWC_OFFSET      = 0x40;      // license-local
+  const FRIEND_MAIN_OFFSET = 0x56D0; // license-local
+  const FRIEND_STRIDE   = 0x1C0;
+  const NUM_FRIENDS     = 30;
+
+  // DWC fields relative to DWC_OFFSET (UInt32 BE)
+  const DWC_FIELDS = [
+    ["Pseudo User ID #1", 0x04],
+    ["Pseudo User ID #2", 0x08],
+    ["Pseudo Player ID",  0x0C],
+    ["Authentic User ID #1", 0x10],
+    ["Authentic User ID #2", 0x14],
+    ["Authentic Player ID",  0x18],
+    ["Player Profile ID",    0x1C],
+  ];
+
+  // Records relative to license base
+  const RECORD_OFFSETS = [
+    ["Offline Wins (Race)",       0x88,  "I32"],
+    ["Offline Losses (Race)",     0x8C,  "I32"],
+    ["Offline Wins (Battle)",     0x90,  "I32"],
+    ["Offline Losses (Battle)",   0x94,  "I32"],
+    ["WFC Wins (Race)",           0x98,  "I32"],
+    ["WFC Losses (Race)",         0x9C,  "I32"],
+    ["WFC Wins (Battle)",         0xA0,  "I32"],
+    ["WFC Losses (Battle)",       0xA4,  "I32"],
+    ["Ghost Race Wins",           0xA8,  "I32"],
+    ["Ghost Race Losses",         0xAC,  "I32"],
+    ["Race Rating",               0xB0,  "U16"],
+    ["Battle Rating",             0xB2,  "U16"],
+    ["Total Race Count",          0xB4,  "I32"],
+    ["Total Battle Count",        0xB8,  "I32"],
+    ["Wii Wheel Races",           0xBC,  "I32"],
+    ["Wii Wheel Battles",         0xC0,  "I32"],
+    ["Distance Travelled",        0xC4,  "F32"],
+    ["Ghost Challenges Sent",     0xC8,  "I32"],
+    ["Ghost Challenges Received", 0xCC,  "I32"],
+    ["Item Hits Delivered",       0xD0,  "I32"],
+    ["Item Hits Received",        0xD4,  "I32"],
+    ["Tricks Performed",          0xD8,  "I32"],
+    ["Times 1st Place",           0xDC,  "I32"],
+    ["Distance 1st Place",        0xE0,  "F32"],
+    ["Distance VS Races",         0xE4,  "F32"],
+    ["Competitions Entered",      0xE8,  "U16"],
+  ];
+
+  const CUP_OFFSETS = [
+    ["Mushroom Cup (50cc)",   0x1C0],
+    ["Flower Cup (50cc)",     0x220],
+    ["Star Cup (50cc)",       0x280],
+    ["Special Cup (50cc)",    0x2E0],
+    ["Shell Cup (50cc)",      0x340],
+    ["Banana Cup (50cc)",     0x3A0],
+    ["Leaf Cup (50cc)",       0x400],
+    ["Lightning Cup (50cc)",  0x460],
+    ["Mushroom Cup (100cc)",  0x4C0],
+    ["Flower Cup (100cc)",    0x520],
+    ["Star Cup (100cc)",      0x580],
+    ["Special Cup (100cc)",   0x5E0],
+    ["Shell Cup (100cc)",     0x640],
+    ["Banana Cup (100cc)",    0x6A0],
+    ["Leaf Cup (100cc)",      0x700],
+    ["Lightning Cup (100cc)", 0x760],
+    ["Mushroom Cup (150cc)",  0x7C0],
+    ["Flower Cup (150cc)",    0x820],
+    ["Star Cup (150cc)",      0x880],
+    ["Special Cup (150cc)",   0x8E0],
+    ["Shell Cup (150cc)",     0x940],
+    ["Banana Cup (150cc)",    0x9A0],
+    ["Leaf Cup (150cc)",      0xA00],
+    ["Lightning Cup (150cc)", 0xA60],
+    ["Mushroom Cup (Mirror)", 0xAC0],
+    ["Flower Cup (Mirror)",   0xB20],
+    ["Star Cup (Mirror)",     0xB80],
+    ["Special Cup (Mirror)",  0xBE0],
+    ["Shell Cup (Mirror)",    0xC40],
+    ["Banana Cup (Mirror)",   0xCA0],
+    ["Leaf Cup (Mirror)",     0xD00],
+    ["Lightning Cup (Mirror)",0xD60],
+  ];
+  const TROPHY_TYPES = ["Gold","Silver","Bronze","None"];
+  const STAR_RANKS   = ["3 Stars","2 Stars","1 Star","A","B","C","D","E","F"];
+
+  // Unlock flags: [label, byteOffset, bitIndex]
+  const UNLOCK_FLAGS = [
+    ["Karts 100cc", 0x30, 0],
+    ["Bikes 50cc",  0x30, 1],
+    ["Leaf Cup Mirror",    0x30, 2],
+    ["Leaf Cup 150cc",     0x30, 3],
+    ["Leaf Cup 100cc",     0x30, 4],
+    ["Leaf Cup 50cc",      0x30, 5],
+    ["Banana Cup Mirror",  0x30, 6],
+    ["Banana Cup 150cc",   0x30, 7],
+    ["Banana Cup 100cc",   0x31, 0],
+    ["Banana Cup 50cc",    0x31, 1],
+    ["Star Cup Mirror",    0x31, 2],
+    ["Star Cup 150cc",     0x31, 3],
+    ["Star Cup 100cc",     0x31, 4],
+    ["Star Cup 50cc",      0x31, 5],
+    ["Flower Cup Mirror",  0x31, 6],
+    ["Flower Cup 150cc",   0x31, 7],
+    ["Flower Cup 100cc",   0x32, 0],
+    ["Flower Cup 50cc",    0x32, 1],
+    // Characters
+    ["Mii Outfit B",       0x32, 2],
+    ["Mii Outfit A",       0x32, 3],
+    ["Rosalina",           0x32, 4],
+    ["Funky Kong",         0x32, 5],
+    ["King Boo",           0x32, 6],
+    ["Dry Bowser",         0x32, 7],
+    ["Birdo",              0x33, 0],
+    ["Daisy",              0x33, 1],
+    ["Bowser Jr.",         0x33, 2],
+    ["Diddy Kong",         0x33, 3],
+    ["Baby Luigi",         0x33, 4],
+    ["Baby Daisy",         0x33, 5],
+    ["Toadette",           0x33, 6],
+    ["Dry Bones",          0x33, 7],
+    // Vehicles
+    ["Phantom",            0x35, 4],
+    ["Spear",              0x35, 5],
+    ["Shooting Star",      0x35, 6],
+    ["Dolphin Dasher",     0x35, 7],
+    ["Sneakster",          0x36, 0],
+    ["Zip Zip",            0x36, 1],
+    ["Jet Bubble",         0x36, 2],
+    ["Magikruiser",        0x36, 3],
+    ["Quacker",            0x36, 4],
+    ["Honeycoupe",         0x36, 5],
+    ["Jetsetter",          0x36, 6],
+    ["Piranha Prowler",    0x36, 7],
+    ["Sprinter",           0x37, 0],
+    ["Daytripper",         0x37, 1],
+    ["Super Blooper",      0x37, 2],
+    ["Blue Falcon",        0x37, 3],
+    ["Tiny Titan",         0x37, 4],
+    ["Cheep Charger",      0x37, 5],
+  ];
+
+  const FAVORITE_CHARACTERS = [
+    ["Mario",0xEC],["Baby Peach",0xEE],["Waluigi",0xF0],
+    ["Bowser",0xF2],["Baby Daisy",0xF4],["Dry Bones",0xF6],
+    ["Baby Mario",0xF8],["Luigi",0xFA],["Toad",0xFC],
+    ["Donkey Kong",0xFE],["Yoshi",0x100],["Wario",0x102],
+    ["Baby Luigi",0x104],["Toadette",0x106],["Koopa Troopa",0x108],
+    ["Daisy",0x10A],["Peach",0x10C],["Birdo",0x10E],
+    ["Diddy Kong",0x110],["King Boo",0x112],["Bowser Jr.",0x114],
+    ["Dry Bowser",0x116],["Funky Kong",0x118],["Rosalina",0x11A],
+    ["Mii",0x11C],
+  ];
+  const FAVORITE_VEHICLES = [
+    ["Standard Kart S",0x11E],["Standard Kart M",0x120],["Standard Kart L",0x122],
+    ["Booster Seat",0x124],["Classic Dragster",0x126],["Offroader",0x128],
+    ["Mini Beast",0x12A],["Wild Wing",0x12C],["Flame Flyer",0x12E],
+    ["Cheep Charger",0x130],["Super Blooper",0x132],["Piranha Prowler",0x134],
+    ["Tiny Titan",0x136],["Daytripper",0x138],["Jetsetter",0x13A],
+    ["Blue Falcon",0x13C],["Sprinter",0x13E],["Honeycoupe",0x140],
+    ["Standard Bike S",0x142],["Standard Bike M",0x144],["Standard Bike L",0x146],
+    ["Bullet Bike",0x148],["Mach Bike",0x14A],["Flame Runner",0x14C],
+    ["Bit Bike",0x14E],["Sugarscoot",0x150],["Wario Bike",0x152],
+    ["Quacker",0x154],["Zip Zip",0x156],["Shooting Star",0x158],
+    ["Magikruiser",0x15A],["Sneakster",0x15C],["Spear",0x15E],
+    ["Jet Bubble",0x160],["Dolphin Dasher",0x162],["Phantom",0x164],
+  ];
+  const FAVORITE_COURSES = [
+    ["Mario Circuit",0x166],["Moo Moo Meadows",0x168],["Mushroom Gorge",0x16A],
+    ["Grumble Volcano",0x16C],["Toad's Factory",0x16E],["Coconut Mall",0x170],
+    ["DK Summit",0x172],["Wario's Gold Mine",0x174],["Luigi Circuit",0x176],
+    ["Daisy Circuit",0x178],["Moonview Highway",0x17A],["Maple Treeway",0x17C],
+    ["Bowser's Castle",0x17E],["Rainbow Road",0x180],["Dry Dry Ruins",0x182],
+    ["Koopa Cape",0x184],["GCN Peach Beach",0x186],["GCN Mario Circuit",0x188],
+    ["GCN Waluigi Stadium",0x18A],["GCN DK Mountain",0x18C],["DS Yoshi Falls",0x18E],
+    ["DS Desert Hills",0x190],["DS Peach Gardens",0x192],["DS Delfino Square",0x194],
+    ["SNES Mario Circuit 3",0x196],["SNES Ghost Valley 2",0x198],
+    ["N64 Mario Raceway",0x19A],["N64 Sherbet Land",0x19C],["N64 Bowser's Castle",0x19E],
+    ["N64 DK's Jungle Parkway",0x1A0],["GBA Bowser Castle 3",0x1A2],["GBA Shy Guy Beach",0x1A4],
+  ];
+  const FAVORITE_STAGES = [
+    ["Delfino Pier",0x1A6],["Block Plaza",0x1A8],["Chain Chomp Wheel",0x1AA],
+    ["Funky Stadium",0x1AC],["Thwomp Desert",0x1AE],["GCN Cookie Land",0x1B0],
+    ["DS Twilight House",0x1B2],["SNES Battle Course 4",0x1B4],["GBA Battle Course 3",0x1B6],
+    ["N64 Skyscraper",0x1B8],
+  ];
+
+  // ===== Byte helpers =====
+  const U8  = (dv, off) => dv.getUint8(off);
+  const U16 = (dv, off) => dv.getUint16(off, false);
+  const U32 = (dv, off) => dv.getUint32(off, false);
+  const I32 = (dv, off) => dv.getInt32(off, false);
+  const F32 = (dv, off) => dv.getFloat32(off, false);
+
+  // ===== Simple UI helpers =====
+  const $ = sel => document.querySelector(sel);
+  const el = (tag, cls, text) => { const n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; };
+
+  // ===== Crypto & calc helpers (no deps) =====
+  function md5Bytes(bytes){
+    const r=(x,n)=>(x<<n)|(x>>>(32-n));
+    const K=new Uint32Array(64); for(let i=0;i<64;i++) K[i]=Math.floor(Math.abs(Math.sin(i+1))*2**32)>>>0;
+    const S=new Uint8Array([7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21]);
+    const len=bytes.length, nWords=(((len+9+63)>>6)<<4), X=new Uint32Array(nWords);
+    for(let i=0;i<len;i++) X[i>>2]|=bytes[i]<<((i&3)*8);
+    X[len>>2]|=0x80<<((len&3)*8);
+    const bl=len*8>>>0, blh=Math.floor((len*8)/2**32)>>>0; X[nWords-2]=bl; X[nWords-1]=blh;
+    let a0=0x67452301|0,b0=0xEFCDAB89|0,c0=0x98BADCFE|0,d0=0x10325476|0;
+    for(let i=0;i<nWords;i+=16){ let a=a0,b=b0,c=c0,d=d0;
+      for(let j=0;j<64;j++){
+        let f,g;
+        if(j<16){ f=(b&c)|(~b&d); g=j; }
+        else if(j<32){ f=(d&b)|(~d&c); g=(5*j+1)%16; }
+        else if(j<48){ f=b^c^d; g=(3*j+5)%16; }
+        else { f=c^(b|~d); g=(7*j)%16; }
+        const t=(a+f+K[j]+X[i+g])>>>0; a=d; d=c; c=b; b=(b+r(t,S[j]))>>>0;
+      }
+      a0=(a0+a)>>>0; b0=(b0+b)>>>0; c0=(c0+c)>>>0; d0=(d0+d)>>>0;
+    }
+    const out=new Uint8Array(16), W=[a0,b0,c0,d0];
+    for(let i=0;i<4;i++){ out[i*4+0]=W[i]&0xFF; out[i*4+1]=(W[i]>>>8)&0xFF; out[i*4+2]=(W[i]>>>16)&0xFF; out[i*4+3]=(W[i]>>>24)&0xFF; }
+    return out;
+  }
+
+  // PID -> Friend Code (pid LE + 'JCMR', MD5, (md5[0]>>1)<<32 | pid)
+  function pidToFriendCode(pid){
+    pid = (pid>>>0);
+    const buf=new Uint8Array(8);
+    buf[0]=pid&0xFF; buf[1]=(pid>>>8)&0xFF; buf[2]=(pid>>>16)&0xFF; buf[3]=(pid>>>24)&0xFF;
+    buf[4]=0x4A; buf[5]=0x43; buf[6]=0x4D; buf[7]=0x52; // 'JCMR'
+    const md=md5Bytes(buf), csum=md[0]>>>1;
+    const fc=(BigInt(csum)<<32n)|BigInt(pid);
+    let s=fc.toString(); if(s.length<12) s=s.padStart(12,'0');
+    return `${s.slice(0,4)}-${s.slice(4,8)}-${s.slice(8,12)}`;
+  }
+
+  // License Mii name: UTF-16BE 0x14 bytes at base+0x14
+  function readMiiName(dv, licBase){
+    const arr=new Uint8Array(dv.buffer, dv.byteOffset + licBase + 0x14, 0x14);
+    let out=''; for(let i=0;i<arr.length;i+=2){ const code=(arr[i]<<8)|arr[i+1]; if(!code) break; out+=String.fromCharCode(code); }
+    return out || '—';
+  }
+
+  // Overall star rank = highest common star rank across all cups; requires all cups completed
+  function computeOverallStarRank(dv, licBase){
+    let allCompleted=true, maxIdx=0;
+    for(const [_,off] of CUP_OFFSETS){
+      const r=dv.getUint8(licBase+off+0x51)&0xF;
+      const c=(dv.getUint8(licBase+off+0x52)&0x80)!==0;
+      if(!c) allCompleted=false;
+      if(r>maxIdx) maxIdx=r;
+    }
+    if(!allCompleted) return {label:'—', detail:'Not all cups completed'};
+    if(maxIdx<=2)     return {label:`${3-maxIdx}★`, detail:STAR_RANKS[maxIdx]};
+    return {label:'—', detail:'At least one cup is below 1★'};
+  }
+
+  function renderKV(target, entries) {
+    const wrap = el('div','kv');
+    for (const [k,v] of entries) {
+      wrap.appendChild(el('div','muted',k));
+      wrap.appendChild(el('div',null,String(v)));
+    }
+    target.appendChild(wrap);
+  }
+
+  function renderTable(target, headers, rows) {
+    const scroll = el('div','scroll');
+    const table = el('table');
+    const thead = el('thead');
+    const trh = el('tr');
+    headers.forEach(h=> trh.appendChild(el('th',null,h)) );
+    thead.appendChild(trh);
+    table.appendChild(thead);
+    const tbody = el('tbody');
+    rows.forEach(r=> {
+      const tr = el('tr');
+      r.forEach(c=> tr.appendChild(el('td',null, c==null?'':String(c))));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    scroll.appendChild(table);
+    target.appendChild(scroll);
+  }
+
+  function makeTab(id, label) {
+    const b = el('button','tabbtn',label);
+    b.setAttribute('role','tab');
+    b.setAttribute('aria-controls', id);
+    b.addEventListener('click', () => selectTab(id, b));
+    return b;
+  }
+
+  function selectTab(id, btn){
+    document.querySelectorAll('.tabbtn').forEach(b=> b.setAttribute('aria-selected','false'));
+    if(btn) btn.setAttribute('aria-selected','true');
+    document.querySelectorAll('[role="tabpanel"]').forEach(p=> p.style.display='none');
+    const pane = document.getElementById(id);
+    if (pane) pane.style.display='block';
+  }
+
+  // ===== Domain renderers =====
+  function renderDWC(pane, dv, licBase){
+    const title = el('h3',null,'DWC Data');
+    pane.appendChild(title);
+    const base = licBase + DWC_OFFSET;
+    const entries = DWC_FIELDS.map(([name, off]) => [name, U32(dv, base+off)]);
+    // Add friend code derived from Player Profile ID (0x1C)
+    const pid = U32(dv, base + 0x1C);
+    entries.push(['Friend Code', pidToFriendCode(pid)]);
+    renderKV(pane, entries);
+  }
+
+  function renderFriends(pane, dv, licBase){
+    const title = el('h3',null,'Friends');
+    pane.appendChild(title);
+    const rows = [];
+    const base = licBase + FRIEND_MAIN_OFFSET;
+    for (let i=0;i<NUM_FRIENDS;i++){
+      const ptr = base + i*FRIEND_STRIDE;
+      const profileId = U32(dv, ptr + 0x04);
+      const losses    = U16(dv, ptr + 0x12);
+      const wins      = U16(dv, ptr + 0x14);
+      const raceR     = U16(dv, ptr + 0x16);
+      const battleR   = U16(dv, ptr + 0x18);
+      const country   = U8 (dv, ptr + 0x68);
+      const region    = U8 (dv, ptr + 0x69);
+      const gx        = U16(dv, ptr + 0x6C);
+      const gy        = U16(dv, ptr + 0x6E);
+      rows.push([i+1, profileId, pidToFriendCode(profileId), wins, losses, raceR, battleR, country, region, gx, gy]);
+    }
+    renderTable(pane, ["Slot","ProfileID","Friend Code","Wins","Losses","RaceR","BattleR","Country","Region","GlobeX","GlobeY"], rows);
+  }
+
+  function renderRecords(pane, dv, licBase){
+    const title = el('h3',null,'Records');
+    pane.appendChild(title);
+    const rows = RECORD_OFFSETS.map(([label, off, typ]) => {
+      let val;
+      switch(typ){
+        case 'I32': val = I32(dv, licBase+off); break;
+        case 'U16': val = U16(dv, licBase+off); break;
+        case 'F32': val = F32(dv, licBase+off); break;
+        default: val = '—';
+      }
+      return [label, val];
+    });
+    renderTable(pane, ["Field","Value"], rows);
+  }
+
+  function renderCups(pane, dv, licBase){
+    const title = el('h3',null,'Cups');
+    pane.appendChild(title);
+    const rows = CUP_OFFSETS.map(([label, off]) => {
+      const t = dv.getUint8(licBase+off+0x4F) & 0x3;
+      const r = dv.getUint8(licBase+off+0x51) & 0xF;
+      const c = (dv.getUint8(licBase+off+0x52) & 0x80) !== 0;
+      return [label, TROPHY_TYPES[t]||'—', STAR_RANKS[r]||'—', c? 'Yes':'No'];
+    });
+    renderTable(pane, ["Cup","Trophy","Rank","Completed"], rows);
+  }
+
+  function renderUnlocks(pane, dv, licBase){
+    const title = el('h3',null,'Unlocks');
+    pane.appendChild(title);
+
+    const cups=[], chars=[], vehs=[];
+    for (const [label, off, bit] of UNLOCK_FLAGS){
+      const byte = dv.getUint8(licBase + off);
+      const on = ((byte >> bit) & 1) === 1;
+      const row = [label, on? 'Yes':'No'];
+      if (label.includes('Cup')) cups.push(row);
+      else if (off===0x32 || off===0x33) chars.push(row); else vehs.push(row);
+    }
+
+    const wrap = el('div');
+    const sec1 = el('div','section'); sec1.appendChild(el('h4',null,'Cup Completions')); renderTable(sec1,["Flag","On"],cups); wrap.appendChild(sec1);
+    const sec2 = el('div','section'); sec2.appendChild(el('h4',null,'Character Unlocks')); renderTable(sec2,["Character","Unlocked"],chars); wrap.appendChild(sec2);
+    const sec3 = el('div','section'); sec3.appendChild(el('h4',null,'Vehicle Unlocks')); renderTable(sec3,["Vehicle","Unlocked"],vehs); wrap.appendChild(sec3);
+    pane.appendChild(wrap);
+  }
+
+  function renderFavorites(pane, dv, licBase){
+    const makeRows = (arr) => arr.map(([name, off]) => [name, U16(dv, licBase+off)]);
+
+    const secC = el('div','section'); secC.appendChild(el('h3',null,'Characters')); renderTable(secC,["Character","Count"], makeRows(FAVORITE_CHARACTERS)); pane.appendChild(secC);
+    const secV = el('div','section'); secV.appendChild(el('h3',null,'Vehicles'));   renderTable(secV,["Vehicle","Count"],   makeRows(FAVORITE_VEHICLES));  pane.appendChild(secV);
+    const secCo= el('div','section'); secCo.appendChild(el('h3',null,'Courses'));    renderTable(secCo,["Course","Count"],    makeRows(FAVORITE_COURSES));    pane.appendChild(secCo);
+    const secS = el('div','section'); secS.appendChild(el('h3',null,'Stages'));     renderTable(secS,["Stage","Count"],     makeRows(FAVORITE_STAGES));     pane.appendChild(secS);
+  }
+
+  function renderLicensePane(pane, dv, licBase, label, fileName, fileSize){
+    pane.innerHTML = '';
+    const head = el('div','section');
+    const miiName = readMiiName(dv, licBase);
+    const star = computeOverallStarRank(dv, licBase);
+    head.appendChild(el('h3',null, label || 'License'));
+    const pid = U32(dv, licBase + DWC_OFFSET + 0x1C);
+    renderKV(head, [["Mii Name", miiName],["Overall Star Rank", star.label],["Friend Code", pidToFriendCode(pid)],["File", fileName||'—'],["Size", fileSize? `${fileSize} bytes (0x${fileSize.toString(16)})`:'—'],["Magic", String.fromCharCode(U8(dv,0),U8(dv,1),U8(dv,2),U8(dv,3))]]);
+    if (star.detail && star.detail!=='—') head.appendChild(el('div','hint',`Detail: ${star.detail}`));
+    pane.appendChild(head);
+
+    renderDWC(pane, dv, licBase);
+    renderFriends(pane, dv, licBase);
+    renderRecords(pane, dv, licBase);
+    renderCups(pane, dv, licBase);
+    renderUnlocks(pane, dv, licBase);
+    renderFavorites(pane, dv, licBase);
+  }
+
+  // ===== File handling (multi-RKP) =====
+  const fileInput = document.getElementById('file');
+  const dropzone  = document.getElementById('dropzone');
+  const clearBtn  = document.getElementById('clear');
+  const tabsEl    = document.getElementById('tabs');
+  const panesEl   = document.getElementById('tabpanes');
+
+  let licenses = []; // [{id,name,dv,bufSize,fileName,mii,fc}]
+  let seq = 1;
+
+  function rebuild(){
+    tabsEl.innerHTML='';
+    panesEl.innerHTML='';
+    if (licenses.length===0){
+      document.getElementById('meta').textContent = 'No files loaded.';
+      return;
+    }
+    document.getElementById('meta').textContent = `${licenses.length} RKP file(s) loaded.`;
+
+    licenses.forEach((lic, idx)=>{
+      const tabId = `tab-${lic.id}`;
+      const label = `${lic.mii||'License'} — ${lic.fc||'—'}`;
+      const b = makeTab(tabId, label);
+      if (idx===0) b.setAttribute('aria-selected','true');
+      tabsEl.appendChild(b);
+
+      const pane = el('div','section');
+      pane.id = tabId;
+      pane.setAttribute('role','tabpanel');
+      if (idx!==0) pane.style.display='none';
+      panesEl.appendChild(pane);
+
+      renderLicensePane(pane, lic.dv, 0, lic.mii?`License: ${lic.mii}`:'License', lic.fileName, lic.bufSize);
+    });
+  }
+
+  function parseQuickMeta(dv){
+    const mii = readMiiName(dv, 0);
+    const pid = U32(dv, DWC_OFFSET + 0x1C);
+    const fc  = pidToFriendCode(pid);
+    return {mii, fc};
+  }
+
+  async function addFile(file){
+    const buf = await file.arrayBuffer();
+    const dv = new DataView(buf);
+    const magic = String.fromCharCode(dv.getUint8(0),dv.getUint8(1),dv.getUint8(2),dv.getUint8(3));
+    if (magic !== 'RKPD'){
+      console.warn('Skipping non-RKP file:', file.name, magic);
+      return {skipped:true};
+    }
+    const meta = parseQuickMeta(dv);
+    licenses.push({ id: seq++, name: file.name, dv, bufSize: dv.byteLength, fileName: file.name, ...meta });
+    return {ok:true};
+  }
+
+  fileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files||[]);
+    for (const f of files) await addFile(f);
+    rebuild();
+  });
+
+  clearBtn.addEventListener('click', () => { licenses = []; rebuild(); });
+
+  // Drag & drop (multi)
+  ;['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add('drag'); }));
+  ;['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', async (e)=>{
+    const files = Array.from(e.dataTransfer.files||[]);
+    for (const f of files) await addFile(f);
+    rebuild();
+  });
+})();
+</script>
+</body>
+</html>
