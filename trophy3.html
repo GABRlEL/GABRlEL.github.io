@@ -14,7 +14,7 @@
     input[type="search"] { border: 1px solid #d0d0da; padding: 6px 10px; border-radius: 6px; min-width: 260px; }
     main { padding: var(--pad); }
     table { border-collapse: collapse; width: 100%; min-width: 820px; }
-    thead th { position: sticky; top: 136px; background: #fff; border-bottom: 2px solid #eee; padding: 8px; text-align: left; font-weight: 600; }
+    thead th { position: sticky; top: 104px; background: #fff; border-bottom: 2px solid #eee; padding: 8px; text-align: left; font-weight: 600; }
     tbody td { border-bottom: 1px solid #f0f0f5; padding: 8px; }
     tbody tr:nth-child(even) { background: #fafafe; }
     .muted { color: #666; }
@@ -69,7 +69,7 @@
   </main>
 
   <script>
-    // === Constants matching the desktop tool ===
+    // === Constants ===
     const SIG_TROP = new Uint8Array([0x54, 0x52, 0x4F, 0x50]); // "TROP"
     const FOOTER    = new Uint8Array([0x47, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]); // 47 50 00 00 00 00 00 01
     const COUNT_OFFS = [0x0C, 0x0E, 0x10, 0x12]; // big-endian 2-byte counts
@@ -89,6 +89,9 @@
     const elSaveBtn = document.getElementById('saveBtn');
     const elTBody  = document.querySelector('#tracksTable tbody');
     const elSearch = document.getElementById('search');
+    const elBtnRR  = document.getElementById('btnRR');
+    const elBtnCustom = document.getElementById('btnCustom');
+    const elTransFile = document.getElementById('transFile');
 
     const colBtns = [
       document.getElementById('col1All'),
@@ -98,26 +101,17 @@
     ];
     const clearBtn = document.getElementById('colClear');
 
-    // === Fetch static translation file next to this page ===
-    fetch('FolderToTrackName.txt')
-      .then(r => {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
-      })
-      .then(text => {
-        translations = parseTranslations(text);
-        elStatus.textContent = `Translations loaded: ${Object.keys(translations).length} entries.`;
-      })
-      .catch(() => {
-        elStatus.textContent = 'Could not load FolderToTrackName.txt – names will fall back to IDs.';
-      });
-
     // === UI wiring ===
     elPulFile.addEventListener('change', onPulChosen);
     elSaveBtn.addEventListener('click', onSave);
     colBtns.forEach((btn, i) => btn.addEventListener('click', () => setAllInColumn(i, true)));
     clearBtn.addEventListener('click', () => setAllInColumn(null, false));
     elSearch.addEventListener('input', onSearch);
+    elBtnRR.addEventListener('click', loadRRTranslations);
+    elBtnCustom.addEventListener('click', () => elTransFile.click());
+    elTransFile.addEventListener('change', onCustomTransChosen);
+
+    // NOTE: No automatic translation loading occurs. Use the buttons above.
 
     function parseTranslations(text) {
       const map = {};
@@ -129,13 +123,14 @@
         if (eq === -1) continue;
         const namePart = line.slice(0, eq);
         const idPart = line.slice(eq + 1);
-        // Strip \c{...} sequences and collapse whitespace
+        // Strip \c{...} sequences, control chars, and collapse whitespace
         const name = namePart
-          .replace(/\\c\{.*?\}/g, '')   // remove \c{color}
-          .replace(/\s+/g, ' ')            // collapse spaces/tabs
+          .replace(/\\c\{.*?\}/g, '')
+          .replace(/[\u0000-\u001F\u007F]/g, ' ')
+          .replace(/\s+/g, ' ')
           .trim();
         const id = idPart.trim().toUpperCase();
-        map[id] = `${name} (${id})`;
+        if (id) map[id] = `${name} (${id})`;
       }
       return map;
     }
@@ -158,6 +153,8 @@
         colBtns.forEach(b => b.disabled = false);
         clearBtn.disabled = false;
         elSearch.disabled = false;
+        // If translations already loaded, apply them
+        if (Object.keys(translations).length) applyTranslations('current');
       };
       reader.readAsArrayBuffer(f);
     }
@@ -215,6 +212,7 @@
         ent.name = translations[ent.idHex] || ent.idHex;
         if (!translations[ent.idHex]) unrecognized++;
         tdName.textContent = ent.name;
+        tdName.dataset.kind = 'nameCell';
         tr.appendChild(tdName);
 
         for (let i = 0; i < 4; i++) {
@@ -235,7 +233,6 @@
       }
       elStatus.textContent = `Loaded ${list.length} tracks. Unrecognized: ${unrecognized}.`;
       updateCountsPill();
-      // apply active search after render, if any
       if (elSearch.value) onSearch();
     }
 
@@ -254,7 +251,6 @@
     function setAllInColumn(colIndex, value) {
       for (const ent of entries) {
         if (colIndex === null) {
-          // clear all four
           for (let i = 0; i < 4; i++) {
             ent.flags[i] = false;
             if (ent.checks[i]) ent.checks[i].checked = false;
@@ -305,6 +301,50 @@
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    }
+
+    // === Translation loading helpers ===
+    function setTranslations(map, sourceLabel) {
+      translations = map || {};
+      const count = Object.keys(translations).length;
+      elStatus.textContent = count ? `Translations loaded (${count}) from ${sourceLabel}.` : 'No translations loaded.';
+      if (entries.length) applyTranslations(sourceLabel);
+    }
+
+    function applyTranslations(sourceLabel) {
+      let unrec = 0;
+      for (const ent of entries) {
+        ent.name = translations[ent.idHex] || ent.idHex;
+        if (!translations[ent.idHex]) unrec++;
+        const nameCell = ent.row.querySelector('[data-kind="nameCell"]');
+        if (nameCell) nameCell.textContent = ent.name;
+      }
+      elStatus.textContent = `${elStatus.textContent} Unrecognized: ${unrec}.`;
+      if (elSearch.value) onSearch();
+    }
+
+    async function loadRRTranslations() {
+      try {
+        const r = await fetch('FolderToTrackName.txt', { cache: 'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const text = await r.text();
+        const map = parseTranslations(text);
+        setTranslations(map, 'server file');
+      } catch (e) {
+        alert('Could not load FolderToTrackName.txt from server.');
+      }
+    }
+
+    function onCustomTransChosen(evt) {
+      const f = evt.target.files && evt.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const map = parseTranslations(reader.result || '');
+        setTranslations(map, 'custom file');
+        elTransFile.value = '';
+      };
+      reader.readAsText(f);
     }
   </script>
 </body>
