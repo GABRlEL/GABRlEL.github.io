@@ -11,9 +11,10 @@
     header .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     button, input[type="file"]::file-selector-button { cursor: pointer; border: 1px solid #d0d0da; background: #fff; padding: 6px 10px; border-radius: 6px; }
     button[disabled] { opacity: .6; cursor: not-allowed; }
+    input[type="search"] { border: 1px solid #d0d0da; padding: 6px 10px; border-radius: 6px; min-width: 260px; }
     main { padding: var(--pad); }
-    table { border-collapse: collapse; width: 100%; min-width: 720px; }
-    thead th { position: sticky; top: 68px; background: #fff; border-bottom: 2px solid #eee; padding: 8px; text-align: left; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; min-width: 820px; }
+    thead th { position: sticky; top: 104px; background: #fff; border-bottom: 2px solid #eee; padding: 8px; text-align: left; font-weight: 600; }
     tbody td { border-bottom: 1px solid #f0f0f5; padding: 8px; }
     tbody tr:nth-child(even) { background: #fafafe; }
     .muted { color: #666; }
@@ -25,9 +26,14 @@
 <body>
   <header>
     <div class="row">
+      <strong>Trophy Monarch Lite</strong>
+      <span class="muted">— Web Settings Editor</span>
+    </div>
+    <div class="row">
       <label for="pulFile"><strong>Load Settings (.pul):</strong></label>
       <input id="pulFile" type="file" accept=".pul" />
       <button id="saveBtn" disabled>Download Edited .pul</button>
+      <input id="search" type="search" placeholder="Search tracks by name or ID" disabled />
       <span class="muted" id="status">Translations loading…</span>
       <span class="pill" id="countsPill" hidden></span>
     </div>
@@ -45,10 +51,10 @@
     <table id="tracksTable">
       <thead>
         <tr>
-          <th style="width:200px">Track ID</th>
+          <th style="width:160px">Track ID</th>
           <th>Track Name</th>
-          <th style="width:160px">150cc</th>
-          <th style="width:160px">200cc</th>
+          <th style="width:140px">150cc</th>
+          <th style="width:140px">200cc</th>
           <th style="width:160px">150cc Feather</th>
           <th style="width:160px">200cc Feather</th>
         </tr>
@@ -68,7 +74,7 @@
     let translations = {};             // ID (uppercase) -> "Name (ID)"
     let bytes = null;                   // Uint8Array of the loaded .pul file
     let headerIdx = -1;                 // index of TROP header
-    let entries = [];                   // {pos, idHex, flags[4], checks[4]}
+    let entries = [];                   // {pos, idHex, flags[4], checks[4], row, name}
     let currentFileNameBase = 'settings';
 
     // === Elements ===
@@ -77,6 +83,7 @@
     const elPulFile = document.getElementById('pulFile');
     const elSaveBtn = document.getElementById('saveBtn');
     const elTBody  = document.querySelector('#tracksTable tbody');
+    const elSearch = document.getElementById('search');
 
     const colBtns = [
       document.getElementById('col1All'),
@@ -105,6 +112,7 @@
     elSaveBtn.addEventListener('click', onSave);
     colBtns.forEach((btn, i) => btn.addEventListener('click', () => setAllInColumn(i, true)));
     clearBtn.addEventListener('click', () => setAllInColumn(null, false));
+    elSearch.addEventListener('input', onSearch);
 
     function parseTranslations(text) {
       const map = {};
@@ -116,7 +124,11 @@
         if (eq === -1) continue;
         const namePart = line.slice(0, eq);
         const idPart = line.slice(eq + 1);
-        const name = namePart.replace(/\\c\\{.*?\\}/g, '').trim();
+        // Strip \c{...} sequences and collapse whitespace
+        const name = namePart
+          .replace(/\\c\{.*?\}/g, '')   // remove \c{color}
+          .replace(/\s+/g, ' ')            // collapse spaces/tabs
+          .trim();
         const id = idPart.trim().toUpperCase();
         map[id] = `${name} (${id})`;
       }
@@ -140,6 +152,7 @@
         elSaveBtn.disabled = false;
         colBtns.forEach(b => b.disabled = false);
         clearBtn.disabled = false;
+        elSearch.disabled = false;
       };
       reader.readAsArrayBuffer(f);
     }
@@ -169,7 +182,8 @@
         const idHex = toHex(idBytes);
         const statusBytes = arr.slice(pos + 4, pos + 8);
         const flags = [...statusBytes].map(b => b !== 0);
-        out.push({ pos, idHex, flags, checks: [] });
+        const name = translations[idHex] || idHex;
+        out.push({ pos, idHex, flags, checks: [], name, row: null });
         pos += 8;
       }
       return out;
@@ -186,15 +200,16 @@
       let unrecognized = 0;
       for (const ent of list) {
         const tr = document.createElement('tr');
+        ent.row = tr;
 
         const tdId = document.createElement('td');
         tdId.textContent = ent.idHex;
         tr.appendChild(tdId);
 
         const tdName = document.createElement('td');
-        const name = translations[ent.idHex] || ent.idHex;
+        ent.name = translations[ent.idHex] || ent.idHex;
         if (!translations[ent.idHex]) unrecognized++;
-        tdName.textContent = name;
+        tdName.textContent = ent.name;
         tr.appendChild(tdName);
 
         for (let i = 0; i < 4; i++) {
@@ -215,14 +230,28 @@
       }
       elStatus.textContent = `Loaded ${list.length} tracks. Unrecognized: ${unrecognized}.`;
       updateCountsPill();
+      // apply active search after render, if any
+      if (elSearch.value) onSearch();
+    }
+
+    function onSearch() {
+      const q = elSearch.value.trim().toLowerCase();
+      for (const ent of entries) {
+        if (!q) {
+          ent.row.style.display = '';
+          continue;
+        }
+        const hay = (ent.idHex + ' ' + (ent.name || '')).toLowerCase();
+        ent.row.style.display = hay.includes(q) ? '' : 'none';
+      }
     }
 
     function setAllInColumn(colIndex, value) {
       for (const ent of entries) {
         if (colIndex === null) {
-          // clear all
+          // clear all four
           for (let i = 0; i < 4; i++) {
-            ent.flags[i] = !!value && false; // ensures false
+            ent.flags[i] = false;
             if (ent.checks[i]) ent.checks[i].checked = false;
           }
         } else {
@@ -241,7 +270,7 @@
 
     function updateCountsPill() {
       const c = currentCounts();
-      elCounts.textContent = `T1 ${c[0]} · T2 ${c[1]} · T3 ${c[2]} · T4 ${c[3]}`;
+      elCounts.textContent = `150cc ${c[0]} · 200cc ${c[1]} · 150cc F ${c[2]} · 200cc F ${c[3]}`;
       elCounts.hidden = false;
     }
 
