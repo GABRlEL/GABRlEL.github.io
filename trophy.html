@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trophy Monarch Lite</title>
+  <style>
+    :root { --pad: 10px; }
+    body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: #111; }
+    header { position: sticky; top: 0; background: #f7f7fb; border-bottom: 1px solid #e8e8ef; padding: var(--pad); display: grid; gap: 8px; }
+    header .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    button, input[type="file"]::file-selector-button { cursor: pointer; border: 1px solid #d0d0da; background: #fff; padding: 6px 10px; border-radius: 6px; }
+    button[disabled] { opacity: .6; cursor: not-allowed; }
+    main { padding: var(--pad); }
+    table { border-collapse: collapse; width: 100%; min-width: 720px; }
+    thead th { position: sticky; top: 68px; background: #fff; border-bottom: 2px solid #eee; padding: 8px; text-align: left; font-weight: 600; }
+    tbody td { border-bottom: 1px solid #f0f0f5; padding: 8px; }
+    tbody tr:nth-child(even) { background: #fafafe; }
+    .muted { color: #666; }
+    .pill { display: inline-block; background: #eef2ff; color: #334155; border: 1px solid #dbeafe; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .right { margin-left: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row">
+      <label for="pulFile"><strong>Load Settings (.pul):</strong></label>
+      <input id="pulFile" type="file" accept=".pul" />
+      <button id="saveBtn" disabled>Download Edited .pul</button>
+      <span class="muted" id="status">Translations loading…</span>
+      <span class="pill" id="countsPill" hidden></span>
+    </div>
+    <div class="row controls">
+      <span><strong>Column actions:</strong></span>
+      <button id="col1All" disabled>Set All 150cc</button>
+      <button id="col2All" disabled>Set All 200cc</button>
+      <button id="col3All" disabled>Set All 150cc Feather</button>
+      <button id="col4All" disabled>Set All 200cc Feather</button>
+      <button id="colClear" class="right" disabled>Clear All</button>
+    </div>
+  </header>
+
+  <main>
+    <table id="tracksTable">
+      <thead>
+        <tr>
+          <th style="width:200px">Track ID</th>
+          <th>Track Name</th>
+          <th style="width:160px">150cc</th>
+          <th style="width:160px">200cc</th>
+          <th style="width:160px">150cc Feather</th>
+          <th style="width:160px">200cc Feather</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    // === Constants matching the desktop tool ===
+    const SIG_TROP = new Uint8Array([0x54, 0x52, 0x4F, 0x50]); // "TROP"
+    const FOOTER    = new Uint8Array([0x47, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]); // 47 50 00 00 00 00 00 01
+    const COUNT_OFFS = [0x0C, 0x0E, 0x10, 0x12]; // big-endian 2-byte counts
+    const FIRST_BLOCK = 0x14; // start of 8-byte entries (ID[4], STATUS[4])
+
+    // === State ===
+    let translations = {};             // ID (uppercase) -> "Name (ID)"
+    let bytes = null;                   // Uint8Array of the loaded .pul file
+    let headerIdx = -1;                 // index of TROP header
+    let entries = [];                   // {pos, idHex, flags[4], checks[4]}
+    let currentFileNameBase = 'settings';
+
+    // === Elements ===
+    const elStatus = document.getElementById('status');
+    const elCounts = document.getElementById('countsPill');
+    const elPulFile = document.getElementById('pulFile');
+    const elSaveBtn = document.getElementById('saveBtn');
+    const elTBody  = document.querySelector('#tracksTable tbody');
+
+    const colBtns = [
+      document.getElementById('col1All'),
+      document.getElementById('col2All'),
+      document.getElementById('col3All'),
+      document.getElementById('col4All'),
+    ];
+    const clearBtn = document.getElementById('colClear');
+
+    // === Fetch static translation file next to this page ===
+    fetch('FolderToTrackName.txt')
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(text => {
+        translations = parseTranslations(text);
+        elStatus.textContent = `Translations loaded: ${Object.keys(translations).length} entries.`;
+      })
+      .catch(() => {
+        elStatus.textContent = 'Could not load FolderToTrackName.txt – names will fall back to IDs.';
+      });
+
+    // === UI wiring ===
+    elPulFile.addEventListener('change', onPulChosen);
+    elSaveBtn.addEventListener('click', onSave);
+    colBtns.forEach((btn, i) => btn.addEventListener('click', () => setAllInColumn(i, true)));
+    clearBtn.addEventListener('click', () => setAllInColumn(null, false));
+
+    function parseTranslations(text) {
+      const map = {};
+      const lines = text.split(/\r?\n/);
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) continue;
+        const eq = line.indexOf('=');
+        if (eq === -1) continue;
+        const namePart = line.slice(0, eq);
+        const idPart = line.slice(eq + 1);
+        const name = namePart.replace(/\\c\\{.*?\\}/g, '').trim();
+        const id = idPart.trim().toUpperCase();
+        map[id] = `${name} (${id})`;
+      }
+      return map;
+    }
+
+    function onPulChosen(evt) {
+      const f = evt.target.files && evt.target.files[0];
+      if (!f) return;
+      currentFileNameBase = (f.name || 'settings').replace(/\.[^.]+$/, '') || 'settings';
+      const reader = new FileReader();
+      reader.onload = () => {
+        bytes = new Uint8Array(reader.result);
+        headerIdx = findSignature(bytes, SIG_TROP);
+        if (headerIdx === -1) {
+          alert('TROP header not found in this file.');
+          return;
+        }
+        entries = parseEntries(bytes, headerIdx);
+        render(entries);
+        elSaveBtn.disabled = false;
+        colBtns.forEach(b => b.disabled = false);
+        clearBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(f);
+    }
+
+    function findSignature(arr, sig) {
+      outer: for (let i = 0; i <= arr.length - sig.length; i++) {
+        for (let j = 0; j < sig.length; j++) {
+          if (arr[i + j] !== sig[j]) continue outer;
+        }
+        return i;
+      }
+      return -1;
+    }
+
+    function parseEntries(arr, tropIdx) {
+      const out = [];
+      let pos = tropIdx + FIRST_BLOCK;
+      while (pos + 8 <= arr.length) {
+        // detect footer
+        let isFooter = true;
+        for (let k = 0; k < 8; k++) {
+          if (arr[pos + k] !== FOOTER[k]) { isFooter = false; break; }
+        }
+        if (isFooter) break;
+
+        const idBytes = arr.slice(pos, pos + 4);
+        const idHex = toHex(idBytes);
+        const statusBytes = arr.slice(pos + 4, pos + 8);
+        const flags = [...statusBytes].map(b => b !== 0);
+        out.push({ pos, idHex, flags, checks: [] });
+        pos += 8;
+      }
+      return out;
+    }
+
+    function toHex(u8) {
+      let s = '';
+      for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
+      return s.toUpperCase();
+    }
+
+    function render(list) {
+      elTBody.innerHTML = '';
+      let unrecognized = 0;
+      for (const ent of list) {
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = ent.idHex;
+        tr.appendChild(tdId);
+
+        const tdName = document.createElement('td');
+        const name = translations[ent.idHex] || ent.idHex;
+        if (!translations[ent.idHex]) unrecognized++;
+        tdName.textContent = name;
+        tr.appendChild(tdName);
+
+        for (let i = 0; i < 4; i++) {
+          const td = document.createElement('td');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !!ent.flags[i];
+          cb.addEventListener('change', () => {
+            ent.flags[i] = cb.checked;
+            updateCountsPill();
+          });
+          ent.checks[i] = cb;
+          td.appendChild(cb);
+          tr.appendChild(td);
+        }
+
+        elTBody.appendChild(tr);
+      }
+      elStatus.textContent = `Loaded ${list.length} tracks. Unrecognized: ${unrecognized}.`;
+      updateCountsPill();
+    }
+
+    function setAllInColumn(colIndex, value) {
+      for (const ent of entries) {
+        if (colIndex === null) {
+          // clear all
+          for (let i = 0; i < 4; i++) {
+            ent.flags[i] = !!value && false; // ensures false
+            if (ent.checks[i]) ent.checks[i].checked = false;
+          }
+        } else {
+          ent.flags[colIndex] = !!value;
+          if (ent.checks[colIndex]) ent.checks[colIndex].checked = !!value;
+        }
+      }
+      updateCountsPill();
+    }
+
+    function currentCounts() {
+      const counts = [0,0,0,0];
+      for (const ent of entries) for (let i=0;i<4;i++) if (ent.flags[i]) counts[i]++;
+      return counts;
+    }
+
+    function updateCountsPill() {
+      const c = currentCounts();
+      elCounts.textContent = `T1 ${c[0]} · T2 ${c[1]} · T3 ${c[2]} · T4 ${c[3]}`;
+      elCounts.hidden = false;
+    }
+
+    function onSave() {
+      if (!bytes || headerIdx < 0 || !entries.length) return;
+
+      // Write per-track flags back (do not alter size)
+      for (const ent of entries) {
+        for (let i = 0; i < 4; i++) {
+          bytes[ent.pos + 4 + i] = ent.flags[i] ? 0x01 : 0x00;
+        }
+      }
+
+      // Recalculate and write trophy totals (2 bytes, big-endian)
+      const counts = currentCounts();
+      for (let i = 0; i < 4; i++) {
+        const off = headerIdx + COUNT_OFFS[i];
+        bytes[off] = (counts[i] >> 8) & 0xff;
+        bytes[off + 1] = counts[i] & 0xff;
+      }
+
+      // Emit new file with identical length
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${currentFileNameBase}_edited.pul`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    }
+  </script>
+</body>
+</html>
