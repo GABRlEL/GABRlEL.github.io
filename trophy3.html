@@ -321,6 +321,20 @@
       }
       elStatus.textContent = `${elStatus.textContent} Unrecognized: ${unrec}.`;
       if (elSearch.value) onSearch();
+      // Warn the user if the loaded translations do not cover all track IDs present
+      if (entries.length && unrec > 0) {
+        alert(
+          `⚠️ Some tracks in this settings file were not recognized (missing in translations).\n\n` +
+          `This likely means your settings file is OUTDATED. To update it cleanly:\n` +
+          `1) In-game, change one of your settings to something else.\n` +
+          `2) Drive a quick Time Trials race.\n` +
+          `3) Re-export/reload the settings file here.\n\n` +
+          `Continuing without reloading/refreshing the file may reset your settings or corrupt the file entirely, which can cause the game to crash.`
+        );
+      }
+    }
+elStatus.textContent = `${elStatus.textContent} Unrecognized: ${unrec}.`;
+      if (elSearch.value) onSearch();
     }
 
     async function loadRRTranslations() {
