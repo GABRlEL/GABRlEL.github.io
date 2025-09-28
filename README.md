@@ -13,3 +13,5 @@
 [Lunacy in License Land – Duplicate Pseudo/Authentic Player ID Checker (RKP version)](https://gabrlel.github.io/dupechecksingle.html)
 
 [Trophy Surfer - Partial Trophy Monarch Web Port](https://gabrlel.github.io/trophy.html)
+
+[binner.ban — Wii Save banner.bin Editor](https://gabrlel.github.io/bnner.html)
