@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>binner.ban</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --panel:#141820; --muted:#a9b1bd; --text:#e6edf3; --accent:#79c0ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+      --br:16px;
+    }
+    html,body{height:100%;}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";}
+    a{color:var(--accent)}
+    .container{max-width:1200px;margin:0 auto;padding:20px;}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:22px;margin:0}
+    .sub{color:var(--muted);font-size:12px}
+    .row{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:1000px){.row{grid-template-columns:2fr 1fr}}
+    .card{background:var(--panel);border:1px solid #1f2430;border-radius:var(--br);}
+    .card h2{margin:0;font-size:16px}
+    .card .hdr{padding:14px 16px;border-bottom:1px solid #1f2430}
+    .card .bd{padding:16px}
+    .muted{color:var(--muted)}
+    .flex{display:flex;gap:8px;align-items:center}
+    .right{margin-left:auto}
+    .btn{background:#1f2430;border:1px solid #2a3140;color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .btn.ok{background:linear-gradient(#2e7d32,#2e7d32);border-color:#2a7a31}
+    .btn.warn{background:#2a210c;border-color:#3a2c11;color:#ffdf99}
+    .btn.ghost{background:transparent;border-color:#2a3140}
+    .inp,.sel,.chk{background:#0e1116;border:1px solid #2a3140;color:var(--text);padding:8px 10px;border-radius:10px}
+    .grid{display:grid;gap:12px}
+    .grid.cols2{grid-template-columns:1fr 1fr}
+    .grid.cols3{grid-template-columns:repeat(3,1fr)}
+    .grid.cols4{grid-template-columns:repeat(4,1fr)}
+    .stack{display:flex;flex-direction:column;gap:8px}
+    .kv{display:flex;justify-content:space-between;gap:8px}
+    .error{background:#2a1214;border:1px solid #4b1a1e;color:#ffb3b8;padding:10px;border-radius:12px;margin-bottom:12px}
+    .drop{padding:18px;border:2px dashed #2a3140;border-radius:14px;text-align:center;color:var(--muted)}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#11151b;border:1px solid #2a3140;border-radius:999px;padding:4px 8px;font-size:12px;color:var(--muted)}
+    .note{font-size:12px;color:var(--muted)}
+    canvas{image-rendering:pixelated;background:repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 50%/16px 16px;border-radius:10px;border:1px solid #2a3140}
+    .row-slim{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .iconGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .iconCard{border:1px solid #2a3140;border-radius:12px;padding:10px}
+    .sep{height:1px;background:#1f2430;margin:10px 0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>binner.ban — Wii Save <code>banner.bin</code> Editor</h1>
+        <div class="sub">Single-file web app. Works with <strong>save-data banners</strong> only (<code>WIBN</code>). Channel/disc meta banners (IMD5+U8) and <code>data.bin</code> exports are not supported.</div>
+      </div>
+      <div class="row-slim">
+        <label class="btn" for="fileOpen">Open banner.bin</label>
+        <input id="fileOpen" type="file" accept="application/octet-stream,.bin" style="display:none" />
+        <button class="btn" id="btnSave" disabled>Download banner.bin</button>
+      </div>
+    </header>
+
+    <div id="err" class="error" style="display:none"></div>
+
+    <div class="drop" id="drop">Drag & drop a raw save <code>banner.bin</code> here or use the Open button.</div>
+
+    <div class="row" id="content" style="display:none">
+      <section class="card">
+        <div class="hdr"><h2>Visuals</h2><div class="sub">Import/Export PNGs — Banner (192×64), Icons (48×48)</div></div>
+        <div class="bd grid cols2">
+          <div class="stack">
+            <div class="kv"><strong>Banner</strong><span class="chip" id="alphaWarn" style="display:none">semi‑transparent pixels</span></div>
+            <canvas id="bannerCanvas" width="192" height="64" style="width:384px;height:128px"></canvas>
+            <div class="row-slim">
+              <label class="btn" for="bannerPng">Import PNG</label>
+              <input id="bannerPng" type="file" accept="image/png" style="display:none" />
+              <button class="btn" id="bannerExport">Export PNG</button>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="kv"><strong>Icons</strong><span class="chip" id="iconCountChip">0 / 8</span></div>
+            <div class="iconGrid" id="icons"></div>
+            <div class="row-slim">
+              <button class="btn" id="addIcon">Add blank</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="hdr"><h2>Metadata & Flags</h2></div>
+        <div class="bd stack">
+          <div>
+            <label>Title (line 1)</label>
+            <input id="line1" class="inp" maxlength="32" />
+            <div class="note"><span id="l1len">0</span>/32 UTF‑16 code units (≈20 reliably visible in System Menu)</div>
+          </div>
+          <div>
+            <label>Comment (line 2)</label>
+            <input id="line2" class="inp" maxlength="32" />
+            <div class="note"><span id="l2len">0</span>/32 UTF‑16 code units</div>
+          </div>
+
+          <div class="sep"></div>
+
+          <div class="row-slim">
+            <label class="chk"><input type="checkbox" id="flagCopy"/> Copy‑protected</label>
+          </div>
+          <div class="row-slim">
+            <label>Animation</label>
+            <select id="anim" class="sel">
+              <option value="loop">Loop</option>
+              <option value="bounce">Bounce</option>
+            </select>
+          </div>
+
+          <div class="sep"></div>
+
+          <div>
+            <strong>Frame timing</strong>
+            <div class="note">Animation ends at first END. Values: FAST=4f, NORMAL=8f, SLOW=12f.</div>
+            <div class="grid cols4" id="timing"></div>
+          </div>
+
+          <div class="sep"></div>
+
+          <div class="stack">
+            <div class="kv"><span>Computed file size</span><code id="fileSize">—</code></div>
+            <div class="note">= 0xA0 header/strings + 24,576 banner + N × 4,608 icon(s)</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="note" style="margin-top:12px">Tip: If you get “missing WIBN signature”, you likely uploaded a channel/disc banner (IMD5+U8) or an SD export <code>data.bin</code>. This tool supports <em>save</em> <code>banner.bin</code> only.</p>
+<p class="note" style="margin-top:12px">Backup your <code>banner.bin</code> before using this tool. This tool has only been tested on Dolphin.</p>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+  // -------------------- constants & helpers --------------------
+  const SIG_WIBN = 0x5749424E; // 'WIBN'
+  const HEADER_SIZE = 0x20;
+  const COMMENT0_OFF = 0x20;
+  const COMMENT1_OFF = 0x60;
+  const BANNER_OFF = 0x00A0;
+  const BANNER_W = 192, BANNER_H = 64;
+  const ICON_W = 48, ICON_H = 48;
+  const BANNER_BYTES = BANNER_W * BANNER_H * 2; // 24576
+  const ICON_BYTES = ICON_W * ICON_H * 2; // 4608
+  const MAX_ICONS = 8;
+  const ICON_SPEED = { END:0, FAST:1, NORMAL:2, SLOW:3 };
+  const ICON_SPEED_LABEL = ["END","FAST (4f)","NORMAL (8f)","SLOW (12f)"];
+  const FLAG_NOTCOPY = 0x00000001;
+  const FLAG_BOUNCE = 0x00000010;
+
+  // dom refs
+  const el = (id) => document.getElementById(id);
+  const err = el('err');
+  const content = el('content');
+  const drop = el('drop');
+  const fileOpen = el('fileOpen');
+  const btnSave = el('btnSave');
+  const bannerCanvas = el('bannerCanvas');
+  const bannerPng = el('bannerPng');
+  const bannerExport = el('bannerExport');
+  const alphaWarn = el('alphaWarn');
+  const iconsWrap = el('icons');
+  const addIconBtn = el('addIcon');
+  const iconCountChip = el('iconCountChip');
+  const line1 = el('line1');
+  const line2 = el('line2');
+  const l1len = el('l1len');
+  const l2len = el('l2len');
+  const flagCopy = el('flagCopy');
+  const anim = el('anim');
+  const timing = el('timing');
+  const fileSize = el('fileSize');
+
+  // state
+  let filename = '';
+  let parsed = null; // object as below
+  let bannerRGBA = null; // Uint8ClampedArray
+  let iconsRGBA = []; // array of Uint8ClampedArray
+  let speeds = new Array(MAX_ICONS).fill(0);
+  let flags = 0;
+
+  // -------------------- RGB5A3 <-> RGBA --------------------
+  const expand4to8 = v => Math.round((v/15)*255);
+  const expand5to8 = v => Math.round((v/31)*255);
+  const expand3to8 = v => Math.round((v/7)*255);
+  const shrink8to4 = v => Math.max(0, Math.min(15, Math.round((v/255)*15)));
+  const shrink8to5 = v => Math.max(0, Math.min(31, Math.round((v/255)*31)));
+  const shrink8to3 = v => Math.max(0, Math.min(7, Math.round((v/255)*7)));
+
+  function rgb5a3ToRgba(px16){
+    if ((px16 & 0x8000) === 0){
+      const a = (px16>>12)&7, r=(px16>>8)&15, g=(px16>>4)&15, b=px16&15;
+      return [expand4to8(r), expand4to8(g), expand4to8(b), expand3to8(a)];
+    } else {
+      const r=(px16>>10)&31, g=(px16>>5)&31, b=px16&31;
+      return [expand5to8(r), expand5to8(g), expand5to8(b), 255];
+    }
+  }
+  function rgbaToRgb5a3(r,g,b,a){
+    if (a >= 224){
+      const R=shrink8to5(r), G=shrink8to5(g), B=shrink8to5(b);
+      return 0x8000 | (R<<10) | (G<<5) | B;
+    } else {
+      const A=shrink8to3(a), R=shrink8to4(r), G=shrink8to4(g), B=shrink8to4(b);
+      return (A<<12)|(R<<8)|(G<<4)|B;
+    }
+  }
+
+  // 4x4 tiled order (row-major tiles, inner 4x4 order)
+  function decodeRGB5A3Tiled(bytes, w, h){
+    const out = new Uint8ClampedArray(w*h*4);
+    let idx=0;
+    for (let y=0;y<h;y+=4){
+      for (let x=0;x<w;x+=4){
+        for (let dy=0;dy<4;dy++){
+          for (let dx=0;dx<4;dx++){
+            const px = x+dx, py=y+dy;
+            const hi = bytes[idx++];
+            const lo = bytes[idx++];
+            const px16 = (hi<<8)|lo;
+            const [r,g,b,a] = rgb5a3ToRgba(px16);
+            const o=(py*w+px)*4; out[o]=r; out[o+1]=g; out[o+2]=b; out[o+3]=a;
+          }
+        }
+      }
+    }
+    return out;
+  }
+  function encodeRGB5A3Tiled(rgba, w, h){
+    const out = new Uint8Array(w*h*2);
+    let idx=0;
+    for (let y=0;y<h;y+=4){
+      for (let x=0;x<w;x+=4){
+        for (let dy=0;dy<4;dy++){
+          for (let dx=0;dx<4;dx++){
+            const px=x+dx, py=y+dy; const o=(py*w+px)*4;
+            const r=rgba[o], g=rgba[o+1], b=rgba[o+2], a=rgba[o+3];
+            const px16 = rgbaToRgb5a3(r,g,b,a);
+            out[idx++] = (px16>>8)&0xff; out[idx++] = px16&0xff;
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  // -------------------- UTF-16BE --------------------
+  function decodeUTF16BE(dv, off, chars){
+    let s='';
+    for (let i=0;i<chars;i++){
+      const cu = dv.getUint16(off+i*2, false);
+      if (cu===0) break; s += String.fromCharCode(cu);
+    }
+    return s;
+  }
+  function encodeUTF16BE(str, chars){
+    const out = new Uint8Array(chars*2); const dv = new DataView(out.buffer);
+    let i=0; for (; i<Math.min(chars, str.length); i++){ dv.setUint16(i*2, str.charCodeAt(i), false); }
+    return out; // remainder zero
+  }
+
+  // -------------------- PNG helpers --------------------
+  function rgbaFromPNG(file, expectedW, expectedH){
+    return new Promise((resolve, reject)=>{
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = ()=>{
+        try{
+          if (img.width!==expectedW || img.height!==expectedH){
+            throw new Error(`PNG dimensions must be ${expectedW}x${expectedH}, got ${img.width}x${img.height}`);
+          }
+          const c = document.createElement('canvas'); c.width=expectedW; c.height=expectedH;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img,0,0);
+          const data = ctx.getImageData(0,0,expectedW,expectedH).data;
+          resolve(new Uint8ClampedArray(data));
+        }catch(e){ reject(e); }
+        finally{ URL.revokeObjectURL(url); }
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('Failed to load PNG')); };
+      img.src = url;
+    });
+  }
+  function downloadPNG(rgba, w, h, name){
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const ctx = c.getContext('2d');
+    const img = new ImageData(rgba, w, h);
+    ctx.putImageData(img, 0, 0);
+    c.toBlob(b=>{ const url = URL.createObjectURL(b); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url); }, 'image/png');
+  }
+  function downloadBinary(bytes, name){
+    const blob = new Blob([bytes], { type:'application/octet-stream' });
+    const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function hasAnyTransparency(rgba){
+    for (let i=3;i<rgba.length;i+=4) if (rgba[i]<255) return true; return false;
+  }
+
+  // -------------------- parse/build banner.bin --------------------
+  function getIconCountFromSize(totalBytes){
+    const afterBanner = totalBytes - (BANNER_OFF + BANNER_BYTES);
+    if (afterBanner <= 0) return 0;
+    return Math.max(0, Math.min(MAX_ICONS, Math.floor(afterBanner / ICON_BYTES)));
+  }
+  function get2Bit(u16, idx){ return (u16 >> (idx*2)) & 0x3; }
+  function set2Bit(u16, idx, val){ const mask = ~(0x3 << (idx*2)) & 0xffff; return (u16 & mask) | ((val & 0x3) << (idx*2)); }
+
+  function parseBannerBin(buf){
+    const dv = new DataView(buf);
+    const sig = dv.getUint32(0,false);
+    if (sig !== SIG_WIBN) throw new Error("Not a save banner.bin (WIBN signature missing). This is likely a channel/disc banner or an SD export.");
+    const flags = dv.getUint32(0x04,false);
+    const iconSpeedU16 = dv.getUint16(0x08,false);
+    const line1 = decodeUTF16BE(dv, COMMENT0_OFF, 32);
+    const line2 = decodeUTF16BE(dv, COMMENT1_OFF, 32);
+
+    const bannerBytes = new Uint8Array(buf, BANNER_OFF, BANNER_BYTES);
+    const bannerRGBA = decodeRGB5A3Tiled(bannerBytes, BANNER_W, BANNER_H);
+
+    const totalBytes = buf.byteLength;
+    const physicalIconCount = getIconCountFromSize(totalBytes);
+    const iconsRGBA = [];
+    const iconsOff = BANNER_OFF + BANNER_BYTES;
+    for (let i=0;i<physicalIconCount;i++){
+      const bytes = new Uint8Array(buf, iconsOff + i*ICON_BYTES, ICON_BYTES);
+      iconsRGBA.push(decodeRGB5A3Tiled(bytes, ICON_W, ICON_H));
+    }
+    const speeds = new Array(MAX_ICONS).fill(0).map((_,i)=>get2Bit(iconSpeedU16,i));
+    return { flags, line1, line2, bannerRGBA, iconsRGBA, speeds };
+  }
+
+  function buildBannerBin(state){
+    const iconCount = Math.max(0, Math.min(MAX_ICONS, state.iconsRGBA.length));
+    const totalSize = BANNER_OFF + BANNER_BYTES + iconCount*ICON_BYTES;
+    const out = new Uint8Array(totalSize);
+    const dv = new DataView(out.buffer);
+    dv.setUint32(0x00, SIG_WIBN, false);
+    dv.setUint32(0x04, state.flags>>>0, false);
+    let u16=0; for (let i=0;i<MAX_ICONS;i++){ u16 = set2Bit(u16, i, state.speeds[i] ?? 0); }
+    dv.setUint16(0x08, u16, false);
+    // reserved 0x0A..0x1F = zero
+    out.set(encodeUTF16BE(state.line1, 32), COMMENT0_OFF);
+    out.set(encodeUTF16BE(state.line2, 32), COMMENT1_OFF);
+    out.set(encodeRGB5A3Tiled(state.bannerRGBA, BANNER_W, BANNER_H), BANNER_OFF);
+    let off = BANNER_OFF + BANNER_BYTES;
+    for (let i=0;i<iconCount;i++){
+      out.set(encodeRGB5A3Tiled(state.iconsRGBA[i], ICON_W, ICON_H), off);
+      off += ICON_BYTES;
+    }
+    return out;
+  }
+
+  // -------------------- UI wiring --------------------
+  function showError(msg){ err.textContent = msg; err.style.display = 'block'; }
+  function clearError(){ err.style.display = 'none'; err.textContent=''; }
+  function updateComputedSize(){
+    const n = iconsRGBA.length; const size = BANNER_OFF + BANNER_BYTES + n*ICON_BYTES; fileSize.textContent = size.toLocaleString()+' bytes';
+    iconCountChip.textContent = `${n} / ${MAX_ICONS}`;
+    alphaWarn.style.display = bannerRGBA && hasAnyTransparency(bannerRGBA) ? 'inline-flex' : 'none';
+  }
+  function renderBanner(){
+    if (!bannerRGBA) return;
+    const ctx = bannerCanvas.getContext('2d');
+    const img = new ImageData(bannerRGBA, BANNER_W, BANNER_H);
+    ctx.putImageData(img, 0, 0);
+  }
+  function renderIcons(){
+    iconsWrap.innerHTML = '';
+    iconsRGBA.forEach((icon, i)=>{
+      const wrap = document.createElement('div'); wrap.className='iconCard';
+      const c = document.createElement('canvas'); c.width=ICON_W; c.height=ICON_H; c.style.width='96px'; c.style.height='96px';
+      const ctx = c.getContext('2d'); ctx.putImageData(new ImageData(icon, ICON_W, ICON_H), 0, 0);
+      const row = document.createElement('div'); row.className='row-slim'; row.style.marginTop='8px';
+      // import
+      const lab = document.createElement('label'); lab.className='btn'; lab.textContent='Import PNG'; lab.htmlFor = `iconPng${i}`;
+      const input = document.createElement('input'); input.type='file'; input.accept='image/png'; input.id=`iconPng${i}`; input.style.display='none';
+      input.onchange = async (e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; try{ const rgba=await rgbaFromPNG(f, ICON_W, ICON_H); iconsRGBA[i]=rgba; renderIcons(); updateComputedSize(); }catch(ex){ showError(ex.message||String(ex)); }};
+      // export
+      const exp = document.createElement('button'); exp.className='btn'; exp.textContent='Export PNG'; exp.onclick = ()=> downloadPNG(icon, ICON_W, ICON_H, `icon_${i}.png`);
+      // speed select
+      const speedSel = document.createElement('select'); speedSel.className='sel';
+      for (let k=0;k<4;k++){ const opt=document.createElement('option'); opt.value=String(k); opt.textContent=ICON_SPEED_LABEL[k]; if ((speeds[i]??0)===k) opt.selected=true; speedSel.appendChild(opt);} 
+      speedSel.onchange = ()=>{ const v=Number(speedSel.value)&3; speeds[i]=v; if (v===ICON_SPEED.END){ for(let t=i+1;t<MAX_ICONS;t++) speeds[t]=ICON_SPEED.END; } renderTiming(); };
+      // remove
+      const rm = document.createElement('button'); rm.className='btn ghost'; rm.textContent='Remove'; rm.onclick = ()=>{ iconsRGBA.splice(i,1); // shift speeds left
+        for (let k=i;k<MAX_ICONS-1;k++) speeds[k]=speeds[k+1]; speeds[MAX_ICONS-1]=ICON_SPEED.END; renderIcons(); renderTiming(); updateComputedSize(); };
+
+      row.appendChild(lab); row.appendChild(input); row.appendChild(exp); row.appendChild(speedSel); row.appendChild(rm);
+      wrap.appendChild(c); wrap.appendChild(row);
+      iconsWrap.appendChild(wrap);
+    });
+  }
+  function renderTiming(){
+    timing.innerHTML='';
+    for (let i=0;i<MAX_ICONS;i++){
+      const cell = document.createElement('div'); cell.className='stack'; cell.style.border='1px solid #2a3140'; cell.style.borderRadius='10px'; cell.style.padding='8px';
+      const idx = document.createElement('div'); idx.textContent=String(i); idx.style.fontFamily='ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      const val = document.createElement('div'); val.textContent = ICON_SPEED_LABEL[speeds[i]??0]; val.className='muted';
+      cell.appendChild(idx); cell.appendChild(val);
+      timing.appendChild(cell);
+    }
+  }
+
+  function refreshUI(){
+    renderBanner(); renderIcons(); renderTiming(); updateComputedSize();
+    line1.value = parsed.line1 || ''; line2.value = parsed.line2 || '';
+    flags = parsed.flags>>>0; flagCopy.checked = !!(flags & FLAG_NOTCOPY); anim.value = (flags & FLAG_BOUNCE) ? 'bounce':'loop';
+    speeds = [...parsed.speeds];
+    l1len.textContent = String(line1.value.length); l2len.textContent = String(line2.value.length);
+    btnSave.disabled = false; content.style.display='grid';
+  }
+
+  async function openFile(file){
+    clearError(); try{
+      const buf = await file.arrayBuffer();
+      filename = file.name || 'banner.bin';
+      const p = parseBannerBin(buf);
+      parsed = p; bannerRGBA = p.bannerRGBA; iconsRGBA = p.iconsRGBA; speeds = [...p.speeds]; flags = p.flags>>>0;
+      refreshUI();
+    } catch(ex){ showError(ex.message || String(ex)); }
+  }
+
+  // events
+  fileOpen.addEventListener('change', (e)=>{ const f=e.target.files && e.target.files[0]; if (f) openFile(f); });
+
+  ;['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.style.borderColor = '#3b4558'; }));
+  ;['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.style.borderColor = '#2a3140'; }));
+  drop.addEventListener('drop', (e)=>{ const f=e.dataTransfer.files && e.dataTransfer.files[0]; if (f) openFile(f); });
+
+  bannerPng.addEventListener('change', async (e)=>{
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    try{ bannerRGBA = await rgbaFromPNG(f, BANNER_W, BANNER_H); renderBanner(); updateComputedSize(); } catch(ex){ showError(ex.message||String(ex)); }
+  });
+  bannerExport.addEventListener('click', ()=>{ if (bannerRGBA) downloadPNG(bannerRGBA, BANNER_W, BANNER_H, 'banner.png'); });
+
+  addIconBtn.addEventListener('click', ()=>{ if (iconsRGBA.length>=MAX_ICONS) return; iconsRGBA.push(new Uint8ClampedArray(ICON_W*ICON_H*4)); if ((speeds[iconsRGBA.length-1]??0)===ICON_SPEED.END) speeds[iconsRGBA.length-1]=ICON_SPEED.NORMAL; renderIcons(); renderTiming(); updateComputedSize(); });
+
+  line1.addEventListener('input', ()=>{ l1len.textContent = String(line1.value.length); });
+  line2.addEventListener('input', ()=>{ l2len.textContent = String(line2.value.length); });
+  flagCopy.addEventListener('change', ()=>{ if (flagCopy.checked) flags = (flags | FLAG_NOTCOPY)>>>0; else flags = (flags & ~FLAG_NOTCOPY)>>>0; });
+  anim.addEventListener('change', ()=>{ if (anim.value==='bounce') flags = (flags | FLAG_BOUNCE)>>>0; else flags = (flags & ~FLAG_BOUNCE)>>>0; });
+
+  btnSave.addEventListener('click', ()=>{
+    if (!bannerRGBA){ showError('No banner image loaded'); return; }
+    try{
+      const out = buildBannerBin({
+        line1: line1.value, line2: line2.value,
+        bannerRGBA, iconsRGBA, speeds, flags
+      });
+      downloadBinary(out, filename || 'banner.bin');
+    } catch(ex){ showError(ex.message||String(ex)); }
+  });
+})();
+</script>
+<section id="credits" style="margin-top:32px;padding-top:16px;border-top:1px solid #2a3140">
+  <h3 style="margin:0 0 8px 0">Credits & Sources</h3>
+  <ul style="margin:0;padding:0 0 0 18px;line-height:1.5">
+    <li>
+      Pokeacer — <em>for releasing Wii Save Data Creation Guidelines</em> (Dec 7, 2006).
+      Not linked for security reasons.
+      <small style="color:#9aa3ae">Primary spec for save-data <code>banner.bin</code> (WIBN), struct layout, flags, string sizes, and image requirements.</small>
+    </li>
+    <li>
+      WiiBrew — <em>Savegame Files</em>.
+      <a href="https://wiibrew.org/wiki/Savegame_Files" target="_blank" rel="noopener">Article</a>.
+      <small style="color:#9aa3ae">Background on exported <code>data.bin</code> container (encryption/signing) versus raw NAND files.</small>
+    </li>
+    <li>
+      Custom Mario Kart (Tockdom) — <em>Image Formats</em>.
+      <a href="https://wiki.tockdom.com/wiki/Image_Formats" target="_blank" rel="noopener">Article</a>.
+      <small style="color:#9aa3ae">Details on GX 4×4 tiling and RGB5A3 bit layout used for banner/icon textures.</small>
+    </li>
+    <li>
+      HackMii — Marcan et&nbsp;al., <em>The Elusive Banner</em> (May 2008).
+      <a href="https://hackmii.com/2008/05/the-elusive-banner/" target="_blank" rel="noopener">Post</a>.
+      <small style="color:#9aa3ae">Explains channel/disc banners (IMET + U8 archive) to distinguish them from save <code>banner.bin</code>.</small>
+    </li>
+    <li>
+      Dolphin Forums — <em>Game banner graphic file extraction</em>.
+      <a href="https://forums.dolphin-emu.org/Thread-game-banner-graphic-file-extraction" target="_blank" rel="noopener">Thread</a>.
+      <small style="color:#9aa3ae">Community notes confirming save <code>banner.bin</code> differs from channel/disc banners.</small>
+    </li>
+    <li>
+      WiiBrew — <em>Opening.bnr</em>.
+      <a href="https://wiibrew.org/wiki/Opening.bnr" target="_blank" rel="noopener">Article</a>.
+      <small style="color:#9aa3ae">Context on disc/channel banner assets and formats (IMET/IMD5/U8).</small>
+    </li>
+<li>
+      ChatGPT 5 Thinking.
+      <small style="color:#9aa3ae">One-shotting this tool within a few prompts.</small>
+    </li>
+    </ul>
+</section>
+</body>
+</html>
