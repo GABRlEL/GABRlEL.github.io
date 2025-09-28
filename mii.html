@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MKMii - MKWii Main.dol Mii Color Editor</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#171a20; --muted:#a0a4ae; --text:#e6e7ea; --brand:#7aa2ff; --ok:#4cc38a; --warn:#f5a623; --bad:#ef4e4e; }
+    html, body { height: 100%; }
+    body { margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif; color:var(--text); background:radial-gradient(1200px 600px at 10% -10%, #1a2030, #0d0f14 55%, #0a0c10 100%) fixed; }
+    a { color: var(--brand); text-decoration: none; }
+    .container { max-width: 1100px; margin: 28px auto 64px; padding: 0 18px; }
+    header { display:flex; gap:16px; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+    .title { font-weight: 700; font-size: 20px; letter-spacing: 0.3px; }
+    .subtitle { color: var(--muted); font-size: 12px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 16px; }
+    .card { background: linear-gradient(180deg, #1c2130, #151924); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); overflow: hidden; }
+    .card h2 { margin: 0; padding: 14px 16px; font-size: 14px; letter-spacing: 0.2px; background: linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.07)); border-bottom: 1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; }
+    .card .body { padding: 14px 16px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .drop { border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 16px; text-align: center; transition: border-color .2s, background .2s; }
+    .drop.drag { border-color: var(--brand); background: rgba(122,162,255,0.06); }
+    .btn { display:inline-flex; align-items:center; gap:8px; background: #1e2433; color: var(--text); border: 1px solid rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 10px; cursor:pointer; transition: transform .02s ease, background .2s, border-color .2s; user-select:none; }
+    .btn:hover { background: #232a3e; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: #27314a; border-color: rgba(122,162,255,0.35); color:#eaf0ff; }
+    .btn.ok { background: #1c2b24; border-color: rgba(76,195,138,0.3); color:#c8f5e3; }
+    .btn.warn { background: #2d2515; border-color: rgba(245,166,35,0.3); color:#ffe4bf; }
+    .btn.bad { background: #2a1922; border-color: rgba(239,78,78,0.35); color:#ffdee1; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row + .row { margin-top: 8px; }
+    .kv { display:grid; grid-template-columns: 130px 1fr; gap: 12px; align-items:center; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .muted { color: var(--muted); }
+    .tag { font-size: 11px; border: 1px solid rgba(255,255,255,0.12); padding:2px 6px; border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+    .status { display:inline-flex; align-items:center; gap:6px; padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+    .status.ok { background: rgba(76,195,138,0.14); color:#c8f5e3; }
+    .status.warn { background: rgba(245,166,35,0.12); color:#ffe4bf; }
+    .status.bad { background: rgba(239,78,78,0.12); color:#ffdee1; }
+    .swatch { width: 22px; height: 22px; border-radius: 6px; border:1px solid rgba(255,255,255,0.15); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+    .group { margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow:hidden; }
+    .group h3 { margin:0; padding:8px 10px; font-size:12px; color:#dbe3ff; background: linear-gradient(0deg, rgba(122,162,255,0.1), rgba(122,162,255,0.05)); border-bottom:1px solid rgba(255,255,255,0.08); }
+    .color-row { display:grid; grid-template-columns: 160px 160px 110px minmax(260px, 1fr); gap:8px; padding:8px 10px; align-items:center; }
+    .color-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+    input[type="text"], input[type="number"] { background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12px; width:100%; box-sizing:border-box; }
+    input[type="text"].mono { font-size: 12px; letter-spacing: .2px; }
+    input[type="color"] { width: 100%; height: 30px; border:none; background: transparent; }
+    .footer { margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .sticky { position: sticky; top: 10px; }
+    .small { font-size: 11px; }
+    details > summary { cursor: pointer; color: var(--muted); }
+    .sep { height: 8px; }
+    .hr { height: 1px; background: rgba(255,255,255,0.08); margin: 10px 0; }
+    select { background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12px; width:100%; box-sizing:border-box; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">MKMii — <span class="muted">MKWii Main.dol</span> — <span style="color:#c9e6ff">Mii Color Editor</span></div>
+        <div class="subtitle">100% client‑side. Detects disc variant, locates FaceLib color table, lets you edit all Mii‑related colors, then download a patched <code class="mono">main.dol</code>.</div>
+      </div>
+      <div class="row">
+        <button id="btnDownload" class="btn ok" disabled>⬇ Download patched <span class="mono">main.dol</span></button>
+        <button id="btnRevert" class="btn" disabled>↩ Revert unsaved changes</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1) Load <code class="mono">main.dol</code><span class="hint"> No uploads — everything stays local.</span></h2>
+        <div class="body">
+          <div id="drop" class="drop">
+            <div class="row" style="justify-content:center; gap:12px;">
+              <label class="btn primary" for="file">Choose file…</label>
+              <input id="file" type="file" accept=".dol" hidden />
+              <div class="muted">…or drag & drop your <span class="mono">main.dol</span> here</div>
+            </div>
+            <div class="hr"></div>
+            <div class="kv">
+              <div class="muted">Loaded file</div>
+              <div id="fileInfo" class="mono">—</div>
+              <div class="muted">Detected disc variant</div>
+              <div id="variant" class="mono">—</div>
+              <div class="muted">Override variant</div>
+              <div>
+                <select id="variantOverride">
+                  <option value="">Auto (detected)</option>
+                  <option value="NTSC-U">NTSC-U (RMCE01)</option>
+                  <option value="PAL">PAL (RMCP01)</option>
+                  <option value="NTSC-J">NTSC-J (RMCJ01)</option>
+                  <option value="NTSC-K">NTSC-K (RMCK01)</option>
+                </select>
+              </div>
+              <div class="muted">FaceLib base</div>
+              <div id="facelib" class="mono">—</div>
+              <div class="muted">Patches</div>
+              <div id="patchCount" class="mono">0</div>
+            </div>
+          </div>
+          <div class="sep"></div>
+          <details>
+            <summary>Verification & detection details</summary>
+            <div class="hr"></div>
+            <table id="detTable">
+              <thead>
+                <tr><th style="width:160px">Variant / Path</th><th class="mono" style="width:90px">Offset</th><th style="width:90px">Found byte</th><th>Meaning</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <div class="small muted" style="margin-top:8px">Region‑byte scan matches the algorithm offsets from <a href="https://mariokartwii.com/showthread.php?tid=1055" target="_blank" rel="noopener noreferrer">Vega</a>'s documentation; PAL/JP have two code paths. Values map to <span class="mono">00..06</span> = Japan, Americas, Europe, AUS/NZ, Taiwan, South Korea, China.</div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2) Edit all Mii colors <span class="hint">(FaceLib element colors)</span></h2>
+        <div class="body" id="editor">
+          <div class="muted">Load a file to populate the editor.</div>
+        </div>
+        <div class="body footer">
+          <button id="btnDefaults" class="btn warn" disabled>↺ Reset to MKW defaults (per Wiiki)</button>
+          <button id="btnExport" class="btn" disabled>⇥ Export palette (.json)</button>
+          <button id="btnImport" class="btn" disabled>⇤ Import palette (.json)</button>
+          <input id="importJson" type="file" accept="application/json" hidden />
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Notes</h2>
+      <div class="body small">
+        <ul>
+          <li>Disc variant detection reads the known <em>Region ID algorithm result</em> byte inside <code class="mono">main.dol</code> at offsets: <span class="mono">0x6113 (RMCE01)</span>, <span class="mono">0x614F / 0x61AF (RMCP01)</span>, <span class="mono">0x60A3 / 0x60D3 (RMCJ01)</span>, <span class="mono">0x625F (RMCK01)</span>. PAL and JP have two valid paths.</li>
+          <li>FaceLib base addresses for Mario Kart Wii: <span class="mono">PAL 0x2479B0, NTSC‑U 0x247678, NTSC‑J 0x247340, NTSC‑K 0x247788</span>. All element color offsets are relative to this base.</li>
+          <li>Colors are stored as 32‑bit big‑endian RGBA words. The HTML color input edits RGB; alpha can be adjusted separately (0–255).</li>
+          <li><strong>Back up</strong> your original file. To patch a full ISO/WBFS, extract <code class="mono">main.dol</code>, patch here, then rebuild with Wiimm's WIT or your preferred tool. Alternatively use in My Stuff on packs that allow it.</li>
+          <li>Tool created by ChatGPT 5 Thinking. Credits to Tockdom for the documentation on the <a href="https://wiki.tockdom.com/wiki/Main.dol" target="_blank" rel="noopener noreferrer">Main.dol file</a>.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+// ======= Constants =======
+const REGION_PATHS = [
+  { variant: 'NTSC-U (RMCE01)', key:'NTSC-U', paths: [ { name: 'RMCE01', offset: 0x6113 } ] },
+  { variant: 'PAL (RMCP01)',    key:'PAL',    paths: [ { name: 'RMCP01 (EU path)', offset: 0x614F }, { name:'RMCP01 (AUS/NZ path)', offset: 0x61AF } ] },
+  { variant: 'NTSC-J (RMCJ01)', key:'NTSC-J', paths: [ { name: 'RMCJ01 (no TWN)', offset: 0x60A3 }, { name:'RMCJ01 (TWN)', offset: 0x60D3 } ] },
+  { variant: 'NTSC-K (RMCK01)', key:'NTSC-K', paths: [ { name: 'RMCK01', offset: 0x625F } ] },
+];
+const REGION_MAP = {
+  0x00: { name:'Japan', color: 'red' },
+  0x01: { name:'Americas', color: 'blue' },
+  0x02: { name:'Europe', color: 'green' },
+  0x03: { name:'Australia/NZ', color: 'yellow' },
+  0x04: { name:'Taiwan', color: 'white' },
+  0x05: { name:'South Korea', color: 'purple' },
+  0x06: { name:'China', color: 'white' }
+};
+const FACELIB_BASE = { 'PAL': 0x2479B0, 'NTSC-U': 0x247678, 'NTSC-J': 0x247340, 'NTSC-K': 0x247788 };
+
+// FaceLib element color layout defaults (RRGGBBAA)
+const WIIKI_DEFAULTS = {
+  0x00:'F0D8C4FF',0x04:'FFBC80FF',0x08:'D88850FF',0x0C:'FFB090FF',0x10:'985030FF',0x14:'522E1CFF',
+  0x18:'1E1A18FF',0x1C:'382015FF',0x20:'552617FF',0x24:'704024FF',0x28:'727278FF',0x2C:'49361AFF',0x30:'7A5928FF',0x34:'C19F64FF',
+  0x38:'1E1A18FF',0x3C:'382015FF',0x40:'552617FF',0x44:'704024FF',0x48:'727278FF',0x4C:'49361AFF',0x50:'7A5928FF',0x54:'C19F64FF',
+  0x58:'101010FF',0x5C:'603810FF',0x60:'981810FF',0x64:'203060FF',0x68:'905800FF',0x6C:'605850FF',
+  0x70:'B84030FF',0x74:'F07828FF',0x78:'F8D820FF',0x7C:'80C828FF',0x80:'007428FF',0x84:'204898FF',0x88:'40A0D8FF',0x8C:'E86078FF',0x90:'702CA8FF',0x94:'483818FF',0x98:'E0E0E0FF',0x9C:'181814FF',
+  0x118:'000000FF',0x11C:'7C8080FF',0x120:'705040FF',0x124:'706E40FF',0x128:'5868B8FF',0x12C:'488068FF',
+  0x130:'1E1A18FF',0x134:'382015FF',0x138:'552617FF',0x13C:'704024FF',0x140:'727278FF',0x144:'49361AFF',0x148:'7A5928FF',0x14C:'C19F64FF',
+  0x150:'BE4E26FF',0x154:'D83028FF',0x158:'CF4447FF',0x15C:'712A04FF',0x160:'781510FF',0x164:'7E2528FF',
+  0x168:'1E1A18FF',0x16C:'382015FF',0x170:'552617FF',0x174:'704024FF',0x178:'727278FF',0x17C:'49361AFF',0x180:'7A5928FF',0x184:'C19F64FF'
+};
+const GROUPS = [
+  { name:'Skin colors', keys:[0x00,0x04,0x08,0x0C,0x10,0x14] },
+  { name:'Hair colors', keys:[0x18,0x1C,0x20,0x24,0x28,0x2C,0x30,0x34] },
+  { name:'Beard colors', keys:[0x38,0x3C,0x40,0x44,0x48,0x4C,0x50,0x54] },
+  { name:'Glasses colors', keys:[0x58,0x5C,0x60,0x64,0x68,0x6C] },
+  { name:'Body colors', keys:[0x70,0x74,0x78,0x7C,0x80,0x84,0x88,0x8C,0x90,0x94,0x98,0x9C] },
+  { name:'Eye colors', keys:[0x118,0x11C,0x120,0x124,0x128,0x12C] },
+  { name:'Eyebrow colors', keys:[0x130,0x134,0x138,0x13C,0x140,0x144,0x148,0x14C] },
+  { name:'Lips colors', keys:[0x150,0x154,0x158,0x15C,0x160,0x164] },
+  { name:'Moustache colors', keys:[0x168,0x16C,0x170,0x174,0x178,0x17C,0x180,0x184] }
+];
+
+// ======= State =======
+let originalBytes = null; // Uint8Array
+let bytes = null;         // Uint8Array (mutable)
+let view = null;          // DataView on bytes.buffer
+let fileHandle = null;    // File
+let selectedVariant = null; // detected: 'PAL' | 'NTSC-U' | 'NTSC-J' | 'NTSC-K'
+let detectedPaths = [];
+let faceBase = null;      // number
+let patchCount = 0;       // how many values changed compared to loaded file
+let variantOverride = null; // manual override
+
+// ======= Helpers =======
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const hex = (n, w=2) => '0x' + n.toString(16).toUpperCase().padStart(w,'0');
+const toRGBAHex = (val) => val.toString(16).toUpperCase().padStart(8,'0'); // RRGGBBAA
+const fromRGBAHex = (str) => parseInt(str.replace(/[^0-9a-f]/gi,'').padEnd(8,'F'), 16) >>> 0;
+const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
+
+// signature helpers for robust variant detection
+function hasLis8024(win){
+  for (let i=0;i<=win.length-4;i++){
+    const a=win[i], b=win[i+1], c=win[i+2], d=win[i+3];
+    if (a===0x3C && (b&0x1F)===0x00 && (b>=0x60 && b<=0xE0) && c===0x80 && d===0x24) return true;
+  }
+  return false;
+}
+function hasLiImm(win, imm){
+  for (let i=0;i<=win.length-4;i++){
+    const a=win[i], b=win[i+1], c=win[i+2], d=win[i+3];
+    if (a===0x38 && (b&0x1F)===0x00 && (b>=0x60 && b<=0xE0) && c===0x00 && d===imm) return true;
+  }
+  return false;
+}
+
+function activeVariant(){ return variantOverride || selectedVariant; }
+function applyVariantUse(){
+  const av = activeVariant();
+  faceBase = av ? FACELIB_BASE[av] : null;
+  if (bytes) buildEditor();
+  updateHeader();
+}
+
+function updateHeader() {
+  const av = activeVariant();
+  $('#fileInfo').textContent = fileHandle ? `${fileHandle.name} — ${bytes?.length.toLocaleString()} bytes` : '—';
+  $('#variant').textContent = av ? (av + (variantOverride ? ' (manual)' : '')) : '—';
+  $('#facelib').textContent = faceBase != null ? hex(faceBase,6) : '—';
+  $('#patchCount').textContent = String(patchCount);
+  $('#btnDownload').disabled = !bytes || patchCount===0;
+  $('#btnRevert').disabled = !bytes || patchCount===0;
+  $('#btnDefaults').disabled = !bytes;
+  $('#btnExport').disabled = !bytes;
+  $('#btnImport').disabled = !bytes;
+}
+
+// ======= File loading =======
+function loadFile(f) {
+  if (!f) return;
+  // allow files without .dol extension
+  fileHandle = f;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const buf = fr.result;
+    originalBytes = new Uint8Array(buf);
+    bytes = new Uint8Array(buf.slice(0));
+    view = new DataView(bytes.buffer);
+    patchCount = 0;
+    selectedVariant = null;
+    faceBase = null;
+    detectedPaths = [];
+    variantOverride = null; // reset to Auto for new file
+    const sel = document.getElementById('variantOverride'); if (sel) sel.value = '';
+    updateHeader();
+    runDetection();
+    if (activeVariant()) buildEditor(); else $('#editor').innerHTML = '<div class="muted">Could not determine disc variant automatically. You can still try editing after selecting a variant below.</div>';
+  };
+  fr.readAsArrayBuffer(f);
+}
+
+// ======= Region/variant detection =======
+function runDetection() {
+  const tbody = $('#detTable tbody');
+  tbody.innerHTML = '';
+  const rows = [];
+  const perVariant = new Map(); // key -> {score, hits}
+
+  for (const v of REGION_PATHS) {
+    let score = 0, hits = 0;
+    for (const p of v.paths) {
+      let byte = null, ok=false, meaning='—';
+      if (bytes && p.offset < bytes.length) {
+        byte = bytes[p.offset];
+        if (byte >= 0x00 && byte <= 0x06) { ok = true; hits++; meaning = `${byte} — ${REGION_MAP[byte]?.name ?? 'Unknown'}`; score += 1; }
+        else meaning = `${byte} — out of range`;
+
+        const start = Math.max(0, p.offset - 40);
+        const end   = Math.min(bytes.length, p.offset + 41);
+        const win = bytes.slice(start, end);
+        let gotLi = false, gotLis = false;
+        if (ok && hasLiImm(win, byte)) { score += 4; gotLi = true; }
+        if (hasLis8024(win)) { score += 2; gotLis = true; }
+        if (gotLi || gotLis) meaning += ` ${gotLi?'| li imm':''}${gotLis?' | lis 0x8024':''}`;
+      } else {
+        meaning = 'offset not present in file';
+      }
+
+      rows.push({ variant:v.variant, key:v.key, path:p.name, offset:p.offset, byte, ok, meaning });
+    }
+    perVariant.set(v.key, { score, hits });
+  }
+
+  // choose best by score; break ties by hits
+  let bestKey = null, bestScore = -1, bestHits = -1;
+  for (const [k, v] of perVariant.entries()) {
+    if (v.score > bestScore || (v.score===bestScore && v.hits>bestHits)) {
+      bestKey = k; bestScore = v.score; bestHits = v.hits;
+    }
+  }
+  selectedVariant = bestKey;
+  faceBase = activeVariant() ? FACELIB_BASE[activeVariant()] : null;
+
+  // Render table
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    const status = r.ok ? '<span class="status ok">ok</span>' : (r.byte==null ? '<span class="status bad">n/a</span>' : '<span class="status warn">sus</span>');
+    tr.innerHTML = `<td>${r.variant} — <span class="muted">${r.path}</span></td>
+                    <td class="mono">${hex(r.offset,4)}</td>
+                    <td>${status} <span class="mono">${r.byte!=null?('0x'+r.byte.toString(16).toUpperCase().padStart(2,'0')):'—'}</span></td>
+                    <td>${r.meaning}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  updateHeader();
+}
+
+// ======= Editor UI =======
+function buildEditor() {
+  if (!bytes || faceBase == null) return;
+  const container = document.createElement('div');
+
+  for (const group of GROUPS) {
+    const g = document.createElement('div');
+    g.className = 'group';
+    const title = document.createElement('h3');
+    title.textContent = group.name;
+    g.appendChild(title);
+
+    for (let i=0;i<group.keys.length;i++) {
+      const rel = group.keys[i];
+      const abs = faceBase + rel;
+      const val = view.getUint32(abs, false); // big-endian
+      const hex8 = toRGBAHex(val);
+      const R = (val>>>24)&0xFF, G=(val>>>16)&0xFF, B=(val>>>8)&0xFF, A=val&0xFF;
+
+      const row = document.createElement('div');
+      row.className = 'color-row';
+      const label = document.createElement('div');
+      label.innerHTML = `<span class="mono">${group.name.replace(/ .*/, '')} #${i+1}</span> <span class="muted">(rel ${hex(rel,3)} / abs ${hex(abs,6)})</span>`;
+
+      const color = document.createElement('input');
+      color.type = 'color';
+      color.value = `#${hex8.slice(0,6)}`;
+      color.title = 'RGB';
+
+      const alpha = document.createElement('input');
+      alpha.type = 'number';
+      alpha.min = 0; alpha.max = 255; alpha.step = 1; alpha.value = A;
+      alpha.title = 'Alpha (0–255)';
+
+      const code = document.createElement('input');
+      code.type = 'text'; code.className='mono'; code.value = hex8; code.maxLength = 8; code.title = 'RRGGBBAA';
+
+      const sw = document.createElement('div'); sw.className = 'swatch'; sw.style.background = `rgba(${R},${G},${B},${(A/255).toFixed(3)})`;
+
+      function write(val32) {
+        const before = view.getUint32(abs, false) >>> 0;
+        if (before !== (val32 >>> 0)) {
+          view.setUint32(abs, val32 >>> 0, false);
+          patchCount++;
+          updateHeader();
+        }
+      }
+      function syncFromRGB() {
+        const rgb = color.value.replace('#','');
+        const a = clamp(parseInt(alpha.value,10)||0,0,255);
+        const val32 = ((parseInt(rgb.slice(0,2),16)<<24) | (parseInt(rgb.slice(2,4),16)<<16) | (parseInt(rgb.slice(4,6),16)<<8) | a) >>> 0;
+        code.value = toRGBAHex(val32);
+        sw.style.background = `rgba(${(val32>>>24)&255},${(val32>>>16)&255},${(val32>>>8)&255},${((val32&255)/255).toFixed(3)})`;
+        write(val32);
+      }
+      function syncFromCode() {
+        const v = fromRGBAHex(code.value);
+        color.value = '#' + toRGBAHex(v).slice(0,6);
+        alpha.value = String(v & 255);
+        sw.style.background = `rgba(${(v>>>24)&255},${(v>>>16)&255},${(v>>>8)&255},${((v&255)/255).toFixed(3)})`;
+        write(v);
+      }
+
+      color.addEventListener('input', syncFromRGB);
+      alpha.addEventListener('change', syncFromRGB);
+      code.addEventListener('change', syncFromCode);
+
+      row.append(label, color, alpha, code, sw);
+      g.appendChild(row);
+    }
+
+    container.appendChild(g);
+  }
+
+  const editor = $('#editor');
+  editor.innerHTML = '';
+  editor.appendChild(container);
+}
+
+// ======= Actions =======
+function download() {
+  if (!bytes) return;
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const name = fileHandle?.name?.replace(/\.dol$/i,'') || 'main';
+  a.download = `${name}.patched.dol`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function revertChanges() {
+  if (!originalBytes || !bytes) return;
+  bytes.set(originalBytes);
+  view = new DataView(bytes.buffer);
+  patchCount = 0;
+  buildEditor();
+  updateHeader();
+}
+function setDefaults() {
+  if (!bytes || faceBase==null) return;
+  for (const [relHex, hexStr] of Object.entries(WIIKI_DEFAULTS)) {
+    const rel = Number(relHex);
+    const abs = faceBase + rel;
+    const val32 = fromRGBAHex(hexStr);
+    const before = view.getUint32(abs, false) >>> 0;
+    if (before !== val32) { view.setUint32(abs, val32 >>> 0, false); patchCount++; }
+  }
+  buildEditor();
+  updateHeader();
+}
+function exportJSON() {
+  if (!bytes || faceBase==null) return;
+  const out = { variant: activeVariant(), faceBase, entries: {} };
+  for (const g of GROUPS) for (const rel of g.keys) {
+    const v = view.getUint32(faceBase+rel,false);
+    out.entries[rel] = toRGBAHex(v);
+  }
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mii_colors.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function importJSONFile(f) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const obj = JSON.parse(fr.result);
+      if (!obj || !obj.entries) throw new Error('Invalid palette JSON');
+      for (const [relStr, hexStr] of Object.entries(obj.entries)) {
+        const rel = Number(relStr);
+        if (!Number.isFinite(rel)) continue;
+        if (faceBase==null) continue;
+        const abs = faceBase + rel;
+        const val32 = fromRGBAHex(String(hexStr));
+        const before = view.getUint32(abs, false) >>> 0;
+        if (before !== val32) { view.setUint32(abs, val32 >>> 0, false); patchCount++; }
+      }
+      buildEditor();
+      updateHeader();
+    } catch (e) { alert('Import failed: ' + e.message); }
+  };
+  fr.readAsText(f);
+}
+
+// ======= Wire up UI =======
+$('#file').addEventListener('change', e => loadFile(e.target.files[0]));
+const drop = $('#drop');
+if (drop) {
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); const f = e.dataTransfer.files[0]; loadFile(f); });
+}
+
+$('#btnDownload').addEventListener('click', download);
+$('#btnRevert').addEventListener('click', revertChanges);
+$('#btnDefaults').addEventListener('click', setDefaults);
+$('#btnExport').addEventListener('click', exportJSON);
+$('#btnImport').addEventListener('click', ()=> $('#importJson').click());
+$('#importJson').addEventListener('change', e => { if (e.target.files[0]) importJSONFile(e.target.files[0]); e.target.value=''; });
+
+const selVariant = document.getElementById('variantOverride');
+if (selVariant) selVariant.addEventListener('change', (e)=>{ variantOverride = e.target.value || null; applyVariantUse(); });
+</script>
+</body>
+</html>
