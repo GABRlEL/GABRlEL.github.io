@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MKW Region ID Patcher (client‑side only)</title>
+  <style>
+    :root {
+      --bg: #0b0e13;
+      --panel: #121722;
+      --muted: #8ea1b2;
+      --text: #e8f0fb;
+      --accent: #7aa2ff;
+      --accent-2: #4be1a1;
+      --warn: #ffce6b;
+      --danger: #ff7a7a;
+      --ok: #6bff95;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    a { color: var(--accent); }
+    .wrap { max-width: 1180px; margin: 24px auto 56px; padding: 0 16px; }
+    header { display:flex; align-items:center; gap:16px; margin-bottom: 18px; }
+    header h1 { font-size: 1.4rem; margin: 0; letter-spacing: 0.2px; }
+    header .tag { padding: 2px 8px; border-radius: 999px; background: #1a2132; color: var(--muted); font-size: 0.8rem; }
+    .card { background: var(--panel); border-radius: var(--radius); border: 1px solid #1c2435; box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+    .card h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .pad { padding: 18px; }
+    .grid { display:grid; gap: 16px; align-items: start; }
+    .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .muted { color: var(--muted); }
+    .hint { font-size: .9rem; color: var(--muted); }
+    .drop {
+      display:flex; align-items:center; justify-content:center; text-align:center;
+      border: 1.5px dashed #2a3550; border-radius: var(--radius);
+      padding: 26px; transition: .2s border-color, .2s background;
+      background: #0e1420;
+    }
+    .drop.drag { border-color: var(--accent); background: #0f1a2c; }
+    input[type="file"] { display:none; }
+    .btn { cursor:pointer; user-select:none; border:1px solid #2a3550; background:#131a28; color:var(--text);
+      padding:10px 14px; border-radius: 12px; font-weight:600; letter-spacing:.2px; transition:.15s transform, .15s background, .15s border;
+    }
+    .btn:hover { background:#182136; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: linear-gradient(135deg, #24355c, #1f2b49); border-color:#44578a; }
+    .btn.danger { background: #2a1b1b; border-color: #5b2a2a; }
+    .stack { display:flex; gap:10px; flex-wrap: wrap; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .kv { display:grid; grid-template-columns: 160px 1fr; gap:8px 16px; }
+    .table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    .table th, .table td { padding: 10px 12px; border-bottom: 1px solid #23304a; }
+    .table th { text-align:left; color:#b3c1d1; font-weight:600; }
+    .pill { padding: 2px 8px; border-radius:999px; font-size:.8rem; }
+    .pill.ok { background:#12381f; border:1px solid #256b3f; color:#94f7b7; }
+    .pill.warn { background:#3b3418; border:1px solid #7a6b24; color:#ffe394; }
+    .pill.maybe { background:#162338; border:1px solid #31486e; color:#a9c7ff; }
+    code { background:#0f1420; padding:2px 6px; border-radius:6px; border:1px solid #1b2234; overflow-wrap: anywhere; word-break: break-word; }
+    footer { margin-top: 22px; color: var(--muted); font-size: .9rem; }
+    .sep { height:1px; background:#1c263b; margin: 10px 0 12px; }
+  .fancy-list{list-style:none;padding-left:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 16px;margin:8px 0 0}.fancy-list li{background:#0f1420;border:1px solid #1b2234;border-radius:10px;padding:6px 8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>MKW Region ID Patcher</h1>
+      <span class="tag">client‑side · single file</span>
+    </header>
+
+    <div class="grid g2">
+      <section class="card pad" style="grid-column: span 2">
+        <h2>1) Load <code>main.dol</code> (Mario Kart Wii)</h2>
+        <div class="drop" id="drop">
+          <div>
+            <p class="muted">Drag & drop your <code>main.dol</code> here (or)</p>
+            <div class="row" style="justify-content:center; margin-top:6px">
+              <label class="btn" for="file">Choose file…</label>
+              <input id="file" type="file" accept=".dol,application/octet-stream" />
+            </div>
+            <p class="hint" style="margin-top:10px">No uploads — everything runs in your browser.
+              Works with <code>main.dol</code> extracted from ISO/WBFS. Editing full disc images in‑browser is not supported.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card pad">
+        <h2>2) Detection</h2>
+        <div id="fileMeta" class="hint">No file loaded yet.</div>
+        <div class="sep"></div>
+        <table class="table" id="scanTable" aria-describedby="scanHelp">
+          <thead>
+            <tr>
+              <th>Variant / Path</th>
+              <th>Offset</th>
+              <th>Found byte</th>
+              <th>Meaning</th>
+              <th>Select</th>
+            </tr>
+          </thead>
+          <tbody id="scanBody"></tbody>
+        </table>
+        <p id="scanHelp" class="hint">We read known <em>Region ID algorithm result</em> bytes inside <code>main.dol</code>. Some games (PAL/JP) have two code paths; you can choose which one to edit.</p>
+      </section>
+
+      <section class="card pad">
+        <h2>3) Change region</h2>
+        <div class="grid" style="gap:10px">
+          <label class="row">New Region:
+            <select id="regionSelect" style="margin-left:10px; padding:8px 10px; border-radius:10px; border:1px solid #2a3550; background:#0f1420; color:var(--text)">
+              <option value="00">00 — Japan (red)</option>
+              <option value="01">01 — Americas (blue)</option>
+              <option value="02">02 — Europe (green)</option>
+              <option value="03">03 — Australia/NZ (yellow)</option>
+              <option value="04">04 — Taiwan (white)</option>
+              <option value="05">05 — South Korea (purple)</option>
+              <option value="06">06 — China (white)</option>
+            </select>
+          </label>
+          <div class="row">
+            <button class="btn primary" id="applyBtn" disabled>Apply to selected offset(s)</button>
+            <button class="btn" id="revertBtn" disabled>Revert to original</button>
+          </div>
+          <div id="status"></div>
+        </div>
+      </section>
+
+      <section class="card pad" style="grid-column: span 2">
+        <h2>4) Download</h2>
+        <div class="row">
+          <a id="downloadLink" class="btn" download style="display:none">Download patched file</a>
+          <span id="downloadHint" class="hint">Patch something to enable download.</span>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <p>Based on offsets and region map documented by Vega on MarioKartWii.com. See thread: “<a href="https://mariokartwii.com/showthread.php?tid=1055" target="_blank" rel="noopener noreferrer">Permanently Hex Edit Your Region ID Algorithm in an ISO/WBFS File</a>” (2019).</p>
+      <ul class="fancy-list">
+        <li><code>RMCE01</code> — <code>0x6113</code></li>
+        <li><code>RMCP01</code> — <code>0x614F</code> <span class="hint">(no AUS/NZ)</span></li>
+        <li><code>RMCP01</code> — <code>0x61AF</code> <span class="hint">(AUS/NZ)</span></li>
+        <li><code>RMCJ01</code> — <code>0x60A3</code> <span class="hint">(no TWN)</span></li>
+        <li><code>RMCJ01</code> — <code>0x60D3</code> <span class="hint">(TWN)</span></li>
+        <li><code>RMCK01</code> — <code>0x625F</code></li>
+      </ul>
+      <p class="hint" style="margin-top:8px">Region values: <code>00..06</code>. If you need to patch a full ISO/WBFS, first extract <code>main.dol</code> (e.g., with Wiimm's WIT), patch here, then rebuild. Alternatively use in My Stuff on packs that allow it. Keep backups.</p>
+    </footer>
+  </div>
+
+  <script>
+  // === Knowledge from https://mariokartwii.com/showthread.php?tid=1055 ===
+  // Known main.dol offsets for the Region ID algorithm result byte(s):
+  const OFFSETS = [
+    { id: 'RMCE01', label: 'USA (RMCE01)',        offset: 0x00006113, defaults: [0x01] },
+    { id: 'RMCP01a', label: 'PAL (RMCP01) — no AUS/NZ CC', offset: 0x0000614F, defaults: [0x02] },
+    { id: 'RMCP01b', label: 'PAL (RMCP01) — AUS/NZ CC',    offset: 0x000061AF, defaults: [0x03] },
+    { id: 'RMCJ01a', label: 'JPN (RMCJ01) — no TWN CC',    offset: 0x000060A3, defaults: [0x00] },
+    { id: 'RMCJ01b', label: 'JPN (RMCJ01) — TWN CC',       offset: 0x000060D3, defaults: [0x04] },
+    { id: 'RMCK01', label: 'KOR (RMCK01)',        offset: 0x0000625F, defaults: [0x05] },
+  ];
+  const REGION_NAMES = {
+    0x00: 'Japan (red line)',
+    0x01: 'Americas (blue line)',
+    0x02: 'Europe (green line)',
+    0x03: 'Australia/NZ (yellow line)',
+    0x04: 'Taiwan (white line)',
+    0x05: 'South Korea (purple line)',
+    0x06: 'China (white line)'
+  };
+
+  const state = {
+    file: null,
+    original: null,    // Uint8Array
+    working: null,     // Uint8Array (mutable copy)
+    hits: [],          // scan results (filtered by detected build)
+    selectedIds: new Set(),
+    build: null,       // {tag, letter, variants}
+    sha1: null,
+  };
+
+  const $ = (q) => document.querySelector(q);
+  const $$ = (q) => Array.from(document.querySelectorAll(q));
+
+  const fmtHex = (n, pad=2) => '0x' + n.toString(16).toUpperCase().padStart(pad, '0');
+
+  const fileEl = $('#file');
+  const dropEl = $('#drop');
+  const scanBody = $('#scanBody');
+  const fileMeta = $('#fileMeta');
+  const applyBtn = $('#applyBtn');
+  const revertBtn = $('#revertBtn');
+  const regionSelect = $('#regionSelect');
+  const statusBox = $('#status');
+  const downloadLink = $('#downloadLink');
+  const downloadHint = $('#downloadHint');
+
+  function resetUI() {
+    scanBody.innerHTML = '';
+    state.hits = [];
+    state.selectedIds.clear();
+    statusBox.innerHTML = '';
+    applyBtn.disabled = true;
+    revertBtn.disabled = true;
+    downloadLink.style.display = 'none';
+    downloadHint.style.display = '';
+    state.build = null;
+    state.sha1 = null;
+  }
+
+  function setStatus(html, type='maybe') {
+    statusBox.innerHTML = `<span class="pill ${type}">${type.toUpperCase()}</span> <span class="hint" style="margin-left:8px">${html}</span>`;
+  }
+
+  function detectBuild(buf) {
+    // Look for ASCII game ID like RMCE / RMCP / RMCJ / RMCK inside the DOL
+    const ascii = new TextDecoder('ascii').decode(new Uint8Array(buf));
+    const m = ascii.match(/RMC([EPJK])/);
+    if (!m) return null;
+    const letter = m[1];
+    const tag = 'RMC' + letter;
+    const variantsByLetter = {
+      'E': ['RMCE01'],
+      'P': ['RMCP01a','RMCP01b'],
+      'J': ['RMCJ01a','RMCJ01b'],
+      'K': ['RMCK01'],
+    };
+    return { tag, letter, variants: variantsByLetter[letter] || [] };
+  }
+
+  async function sha1Hex(buf) {
+    if (!('crypto' in window) || !('subtle' in crypto)) return null;
+    const hash = await crypto.subtle.digest('SHA-1', buf);
+    const u8 = new Uint8Array(hash);
+    return Array.from(u8).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function guessInitialSelection(hits) {
+    // If multiple valid hits exist for the detected build (e.g., PAL or JPN), select all valid ones by default
+    const valid = hits.filter(h => h.isValid);
+    return valid.map(h => h.id);
+  }
+
+  function scanBuffer(buf) {
+    // Detect build and select relevant offsets for this DOL
+    state.build = detectBuild(buf);
+    const candidates = state.build?.variants?.length ? OFFSETS.filter(o => state.build.variants.includes(o.id)) : OFFSETS;
+
+    const view = new DataView(buf);
+    const hits = candidates.map(info => {
+      const present = view.byteLength > info.offset;
+      let byte = null;
+      let isValid = false;
+      let isDefault = false;
+      let meaning = '—';
+      if (present) {
+        byte = view.getUint8(info.offset);
+        isValid = byte >= 0x00 && byte <= 0x06; // documented range
+        isDefault = info.defaults.includes(byte);
+        meaning = isValid ? (REGION_NAMES[byte] || 'Unknown') : 'Not a region value';
+      }
+      return {
+        id: info.id,
+        label: info.label,
+        offset: info.offset,
+        present,
+        byte,
+        isValid,
+        isDefault,
+        meaning
+      };
+    });
+
+    state.hits = hits;
+
+    // Render table
+    scanBody.innerHTML = hits.map(h => `
+      <tr>
+        <td>${h.label}</td>
+        <td><code>${fmtHex(h.offset, 6)}</code></td>
+        <td>${h.present ? `<code>${fmtHex(h.byte)}</code>` : '<span class="muted">(beyond EOF)</span>'}</td>
+        <td>${h.present ? (h.isValid ? h.meaning : `<span class=\"muted\">${h.meaning}</span>`) : ''}</td>
+        <td>
+          ${h.present ? `<label class="row" style="gap:6px">
+            <input type="checkbox" data-id="${h.id}" ${h.isValid ? '' : ''} />
+            <span class="hint">edit</span>
+          </label>` : ''}
+        </td>
+      </tr>`).join('');
+
+    // Attach checkbox listeners
+    $$('#scanBody input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const id = e.target.getAttribute('data-id');
+        if (e.target.checked) state.selectedIds.add(id);
+        else state.selectedIds.delete(id);
+        applyBtn.disabled = state.selectedIds.size === 0;
+      });
+    });
+
+    // Automatic selection
+    state.selectedIds.clear();
+    const initial = guessInitialSelection(hits);
+    initial.forEach(id => {
+      const cb = document.querySelector(`input[type="checkbox"][data-id="${id}"]`);
+      if (cb) { cb.checked = true; state.selectedIds.add(id); }
+    });
+    applyBtn.disabled = state.selectedIds.size === 0;
+
+    // Status line with build information
+    const buildTxt = state.build ? `Detected build: <code>${state.build.tag}</code> — candidates: ${state.build.variants.map(v=>`<code>${v}</code>`).join(', ')}` : 'Build tag not found — showing all known candidates.';
+
+    if (hits.length && state.selectedIds.size) {
+      const chosen = hits.filter(h => state.selectedIds.has(h.id));
+      const desc = chosen.map(h=>`<code>${h.label}</code> at <code>${fmtHex(h.offset,6)}</code> value <code>${fmtHex(h.byte)}</code>`).join('<br>');
+      setStatus(`${buildTxt}.<br>Selected:<br>${desc}.`, chosen.every(h=>h.isDefault) ? 'ok' : 'maybe');
+    } else if (hits.length) {
+      setStatus(`${buildTxt}. No automatic selection.`, 'warn');
+    } else {
+      setStatus('No candidate offsets to scan.', 'warn');
+    }
+  }
+
+  function updateFileMeta(file) {
+    const sizeKB = (file.size / 1024).toFixed(1);
+    const rows = [
+      `<div>File name</div><div><code>${file.name}</code></div>`,
+      `<div>Size</div><div>${sizeKB} KB</div>`,
+      `<div>Type</div><div>${file.type || 'binary'}</div>`,
+    ];
+    if (state.build) rows.push(`<div>Detected build</div><div><code>${state.build.tag}</code></div>`);
+    if (state.sha1) rows.push(`<div>SHA‑1</div><div><code>${state.sha1}</code></div>`);
+    fileMeta.innerHTML = `<div class="kv">${rows.join('')}</div>`;
+  }
+
+  function loadFile(file) {
+    resetUI();
+    state.file = file;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const buf = reader.result;
+      state.original = new Uint8Array(buf);
+      state.working = new Uint8Array(state.original); // mutable copy
+      // compute sha1 (optional)
+      try { state.sha1 = await sha1Hex(buf); } catch(e) { state.sha1 = null; }
+      scanBuffer(buf);
+      updateFileMeta(file);
+      revertBtn.disabled = false;
+    };
+    reader.onerror = () => { setStatus('Failed to read file.', 'danger'); };
+    reader.readAsArrayBuffer(file);
+    // show basic meta first
+    updateFileMeta(file);
+  }
+
+  // File input handlers
+  fileEl.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) loadFile(file);
+  });
+
+  // Drag&drop
+  ;['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, (e)=>{ e.preventDefault(); dropEl.classList.add('drag'); }));
+  ;['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, (e)=>{ e.preventDefault(); dropEl.classList.remove('drag'); }));
+  dropEl.addEventListener('drop', (e)=>{
+    const file = e.dataTransfer?.files?.[0];
+    if (file) loadFile(file);
+  });
+
+  // Apply patch
+  applyBtn.addEventListener('click', () => {
+    if (!state.working) return;
+    const valueHex = regionSelect.value;
+    const value = parseInt(valueHex, 16) & 0xFF;
+    const selectedInfos = OFFSETS.filter(o => state.selectedIds.has(o.id));
+
+    let applied = 0;
+    selectedInfos.forEach(info => {
+      if (state.working.length > info.offset) {
+        state.working[info.offset] = value;
+        applied++;
+      }
+    });
+
+    if (applied === 0) {
+      setStatus('No bytes patched (selected offsets beyond EOF?).', 'warn');
+      return;
+    }
+
+    // Re-scan using working buffer to reflect changes
+    const buf = state.working.buffer;
+    scanBuffer(buf);
+    updateFileMeta(state.file);
+
+    // Prepare download
+    const blob = new Blob([state.working], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    downloadLink.href = url;
+    const [base, ext] = (() => {
+      const i = state.file.name.lastIndexOf('.');
+      return i > 0 ? [state.file.name.slice(0,i), state.file.name.slice(i)] : [state.file.name, ''];
+    })();
+    const buildTag = state.build?.tag || 'RMC?';
+    downloadLink.download = `${base}.${buildTag}.region-${valueHex}${ext || ''}`;
+    downloadLink.textContent = `Download ${downloadLink.download}`;
+    downloadLink.style.display = '';
+    downloadHint.style.display = 'none';
+
+    setStatus(`Patched ${applied} offset(s) to <code>${fmtHex(value)}</code> (${REGION_NAMES[value] || 'Unknown'}). Verify in‑game and keep a backup of your original <code>main.dol</code>.`, 'ok');
+  });
+
+  // Revert
+  revertBtn.addEventListener('click', () => {
+    if (!state.original) return;
+    state.working = new Uint8Array(state.original);
+    state.selectedIds.clear();
+    scanBuffer(state.working.buffer);
+    updateFileMeta(state.file);
+    downloadLink.style.display = 'none';
+    downloadHint.style.display = '';
+    setStatus('Restored original buffer.', 'maybe');
+  });
+  </script>
+</body>
+</html>
