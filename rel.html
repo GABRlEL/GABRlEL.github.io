@@ -1,0 +1,1366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DynamicR — MKWii StaticR.rel — Editor Suite</title>
+  <style>
+    :root { --bg:#0f1115; --muted:#a0a4ae; --text:#e6e7ea; --brand:#7aa2ff; }
+    html, body { height:100%; }
+    body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; color:var(--text); background:#0f1115; }
+    .container { max-width: 1200px; margin: 28px auto 64px; padding: 0 18px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 18px; }
+    .title { font-weight:700; font-size:20px; letter-spacing:0.3px; }
+    .subtitle { color: var(--muted); font-size:12px; }
+    .card { background: linear-gradient(180deg, #1c2130, #151924); border:1px solid rgba(255,255,255,0.06); border-radius:16px; box-shadow: 0 15px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); overflow:hidden; }
+    .card h2 { margin:0; padding:18px 24px; font-size:14px; letter-spacing:0.2px; background: linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.07)); border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; }
+    .card .body { padding:28px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .kv { display:grid; grid-template-columns: 160px 1fr; gap:10px; align-items:center; }
+    .btn { display:inline-flex; align-items:center; gap:8px; background:#1e2433; color:var(--text); border:1px solid rgba(255,255,255,0.08); padding:8px 12px; border-radius:10px; cursor:pointer; user-select:none; }
+    .btn.primary { background:#27314a; border-color:rgba(122,162,255,0.35); color:#eaf0ff; }
+    .btn.ok { background:#1c2b24; border-color:rgba(76,195,138,0.3); color:#c8f5e3; }
+    .muted { color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .hr { height:1px; background:rgba(255,255,255,0.08); margin:12px 0; }
+    .palette-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; }
+    .swatch { display:flex; align-items:center; gap:10px; padding:10px; background:#121620; border:1px solid rgba(255,255,255,0.12); border-radius:10px; }
+    .swatch .box { width:34px; height:24px; border-radius:6px; border:1px solid rgba(255,255,255,0.25); }
+    input[type="color"] { width: 40px; height: 28px; padding:0; border:none; background:transparent; }
+    input[type="text"], input[type="number"], select { background:#121620; color:var(--text); border:1px solid rgba(255,255,255,0.14); border-radius:8px; padding:6px 8px; }
+    .small { font-size: 12px; }
+  </style>
+
+  <style>
+    /* High-contrast chips for Character Order Table DnD */
+    #cotDnD .chip {
+      background: #f1f5f9;          /* slate-100 */
+      color: #111827;               /* near-black */
+      border: 1px solid #cbd5e1;    /* slate-300 */
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      line-height: 1.2;
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,.06);
+    }
+    #cotDnD .chip:hover {
+      background: #e5e7eb;          /* gray-200 */
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    }
+    #cotDnD .chip:active {
+      cursor: grabbing;
+      transform: scale(0.98);
+    }
+  </style>
+
+
+  <style>
+    /* Soft warning box for duplicate character entries */
+    #cotWarn strong { font-weight: 700; }
+    #cotWarn code { background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">DynamicR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">Editor Suite</span></div>
+        <div class="subtitle">Extensive <code>StaticR.rel</code> tool suite. Client-side only with region detection. Sponsored by ChatGPT 5 Thinking. Tested on PAL only.<br>Credits to <a href="https://mariokartwii.com/member.php?action=profile&uid=1">Vega</a> and <a href="https://mariokartwii.com/member.php?action=profile&uid=447">Ro</a> for their research and documentations.</div>
+      </div>
+      <div class="row">
+        <button id="btnSave" class="btn ok" disabled>⬇ Apply & download patched <span class="mono">StaticR.rel</span></button>
+        <button id="btnRevert" class="btn" disabled>↩ Revert</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>1) Load <code class="mono">StaticR.rel</code></h2>
+      <div class="body">
+        <div class="row" style="justify-content:center; gap:12px;">
+          <label class="btn primary" for="file">Choose file…</label>
+          <input id="file" type="file" accept=",.rel" hidden />
+          <div class="muted">…or drag & drop your <span class="mono">StaticR.rel</span> here</div>
+        </div>
+        <div class="hr"></div>
+        <div class="kv">
+          <div class="muted">Loaded file</div>
+          <div id="fileInfo" class="mono">—</div>
+          <div class="muted">Region</div>
+          <div>
+            <select id="region">
+              <option value="auto">Auto (SHA-256 → heuristics)</option>
+              <option value="NTSC-U">NTSC-U (USA)</option>
+              <option value="PAL">PAL (EUR)</option>
+              <option value="NTSC-J">NTSC-J (JPN)</option>
+              <option value="NTSC-K">NTSC-K (KOR)</option>
+            </select>
+          </div>
+          <div class="muted">Assumed base</div>
+          <div id="base" class="mono">—</div>
+        </div>
+        <div class="hr"></div>
+        <details>
+          <summary class="muted">How region was chosen</summary>
+          <div id="detectExplain" class="mono muted" style="padding-top:6px">—</div>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) Editors</h2>
+      <div class="body">
+        <div class="row" style="justify-content:space-between; gap:24px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:480px;">
+            <h3 class="mono">Region Line Colors (9× RGBA8)</h3>
+            <div class="row" style="margin-bottom:8px">
+              <div class="muted">Offset</div>
+              <input id="offRegionLine" class="mono" size="12" />
+              <button class="btn" id="btnLoadRegionLine">Load</button>
+            </div>
+            <div id="regionLineGrid" class="palette-grid"></div>
+          </div>
+          <div style="flex:1; min-width:480px;">
+            <h3 class="mono">Mii Suit Colors (12× RGBA8)</h3>
+            <div class="row" style="margin-bottom:8px">
+              <div class="muted">Offset</div>
+              <input id="offMii" class="mono" size="12" />
+              <button class="btn" id="btnLoadMii">Load</button>
+            </div>
+            <div id="miiGrid" class="palette-grid"></div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="row" style="justify-content:space-between; gap:24px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:480px;">
+            <h3 class="mono">Menu Colors</h3>
+            <div class="row" style="margin-bottom:8px">
+              <div class="muted">Offset</div>
+              <input id="offMenu" class="mono" size="12" />
+              <button class="btn" id="btnLoadMenu">Load</button>
+              <span class="muted small">Encoding:</span>
+              <select id="menuMode" title="Choose how Menu colors are stored">
+                <option value="rgb16" selected>RGB16 (00RR 00GG 00BB) — 24 entries, ChatGPT</option>
+                <option value="rgba8">RGBA8 (00RR 00GG 00BB 00AA) — 18 entries, Atlas</option>
+              </select>
+            </div>
+            <div id="menuGrid" class="palette-grid"></div>
+            <div class="small muted">
+              <span id="menuHint">RGB16 mode stores 24 entries as three BE16 lanes per color with zero high bytes: <span class="mono">00RR 00GG 00BB</span>.</span>
+            </div>
+          </div>
+
+          <div style="flex:1; min-width:480px;">
+            <h3 class="mono">HUD Color (4× f32 @ fixed offsets)</h3>
+            <div class="row" style="margin-bottom:8px">
+              <div class="muted">Offset</div>
+              <input id="offHUD" class="mono" size="12" />
+              <button class="btn" id="btnLoadHUD">Load</button>
+              <span class="muted small">Reads 4× big-endian float from 4-byte aligned address near the given offset (wiki: <code>Change Color of HUD</code>).</span>
+            </div>
+            <div id="hudGrid" class="palette-grid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2b) Fake Item Box Color Modifier</h2>
+      <div class="body">
+        <div class="kv">
+          <div class="muted">First patch offset</div>
+          <div class="mono" id="fake1Off">—</div>
+          <div class="muted">First patch value</div>
+          <div class="row">
+            <span id="fake1Cur" class="mono small">—</span>
+            <input id="fake1Hex" class="mono" size="10" placeholder="8 hex (BE)" />
+            <button class="btn" id="btnFake1Write">Write</button>
+            <button class="btn ok" id="btnFake1Real">Looks like real</button>
+          </div>
+
+          <div class="muted">Second patch offset</div>
+          <div class="mono" id="fake2Off">—</div>
+          <div class="muted">Second patch value</div>
+          <div class="row">
+            <span id="fake2Cur" class="mono small">—</span>
+            <input id="fake2Hex" class="mono" size="10" placeholder="8 hex (BE)" />
+            <button class="btn" id="btnFake2Write">Write</button>
+            <button class="btn ok" id="btnFake2Real">Looks like real</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:8px">
+          Values are written as big-endian u32. Quick set: First = <span class="mono">0x4BC00000</span>, Second = <span class="mono">0x40000000</span>. Offsets per region from the wiki.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) Item Behavior Modifier</h2>
+      <div class="body">
+        <div class="kv" style="row-gap:10px; align-items:center">
+          <div class="muted">Item</div>
+          <div class="row">
+            <select id="itemBehItem" style="min-width:220px"></select>
+            <button class="btn" id="btnLoadItemBeh">Load</button>
+          </div>
+
+          <div class="muted">Offset (current region)</div>
+          <div class="mono" id="itemBehOff">—</div>
+
+          <div class="muted">Standard value</div>
+          <div class="mono" id="itemBehStd">—</div>
+
+          <div class="muted">Current value</div>
+          <div class="mono" id="itemBehCur">—</div>
+
+          <div class="muted">Desired behavior</div>
+          <div class="row">
+            <select id="itemBehSelect" style="min-width:280px">
+              <option value="0">00 — Use Item (e.g. Bullet Bill)</option>
+              <option value="1">01 — Fire Item (e.g. Red Shell)</option>
+              <option value="2">02 — Trailing Kart (e.g. Triple Banana)</option>
+              <option value="3">03 — Circling Kart (e.g. Triple Shell)</option>
+            </select>
+            <button class="btn primary" id="btnWriteItemBeh">Write</button>
+            <button class="btn" id="btnResetItemBeh">Reset to Standard</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          Values are written as big-endian <span class="mono">u32</span> (0x00000000–0x00000003). Offsets per region from the Tockdom wiki.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) Engine Class Modifier</h2>
+      <div class="body">
+        <div class="kv" style="row-gap:10px; align-items:center">
+          <div class="muted">Engine Class</div>
+          <div class="row">
+            <select id="engClassSelect" style="min-width:260px"></select>
+            <button class="btn" id="btnLoadEngineClass">Load</button>
+          </div>
+
+          <div class="muted">Offset (current region)</div>
+          <div class="mono" id="engOff">—</div>
+
+          <div class="muted">Standard value</div>
+          <div class="mono" id="engStd">—</div>
+
+          <div class="muted">Current value</div>
+          <div class="mono" id="engCur">—</div>
+
+          <div class="muted">Desired multiplier (f32)</div>
+          <div class="row">
+            <input id="engValue" type="number" step="0.01" min="0.50" max="2.50" style="width:120px" />
+            <button class="btn primary" id="btnWriteEngineClass">Write</button>
+            <button class="btn" id="btnResetEngineClass">Reset to Standard</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          Values are written as big-endian <span class="mono">f32</span>. Offsets per region from the attached Tockdom documentation.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5) Menu Character Display Position</h2>
+      <div class="body">
+        <div class="kv" style="row-gap:10px; align-items:center">
+          <div class="muted">Offset (current region)</div>
+          <div class="mono" id="mcdpOff">—</div>
+
+          <div class="muted">Standard values (f32)</div>
+          <div class="mono" id="mcdpStd">x = -190.000, y = 0.000, scale = 1.000</div>
+
+          <div class="muted">Current values (f32)</div>
+          <div class="mono" id="mcdpCur">—</div>
+
+          <div class="muted">Desired values</div>
+          <div class="row" style="gap:8px; flex-wrap:wrap">
+            <label> x: <input id="mcdpX" type="number" step="0.1" style="width:110px"></label>
+            <label> y: <input id="mcdpY" type="number" step="0.1" style="width:110px"></label>
+            <label> scale: <input id="mcdpS" type="number" step="0.01" min="0.10" max="5.00" style="width:110px"></label>
+            <button class="btn" id="btnLoadMCDP">Load</button>
+            <button class="btn primary" id="btnWriteMCDP">Write</button>
+            <button class="btn" id="btnResetMCDP">Reset to Standard</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          Three consecutive <span class="mono">f32</span> values: <span class="mono">x</span> (horizontal from center), <span class="mono">y</span> (vertical from center),
+          and <span class="mono">scale</span>. Values are big-endian. Offsets per region from the attached documentation.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>6) Race Points (Offline / Friend Rooms)</h2>
+      <div class="body">
+        <div class="kv" style="row-gap:10px; align-items:center">
+          <div class="muted">Base offset (current region)</div>
+          <div class="mono" id="ptsBaseOff">—</div>
+
+          <div class="muted">Definition size</div>
+          <div class="mono">144 bytes (12 groups × 12 bytes)</div>
+
+          <div class="muted">Player count</div>
+          <div class="row">
+            <select id="ptsPlayerCount" style="min-width:160px">
+              <option value="1">1 player</option>
+              <option value="2">2 players</option>
+              <option value="3">3 players</option>
+              <option value="4">4 players</option>
+              <option value="5">5 players</option>
+              <option value="6">6 players</option>
+              <option value="7">7 players</option>
+              <option value="8">8 players</option>
+              <option value="9">9 players</option>
+              <option value="10">10 players</option>
+              <option value="11">11 players</option>
+              <option value="12">12 players</option>
+            </select>
+            <button class="btn" id="btnPtsLoad">Load</button>
+          </div>
+
+          <div class="muted">Group offset</div>
+          <div class="mono" id="ptsGroupOff">—</div>
+
+          <div class="muted">Standard values</div>
+          <div class="mono" id="ptsStd">—</div>
+
+          <div class="muted">Current values</div>
+          <div class="mono" id="ptsCur">—</div>
+
+          <div class="muted">Desired values (per finishing position)</div>
+          <div id="ptsInputs" class="row" style="gap:6px; flex-wrap:wrap"></div>
+
+          <div class="row" style="gap:8px">
+            <button class="btn primary" id="btnPtsWrite">Write</button>
+            <button class="btn" id="btnPtsReset">Reset to Standard</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          Each player-count group stores up to 12 one-byte values (big-endian is irrelevant for bytes). Only the first <em>N</em> bytes are used for N players; the remaining bytes are unused. Offsets per region are based on the Tockdom documentation.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>7) Character Order Table</h2>
+      <div class="body">
+        <div class="kv" style="row-gap:10px; align-items:center">
+          <div class="muted">Base offset (current region)</div>
+          <div class="mono" id="cotBaseOff">—</div>
+
+          <div class="muted">Table size</div>
+          <div class="mono">0x60 bytes (24 entries × 4 bytes)</div>
+
+          <div class="muted">Current table (decoded)</div>
+          <div class="mono" id="cotCur">—</div>
+
+          <div class="muted">Edit slots (left → right)</div>
+          <div id="cotGrid" class="row" style="gap:8px; flex-wrap:wrap"></div>
+          <div class="muted">Drag &amp; drop order (left → right)</div>
+          <div id="cotDnD" class="row" style="gap:8px; flex-wrap:wrap"></div>
+          <div id="cotWarn" class="small" style="display:none; margin:8px 0; padding:8px 10px; border-radius:8px; border:1px solid #F59E0B; background:#FEF3C7; color:#78350F;">
+            <!-- Duplicate warning text goes here -->
+          </div>
+          <div class="row" style="gap:8px">
+            <button class="btn" id="btnCOTLoad">Load</button>
+            <button class="btn primary" id="btnCOTWrite">Write</button>
+            <button class="btn" id="btnCOTFillAsc">Fill ascending by code</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          Each entry is the 32‑bit big‑endian value of the character’s identifier (see identifiers list). As you unlock characters, right‑hand slots appear in the UI. Offsets per region from the attached documentation.
+        </div>
+      </div>
+    </section>
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  <script>
+  // ===== Region bases & heuristics =====
+  const BASES = { 'NTSC-U':0x8050BF60, 'PAL':0x805102E0, 'NTSC-J':0x8050FC60, 'NTSC-K':0x804FE300 };
+
+  // Heuristics (credit Ro)
+  const HEUR_BUNDLE1 = { 'NTSC-U':[0x80831CCC,0x80831DC0], 'PAL':[0x808512E0,0x808513D4], 'NTSC-J':[0x8085094C,0x80850A40], 'NTSC-K':[0x8083F6A0,0x8083F794] };
+  const HEUR_B1_WORD = 0x88030014;
+  const HEUR_BUNDLE2 = { 'NTSC-U':[0x80831BD8], 'PAL':[0x808511EC], 'NTSC-J':[0x80850858], 'NTSC-K':[0x8083F5AC] };
+  const HEUR_B2_WORD = HEUR_B1_WORD;
+
+  // Known retail SHA-256 signatures (user-supplied)
+  const KNOWN_SHA256 = {
+    '16d9d146112541fefea701ecb5bc1a496f9d50e4a752fbb5b6778e7c6399f67d':'PAL',
+    '1168107f8fdef27a356df76036db55afe4fbf7752606dbac991726701133a617':'NTSC-U',
+    '88539012d357a1420724e51dc7e351192ce696da4b0045994895518a3fad6fae':'NTSC-J',
+    'f441b08e4ccc2d64aadcac8429973f10ea6b1cc8f175500fc084983775f7b3e5':'NTSC-K',
+  };
+  const KNOWN_SIZE = { 4903876:'PAL', 4902804:'NTSC-U', 4901564:'NTSC-J', 4905468:'NTSC-K' };
+
+  // Confirmed color tables (file offsets per region)
+  const OFFS_REGION_LINE = { 'PAL':0x00399B14, 'NTSC-U':0x0039856C, 'NTSC-J':0x003992F4, 'NTSC-K':0x00399F54 }; // 9×RGBA8
+  const OFFS_MII        = { 'PAL':0x00394838, 'NTSC-U':0x003941F8, 'NTSC-J':0x00394018, 'NTSC-K':0x00394C78 }; // 12×RGBA8
+  const OFFS_MENU_RGB   = { 'PAL':0x003859E0, 'NTSC-U':0x00383DB8, 'NTSC-J':0x003856B0, 'NTSC-K':0x003862E8 }; // base for both modes
+
+  // HUD "Change Color of HUD" (wiki) — align to 4 for f32
+  const OFFS_HUD        = { 'PAL':0x00399346, 'NTSC-U':0x00397F9E, 'NTSC-J':0x00398B26, 'NTSC-K':0x00399786 };
+
+  // Fake Item Box Color Modifier offsets
+  const OFFS_FAKEBOX_1  = { 'PAL':0x003953E0, 'NTSC-U':0x00394DA0, 'NTSC-J':0x00394BC0, 'NTSC-K':0x00395820 };
+  const OFFS_FAKEBOX_2  = { 'PAL':0x00395EF0, 'NTSC-U':0x00395540, 'NTSC-J':0x003956D0, 'NTSC-K':0x00396330 };
+  const FAKEBOX_REAL_1 = 0x4BC00000;
+  const FAKEBOX_REAL_2 = 0x40000000;
+
+  // ===== State =====
+  let fileHandle=null, original=null, bytes=null, view=null, shaSeen=null, detectedRegion=null;
+
+  // ===== Helpers =====
+  const $ = s=>document.querySelector(s);
+  const hex = (n,w=2)=>'0x'+(n>>>0).toString(16).toUpperCase().padStart(w,'0');
+  const toHex2 = v=>v.toString(16).toUpperCase().padStart(2,'0');
+  const fromHex = s=>parseInt(String(s).trim().replace(/[^0-9A-Fa-f]/g,''),16)>>>0;
+  async function sha256(u8){ const h=await crypto.subtle.digest('SHA-256', u8); return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+
+  function setDisabled(id, v){ const el=document.getElementById(id); if (el) el.disabled=!!v; }
+
+  function renderDetectExplain(region, reason){
+    const el = document.getElementById('detectExplain');
+    if (!el){ return; }
+    const size = bytes?.length||0;
+    const sigRegion = shaSeen ? (KNOWN_SHA256[shaSeen]||null) : null;
+
+    // Heuristic summaries
+    const heur = {};
+    const heur2 = {};
+    if (bytes && view){
+      for (const [reg, base] of Object.entries(BASES)){
+        let m1=0, t1=(HEUR_BUNDLE1[reg]||[]).length;
+        for (const a of (HEUR_BUNDLE1[reg]||[])){ const off=(a-base)>>>0; if (off+4<=bytes.length && view.getUint32(off,false)===HEUR_B1_WORD) m1++; }
+        heur[reg]={match:m1,total:t1};
+        let m2=0, t2=(HEUR_BUNDLE2[reg]||[]).length;
+        for (const a of (HEUR_BUNDLE2[reg]||[])){ const off=(a-base)>>>0; if (off+4<=bytes.length && view.getUint32(off,false)===HEUR_B2_WORD) m2++; }
+        heur2[reg]={match:m2,total:t2};
+      }
+    }
+
+    const parts1 = Object.keys(heur).length ? `Heuristic #1 (Ro): ${Object.keys(heur).map(r=>`${r} ${heur[r].match}/${heur[r].total}`).join(' • ')}` : '';
+    const parts2 = Object.keys(heur2).length ? `Heuristic #2 (Ro): ${Object.keys(heur2).map(r=>`${r} ${heur2[r].match}/${heur2[r].total}`).join(' • ')}` : '';
+
+    el.innerHTML = [
+      region ? `Chosen: <span class="mono">${region}</span> <span class="muted">(${reason})</span>` : null,
+      shaSeen ? `Signature: ${sigRegion?('match '+sigRegion):'no match'} <span class="mono">SHA-256 ${shaSeen.slice(0,8)}…</span> • size ${size.toLocaleString()} bytes` : `Size ${size.toLocaleString()} bytes`,
+      parts1, parts2
+    ].filter(Boolean).map(s=>`<div>${s}</div>`).join('');
+  }
+
+  function pickRegion(){
+    if (KNOWN_SHA256[shaSeen]) return {region:KNOWN_SHA256[shaSeen], reason:'detected'};
+    // Heur1
+    const c1=[];
+    for (const [reg,base] of Object.entries(BASES)){
+      const addrs=HEUR_BUNDLE1[reg]; if(!addrs) continue;
+      let ok=true;
+      for (const a of addrs){ const off=(a-base)>>>0; if(off+4>bytes.length){ok=false;break;} if(view.getUint32(off,false)!==HEUR_B1_WORD){ok=false;break;} }
+      if(ok) c1.push(reg);
+    }
+    if (c1.length===1) return {region:c1[0], reason:'heuristic: Ro #1'};
+    // Heur2
+    const c2=[];
+    for (const [reg,base] of Object.entries(BASES)){
+      const addrs=HEUR_BUNDLE2[reg]; if(!addrs) continue;
+      let ok=true;
+      for (const a of addrs){ const off=(a-base)>>>0; if(off+4>bytes.length){ok=false;break;} if(view.getUint32(off,false)!==HEUR_B2_WORD){ok=false;break;} }
+      if(ok) c2.push(reg);
+    }
+    if (c2.length===1) return {region:c2[0], reason:'heuristic: Ro #2'};
+    return {region:null, reason:'ambiguous'};
+  }
+
+  function currentRegion(){ const sel=document.getElementById('region').value; if (sel && sel!=='auto') return sel; return KNOWN_SHA256[shaSeen]||KNOWN_SIZE[bytes?.length]||null; }
+
+  // ===== Color I/O =====
+  function readRGBA(off,count){ const out=[]; for(let i=0;i<count;i++){ const o=off+i*4; out.push([bytes[o],bytes[o+1],bytes[o+2],bytes[o+3]]);} return out; }
+  function writeRGBA(off,arr){ for(let i=0;i<arr.length;i++){ const o=off+i*4; const [r,g,b,a]=arr[i]; bytes[o]=r; bytes[o+1]=g; bytes[o+2]=b; bytes[o+3]=a; } }
+
+  function readRGB16(off,count){ let p=off; const out=[]; for(let i=0;i<count;i++){ const r=(bytes[p]<<8|bytes[p+1])&0xFFFF; const g=(bytes[p+2]<<8|bytes[p+3])&0xFFFF; const b=(bytes[p+4]<<8|bytes[p+5])&0xFFFF; out.push([r&0xFF,g&0xFF,b&0xFF]); p+=6; } return out; }
+  function writeRGB16(off,arr){ let p=off; for(const [r8,g8,b8] of arr){ bytes[p]=0; bytes[p+1]=r8&0xFF; bytes[p+2]=0; bytes[p+3]=g8&0xFF; bytes[p+4]=0; bytes[p+5]=b8&0xFF; p+=6; } }
+
+  // Menu RGBA8 (Atlas-style) 18 entries × 8B = 00RR 00GG 00BB 00AA
+  function readMenuRGBA8(off, count = 18){ const out=[]; let p=off>>>0; for(let i=0;i<count;i++,p+=8){ out.push([bytes[p+1],bytes[p+3],bytes[p+5],bytes[p+7]]); } return out; }
+  function writeMenuRGBA8(off, arr){ let p=off>>>0; for(const [r,g,b,a] of arr){ bytes[p]=0;bytes[p+1]=r&0xFF; bytes[p+2]=0;bytes[p+3]=g&0xFF; bytes[p+4]=0;bytes[p+5]=b&0xFF; bytes[p+6]=0;bytes[p+7]=a&0xFF; p+=8; } }
+
+  function readF32BE(off){ const b=(off&~3)>>>0; const v=new DataView(bytes.buffer).getFloat32(b,false); return { at:b, value:v }; }
+  function writeF32BE(off,val){ const b=(off&~3)>>>0; new DataView(bytes.buffer).setFloat32(b,val,false); }
+
+  // ===== Swatch =====
+  function makeSwatch(parent, label, rgba, onChange, withAlpha = true) {
+    const el = document.createElement('div'); el.className = 'swatch';
+    const box = document.createElement('div'); box.className = 'box';
+    const lab = document.createElement('div'); lab.textContent = label; lab.style.minWidth = '64px';
+    const col = document.createElement('input'); col.type = 'color'; col.value = `#${toHex2(rgba[0])}${toHex2(rgba[1])}${toHex2(rgba[2])}`;
+    const hexIn = document.createElement('input'); hexIn.type='text'; hexIn.className='mono'; hexIn.size = withAlpha?10:8; hexIn.placeholder = withAlpha?'RRGGBBAA':'RRGGBB';
+    hexIn.value = withAlpha ? `${toHex2(rgba[0])}${toHex2(rgba[1])}${toHex2(rgba[2])}${toHex2(rgba[3] ?? 255)}`
+                            : `${toHex2(rgba[0])}${toHex2(rgba[1])}${toHex2(rgba[2])}`;
+    let a = null;
+    if (withAlpha) { a = document.createElement('input'); a.type='number'; a.min=0; a.max=255; a.value=rgba[3] ?? 255; a.style.width='72px'; a.title='Alpha'; }
+
+    function preview(r,g,b,aa){ box.style.background = `rgba(${r},${g},${b},${(aa/255).toFixed(3)})`; }
+    function sync(){ const r=parseInt(col.value.slice(1,3),16), g=parseInt(col.value.slice(3,5),16), b=parseInt(col.value.slice(5,7),16); const aa=withAlpha?Math.max(0,Math.min(255,(parseInt(a.value||'255',10)|0))):255; preview(r,g,b,aa); hexIn.value = withAlpha?`${toHex2(r)}${toHex2(g)}${toHex2(b)}${toHex2(aa)}`:`${toHex2(r)}${toHex2(g)}${toHex2(b)}`; onChange([r,g,b,aa]); enableSave(); }
+    function syncHex(){ let v=hexIn.value.replace(/[^0-9A-Fa-f]/g,''); if(withAlpha){ v=v.slice(0,8).padEnd(8,'F'); const r=parseInt(v.slice(0,2),16), g=parseInt(v.slice(2,4),16), b=parseInt(v.slice(4,6),16), aa=parseInt(v.slice(6,8),16); col.value=`#${toHex2(r)}${toHex2(g)}${toHex2(b)}`; a.value=aa; preview(r,g,b,aa); onChange([r,g,b,aa]); } else { v=v.slice(0,6).padEnd(6,'F'); const r=parseInt(v.slice(0,2),16), g=parseInt(v.slice(2,4),16), b=parseInt(v.slice(4,6),16), aa=255; hexIn.value=v.toUpperCase(); col.value=`#${toHex2(r)}${toHex2(g)}${toHex2(b)}`; preview(r,g,b,aa); onChange([r,g,b,aa]); } enableSave(); }
+    col.addEventListener('input', sync); if (withAlpha) a.addEventListener('input', sync); hexIn.addEventListener('change', syncHex);
+    if (withAlpha) el.append(box, lab, col, a, hexIn); else el.append(box, lab, col, hexIn);
+    preview(rgba[0],rgba[1],rgba[2], withAlpha ? (rgba[3] ?? 255) : 255); parent.appendChild(el);
+  }
+
+  // ===== Panels =====
+  function fillRegionLine(){ const off=fromHex(document.getElementById('offRegionLine').value); const vals=readRGBA(off,9); const grid=document.getElementById('regionLineGrid'); grid.innerHTML=''; vals.forEach((rgba,i)=> makeSwatch(grid, String(i+1), rgba, v=>{ const arr=readRGBA(off,9); arr[i]=v; writeRGBA(off,arr); })); }
+  function fillMii(){ const off=fromHex(document.getElementById('offMii').value); const vals=readRGBA(off,12); const grid=document.getElementById('miiGrid'); grid.innerHTML=''; vals.forEach((rgba,i)=> makeSwatch(grid, String(i+1), rgba, v=>{ const arr=readRGBA(off,12); arr[i]=v; writeRGBA(off,arr); })); }
+
+  function fillMenu(){
+    const off = fromHex(document.getElementById('offMenu').value);
+    const mode = document.getElementById('menuMode').value; // 'rgb16' | 'rgba8'
+    const grid = document.getElementById('menuGrid'); grid.innerHTML='';
+
+    if (mode === 'rgb16') {
+      const count = 24;
+      const rgb = readRGB16(off, count);
+      rgb.forEach((rgb3,i)=> makeSwatch(grid, String(i+1), [rgb3[0],rgb3[1],rgb3[2],255], v=>{ const arr=readRGB16(off,count); arr[i]=[v[0],v[1],v[2]]; writeRGB16(off,arr); }, false));
+      document.getElementById('menuHint').textContent = 'RGB16 mode stores 24 entries as three BE16 lanes per color with zero high bytes: 00RR 00GG 00BB.';
+    } else {
+      const count = 18;
+      const rgba = readMenuRGBA8(off, count); // 00RR 00GG 00BB 00AA
+      rgba.forEach((px,i)=> makeSwatch(grid, String(i+1), px, v=>{ const arr=readMenuRGBA8(off,count); arr[i]=v; writeMenuRGBA8(off,arr); }, true));
+      document.getElementById('menuHint').textContent = 'RGBA8 mode treats the table as 18× entries at 8-byte stride: 00RR 00GG 00BB 00AA (Atlas-style).';
+    }
+  }
+
+  function fillHUD(){
+    const off=fromHex(document.getElementById('offHUD').value);
+    const base=(off&~3)>>>0; const dv=new DataView(bytes.buffer);
+    const vals=[ dv.getFloat32(base+0,false), dv.getFloat32(base+4,false), dv.getFloat32(base+8,false), dv.getFloat32(base+12,false) ];
+    const grid=document.getElementById('hudGrid'); grid.innerHTML='';
+    vals.forEach((f,i)=>{ const el=document.createElement('div'); el.className='swatch';
+      const lab=document.createElement('div'); lab.textContent='P'+(i+1); lab.style.minWidth='64px';
+      const inp=document.createElement('input'); inp.type='number'; inp.step='0.01'; inp.value=Number.isFinite(f)?String(f):'0'; inp.style.width='120px';
+      const hexv=document.createElement('div'); hexv.className='mono muted'; hexv.textContent = hex(base+4*i,6);
+      inp.addEventListener('input',()=>{ let v=parseFloat(inp.value); if(!Number.isFinite(v)) v=0; dv.setFloat32(base+4*i, v, false); enableSave(); });
+      el.append(lab, inp, hexv); grid.appendChild(el);
+    });
+  }
+
+  // ==== Fake Item Box helpers ====
+  function u32toHex(u){ return (u>>>0).toString(16).toUpperCase().padStart(8,'0'); }
+  function readFakeBox(){
+    const reg=currentRegion(); const o1=OFFS_FAKEBOX_1[reg]; const o2=OFFS_FAKEBOX_2[reg];
+    const off1El=document.getElementById('fake1Off'); const off2El=document.getElementById('fake2Off');
+    const cur1=document.getElementById('fake1Cur'); const cur2=document.getElementById('fake2Cur');
+    if(!bytes||!reg||o1==null||o2==null){ if(off1El) off1El.textContent='—'; if(off2El) off2El.textContent='—'; if(cur1) cur1.textContent='—'; if(cur2) cur2.textContent='—'; return; }
+    off1El.textContent=hex(o1,6); off2El.textContent=hex(o2,6);
+    const v1=view.getUint32(o1,false), v2=view.getUint32(o2,false);
+    if(cur1) cur1.textContent=`0x${u32toHex(v1)}`; if(cur2) cur2.textContent=`0x${u32toHex(v2)}`;
+    const in1=document.getElementById('fake1Hex'); const in2=document.getElementById('fake2Hex');
+    if(in1 && !in1.value) in1.value=u32toHex(v1); if(in2 && !in2.value) in2.value=u32toHex(v2);
+  }
+  function writeFake(which,val){ const reg=currentRegion(); if(!bytes||!reg){ alert('Load file / choose region first'); return; } const off = which===1?OFFS_FAKEBOX_1[reg]:OFFS_FAKEBOX_2[reg]; view.setUint32(off, (val>>>0), false); enableSave(); readFakeBox(); }
+
+  // ===== Save / Revert =====
+  function enableSave(){ setDisabled('btnSave', false); setDisabled('btnRevert', false); }
+  function revert(){ if(!original||!bytes) return; bytes.set(original); view=new DataView(bytes.buffer); setDisabled('btnSave', true); setDisabled('btnRevert', true); initForRegion(document.getElementById('region').value); }
+  function save(){ const blob=new Blob([bytes],{type:'application/octet-stream'}); const a=document.createElement('a'); const baseName=(fileHandle?.name||'StaticR.rel').replace(/\.[^.]+$/,''); a.href=URL.createObjectURL(blob); a.download=baseName+'.patched.rel'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); setDisabled('btnRevert', false); }
+
+  // ===== Region init =====
+  function initForRegion(reg){
+    if(!reg || !OFFS_REGION_LINE[reg]) return;
+    document.getElementById('offRegionLine').value=hex(OFFS_REGION_LINE[reg],6);
+    document.getElementById('offMii').value=hex(OFFS_MII[reg],6);
+    document.getElementById('offMenu').value=hex(OFFS_MENU_RGB[reg],6);
+    document.getElementById('offHUD').value=hex(OFFS_HUD[reg],6);
+    document.getElementById('menuMode').value='rgb16';
+    fillRegionLine(); fillMii(); fillMenu(); fillHUD(); readFakeBox();
+  refreshItemBehaviorUI(); refreshEngineClassUI(); refreshMCDPUI(); refreshPtsUI(); refreshCOTUI(); }
+
+  // ===== File I/O & detection =====
+  function loadFile(f){
+    if(!f) return;
+    fileHandle=f;
+    const fr=new FileReader();
+    fr.onload=async()=>{
+      const buf=fr.result;
+      original=new Uint8Array(buf);
+      bytes=new Uint8Array(buf.slice(0));
+      view=new DataView(bytes.buffer);
+      document.getElementById('fileInfo').textContent=`${f.name} — ${bytes.length.toLocaleString()} bytes`;
+      setDisabled('btnSave', true); setDisabled('btnRevert', true);
+      // detect sig
+      detectedRegion = KNOWN_SIZE[bytes.length] || null;
+      try { shaSeen = await sha256(bytes); if (KNOWN_SHA256[shaSeen]) detectedRegion = KNOWN_SHA256[shaSeen]; } catch {}
+      const det = pickRegion(); // uses heuristics too
+      const autoRegion = det.region || detectedRegion || KNOWN_SIZE[bytes.length] || null;
+      if (autoRegion && BASES[autoRegion]){
+        document.getElementById('region').value = autoRegion;
+        document.getElementById('base').textContent = hex(BASES[autoRegion],8) + ` (${det.reason || 'detected'})`;
+        initForRegion(autoRegion);
+        renderDetectExplain(autoRegion, det.reason || 'detected');
+      } else {
+        document.getElementById('base').textContent = '(ambiguous) choose region';
+        renderDetectExplain(null, 'ambiguous');
+        readFakeBox();
+      }
+    };
+    fr.readAsArrayBuffer(f);
+  }
+
+  // ===== Wire up =====
+  const dropArea = document.querySelector('section input#file').parentElement.parentElement;
+  dropArea.addEventListener('dragover', e=>{ e.preventDefault(); });
+  dropArea.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; loadFile(f); });
+
+  document.getElementById('file').addEventListener('change', e=> loadFile(e.target.files[0]));
+  document.getElementById('region').addEventListener('change', ()=>{
+    if (!bytes) return;
+    const reg = document.getElementById('region').value;
+    if (reg && reg !== 'auto'){
+      document.getElementById('base').textContent = hex(BASES[reg],8) + ' (manual)';
+      initForRegion(reg);
+      renderDetectExplain(reg, 'manual');
+    } else {
+      const det = pickRegion();
+      const autoRegion = det.region || detectedRegion || KNOWN_SIZE[bytes.length] || null;
+      if (autoRegion && BASES[autoRegion]){
+        document.getElementById('region').value = autoRegion;
+        document.getElementById('base').textContent = hex(BASES[autoRegion],8) + ` (${det.reason || 'detected'})`;
+        initForRegion(autoRegion);
+        renderDetectExplain(autoRegion, det.reason || 'detected');
+      }
+    }
+  });
+
+  document.getElementById('btnLoadRegionLine').addEventListener('click', fillRegionLine);
+  document.getElementById('btnLoadMii').addEventListener('click', fillMii);
+  document.getElementById('btnLoadMenu').addEventListener('click', fillMenu);
+  document.getElementById('btnLoadHUD').addEventListener('click', fillHUD);
+  document.getElementById('menuMode').addEventListener('change', ()=>{ if(bytes) fillMenu(); });
+
+  document.getElementById('btnSave').addEventListener('click', save);
+  document.getElementById('btnRevert').addEventListener('click', revert);
+
+  // Fake box buttons
+  document.getElementById('btnFake1Write').addEventListener('click', ()=>{ const v=(document.getElementById('fake1Hex').value||'').replace(/[^0-9A-Fa-f]/g,'').padStart(8,'0'); writeFake(1, parseInt(v,16)>>>0); });
+  document.getElementById('btnFake2Write').addEventListener('click', ()=>{ const v=(document.getElementById('fake2Hex').value||'').replace(/[^0-9A-Fa-f]/g,'').padStart(8,'0'); writeFake(2, parseInt(v,16)>>>0); });
+  document.getElementById('btnFake1Real').addEventListener('click', ()=>{ document.getElementById('fake1Hex').value = u32toHex(FAKEBOX_REAL_1); writeFake(1, FAKEBOX_REAL_1); });
+  document.getElementById('btnFake2Real').addEventListener('click', ()=>{ document.getElementById('fake2Hex').value = u32toHex(FAKEBOX_REAL_2); writeFake(2, FAKEBOX_REAL_2); });
+  
+  // Wire up Item Behavior UI
+  document.addEventListener('DOMContentLoaded', populateItemBehList);
+  document.getElementById('btnLoadItemBeh').addEventListener('click', refreshItemBehaviorUI);
+  document.getElementById('itemBehItem').addEventListener('change', refreshItemBehaviorUI);
+  document.getElementById('itemBehSelect').addEventListener('change', ()=>{
+    const v = parseInt(document.getElementById('itemBehSelect').value,10)>>>0;
+    writeItemBehavior(v);
+  });
+  document.getElementById('btnWriteItemBeh').addEventListener('click', ()=>{
+    const v = parseInt(document.getElementById('itemBehSelect').value,10)>>>0;
+    writeItemBehavior(v);
+  });
+  document.getElementById('btnResetItemBeh').addEventListener('click', ()=>{
+    const item = document.getElementById('itemBehItem').value;
+    if (!ITEM_BEHAVIOR[item]) return;
+    writeItemBehavior(ITEM_BEHAVIOR[item].std>>>0);
+  });
+
+  // ===== Item Behavior Modifier (quick win) =====
+  // Offsets per region (file offsets), and the standard/default value (0..3).
+  const ITEM_BEHAVIOR = {
+    'Banana':            { offs: { 'PAL':0x00395084, 'NTSC-U':0x00394A44, 'NTSC-J':0x00394864, 'NTSC-K':0x003954C4 }, std: 0x01 },
+    'Triple Banana':     { offs: { 'PAL':0x003950A0, 'NTSC-U':0x00394A60, 'NTSC-J':0x00394880, 'NTSC-K':0x003954E0 }, std: 0x02 },
+    'Bob-omb':           { offs: { 'PAL':0x0039519C, 'NTSC-U':0x00394B5C, 'NTSC-J':0x0039497C, 'NTSC-K':0x003955DC }, std: 0x01 },
+    'Fake Item Box':     { offs: { 'PAL':0x003953FC, 'NTSC-U':0x00394DBC, 'NTSC-J':0x00394BDC, 'NTSC-K':0x0039583C }, std: 0x01 },
+    'Mushroom':          { offs: { 'PAL':0x00395670, 'NTSC-U':0x00394F50, 'NTSC-J':0x00394E50, 'NTSC-K':0x00395AB0 }, std: 0x00 },
+    'Triple Mushroom':   { offs: { 'PAL':0x0039568C, 'NTSC-U':0x00394F6C, 'NTSC-J':0x00394E6C, 'NTSC-K':0x00395ACC }, std: 0x00 },
+    'Golden Mushroom':   { offs: { 'PAL':0x003956F8, 'NTSC-U':0x00394FA0, 'NTSC-J':0x00394ED8, 'NTSC-K':0x00395B38 }, std: 0x00 },
+    'Red Shell':         { offs: { 'PAL':0x00395734, 'NTSC-U':0x00394FDC, 'NTSC-J':0x00394F14, 'NTSC-K':0x00395B74 }, std: 0x01 },
+    'Triple Red Shell':  { offs: { 'PAL':0x00395750, 'NTSC-U':0x00394FF8, 'NTSC-J':0x00394F30, 'NTSC-K':0x00395B90 }, std: 0x03 },
+    'Blue Shell':        { offs: { 'PAL':0x0039584C, 'NTSC-U':0x003950F4, 'NTSC-J':0x0039502C, 'NTSC-K':0x00395C8C }, std: 0x01 },
+    'Green Shell':       { offs: { 'PAL':0x00395A3C, 'NTSC-U':0x003952E4, 'NTSC-J':0x0039521C, 'NTSC-K':0x00395E7C }, std: 0x01 },
+    'Triple Green Shell':{ offs: { 'PAL':0x00395A58, 'NTSC-U':0x00395300, 'NTSC-J':0x00395238, 'NTSC-K':0x00395E90 }, std: 0x03 },
+    'Star':              { offs: { 'PAL':0x00395ED8, 'NTSC-U':0x00395528, 'NTSC-J':0x003956B8, 'NTSC-K':0x00396318 }, std: 0x00 },
+    'Lightning':         { offs: { 'PAL':0x00395F88, 'NTSC-U':0x003955D8, 'NTSC-J':0x00395768, 'NTSC-K':0x003963C8 }, std: 0x00 },
+    'Blooper':           { offs: { 'PAL':0x003955B0, 'NTSC-U':0x00396E10, 'NTSC-J':0x00394D90, 'NTSC-K':0x003959F0 }, std: 0x00 },
+    'Mega Mushroom':     { offs: { 'PAL':0x003956C0, 'NTSC-U':0x00396ED0, 'NTSC-J':0x00394EA0, 'NTSC-K':0x00395B00 }, std: 0x00 },
+    'Bullet Bill':       { offs: { 'PAL':0x00395628, 'NTSC-U':0x00396E88, 'NTSC-J':0x00394E08, 'NTSC-K':0x00395A68 }, std: 0x00 },
+    'Thunder Cloud':     { offs: { 'PAL':0x00395B2C, 'NTSC-U':0x00396F0C, 'NTSC-J':0x0039530C, 'NTSC-K':0x00395F6C }, std: 0x00 },
+    'POW Block':         { offs: { 'PAL':0x00395CBC, 'NTSC-U':0x0039709C, 'NTSC-J':0x0039549C, 'NTSC-K':0x003960FC }, std: 0x00 },
+  };
+  const BEHAVIOR_LABELS = {
+    0: 'Use Item', 1: 'Fire Item', 2: 'Trailing Kart', 3: 'Circling Kart'
+  };
+
+  function populateItemBehList(){
+    const sel = document.getElementById('itemBehItem');
+    if (!sel) return;
+    sel.innerHTML = '';
+    Object.keys(ITEM_BEHAVIOR).forEach(name=>{
+      const opt=document.createElement('option'); opt.value=name; opt.textContent=name; sel.appendChild(opt);
+    });
+    sel.value = sel.value || 'Banana';
+  }
+
+  function currentItemBehaviorOffset(){
+    const reg = currentRegion();
+    const item = document.getElementById('itemBehItem')?.value;
+    if (!bytes || !reg || !ITEM_BEHAVIOR[item]) return null;
+    const off = ITEM_BEHAVIOR[item].offs[reg];
+    return (typeof off === 'number') ? off : null;
+  }
+
+  function refreshItemBehaviorUI(){
+    const offSpan = document.getElementById('itemBehOff');
+    const curSpan = document.getElementById('itemBehCur');
+    const stdSpan = document.getElementById('itemBehStd');
+    const sel = document.getElementById('itemBehSelect');
+    const item = document.getElementById('itemBehItem')?.value;
+    const reg = currentRegion();
+    if (!bytes || !reg || !ITEM_BEHAVIOR[item]){
+      if (offSpan) offSpan.textContent='—';
+      if (curSpan) curSpan.textContent='—';
+      if (stdSpan) stdSpan.textContent='—';
+      return;
+    }
+    const off = ITEM_BEHAVIOR[item].offs[reg];
+    const std = ITEM_BEHAVIOR[item].std >>> 0;
+    if (offSpan) offSpan.textContent = typeof off==='number' ? hex(off,6) : '—';
+    if (stdSpan) stdSpan.textContent = '0x' + (std>>>0).toString(16).toUpperCase().padStart(8,'0') + ` (${std} — ${BEHAVIOR_LABELS[std]||'?'})`;
+    if (typeof off==='number'){
+      const v = view.getUint32(off, false) >>> 0;
+      if (curSpan) curSpan.textContent = '0x' + v.toString(16).toUpperCase().padStart(8,'0') + ` (${v} — ${BEHAVIOR_LABELS[v]||'?'})`;
+      if (sel) sel.value = String(Math.min(3, Math.max(0, v|0)));
+    } else {
+      if (curSpan) curSpan.textContent = '—';
+    }
+  }
+
+  function writeItemBehavior(value){
+    const off = currentItemBehaviorOffset();
+    if (off==null) return;
+    const v = (value>>>0) & 0xFFFFFFFF;
+    view.setUint32(off, v, false);
+    enableSave();
+    refreshItemBehaviorUI();
+  }
+
+  // ===== Engine Class Modifier =====
+  // Offsets per region and standard float values (from Tockdom).
+  const ENGINE_CLASS = {
+    '50cc': { offs: { 'PAL':0x003A59F4, 'NTSC-U':0x003A54B4, 'NTSC-J':0x003A51D4, 'NTSC-K':0x003A5E4C }, std: 0.8 },
+    '100cc / Spectate': { offs: { 'PAL':0x003A59F8, 'NTSC-U':0x003A54B8, 'NTSC-J':0x003A51D8, 'NTSC-K':0x003A5E50 }, std: 0.9 },
+    '150cc / Mirror / Time Trials': { offs: { 'PAL':0x003A59FC, 'NTSC-U':0x003A54BC, 'NTSC-J':0x003A51DC, 'NTSC-K':0x003A5E54 }, std: 1.0 },
+    'Battle': { offs: { 'PAL':0x003A5A00, 'NTSC-U':0x003A54C0, 'NTSC-J':0x003A51E0, 'NTSC-K':0x003A5E58 }, std: 0.7 },
+  };
+
+  function populateEngClassList(){
+    const sel = document.getElementById('engClassSelect');
+    if (!sel) return;
+    sel.innerHTML = '';
+    Object.keys(ENGINE_CLASS).forEach(name=>{
+      const opt=document.createElement('option'); opt.value=name; opt.textContent=name; sel.appendChild(opt);
+    });
+    if (!sel.value) sel.value = '150cc / Mirror / Time Trials';
+  }
+
+  function currentEngineClassOffset(){
+    const reg = currentRegion();
+    const key = document.getElementById('engClassSelect')?.value;
+    if (!bytes || !reg || !ENGINE_CLASS[key]) return null;
+    const off = ENGINE_CLASS[key].offs[reg];
+    return (typeof off === 'number') ? off : null;
+  }
+
+  function refreshEngineClassUI(){
+    const offSpan = document.getElementById('engOff');
+    const curSpan = document.getElementById('engCur');
+    const stdSpan = document.getElementById('engStd');
+    const input = document.getElementById('engValue');
+    const key = document.getElementById('engClassSelect')?.value;
+    const reg = currentRegion();
+    if (!bytes || !reg || !ENGINE_CLASS[key]){
+      if (offSpan) offSpan.textContent='—';
+      if (curSpan) curSpan.textContent='—';
+      if (stdSpan) stdSpan.textContent='—';
+      if (input) input.value='';
+      return;
+    }
+    const off = ENGINE_CLASS[key].offs[reg];
+    const std = ENGINE_CLASS[key].std;
+    if (offSpan) offSpan.textContent = typeof off==='number' ? hex(off,6) : '—';
+    if (stdSpan) stdSpan.textContent = `${std.toFixed(3)} (f32)`;
+    if (typeof off==='number'){
+      const f = view.getFloat32(off, false);
+      const u = view.getUint32(off, false)>>>0;
+      if (curSpan) curSpan.textContent = `${f.toFixed(3)} (0x${u.toString(16).toUpperCase().padStart(8,'0')})`;
+      if (input) input.value = String(f.toFixed(3));
+    } else {
+      if (curSpan) curSpan.textContent = '—';
+      if (input) input.value = '';
+    }
+  }
+
+  function writeEngineClass(value){
+    const off = currentEngineClassOffset();
+    if (off==null) return;
+    const f = Number(value);
+    if (!Number.isFinite(f)) return;
+    view.setFloat32(off, f, false); // big-endian f32
+    enableSave();
+    refreshEngineClassUI();
+  }
+
+  // Wire up Engine Class UI
+  document.addEventListener('DOMContentLoaded', populateEngClassList);
+  document.getElementById('btnLoadEngineClass').addEventListener('click', refreshEngineClassUI);
+  document.getElementById('engClassSelect').addEventListener('change', refreshEngineClassUI);
+  document.getElementById('engValue').addEventListener('change', ()=>{
+    const v = parseFloat(document.getElementById('engValue').value);
+    if (Number.isFinite(v)) writeEngineClass(v);
+  });
+  document.getElementById('btnWriteEngineClass').addEventListener('click', ()=>{
+    const v = parseFloat(document.getElementById('engValue').value);
+    if (Number.isFinite(v)) writeEngineClass(v);
+  });
+  document.getElementById('btnResetEngineClass').addEventListener('click', ()=>{
+    const key = document.getElementById('engClassSelect').value;
+    if (!ENGINE_CLASS[key]) return;
+    writeEngineClass(ENGINE_CLASS[key].std);
+  });
+
+  // ===== Menu Character Display Position (MCDP) =====
+  // Offsets per region (from Tockdom doc). At offset: x, y, scale (each f32, big-endian).
+  const MCDP_OFFS = { 'PAL':0x00385DC0, 'NTSC-U':0x00388728, 'NTSC-J':0x00349A90, 'NTSC-K':0x003866C8 };
+  const MCDP_STD = { x:-190.0, y:0.0, s:1.0 };
+
+  function mcdpOffset(){
+    const reg = currentRegion();
+    if (!bytes || !reg) return null;
+    const off = MCDP_OFFS[reg];
+    return (typeof off==='number') ? off : null;
+  }
+
+  function refreshMCDPUI(){
+    const offSpan = document.getElementById('mcdpOff');
+    const curSpan = document.getElementById('mcdpCur');
+    const xIn = document.getElementById('mcdpX');
+    const yIn = document.getElementById('mcdpY');
+    const sIn = document.getElementById('mcdpS');
+    const off = mcdpOffset();
+    if (offSpan) offSpan.textContent = (off!=null) ? hex(off,6) : '—';
+    if (off==null || !bytes){
+      if (curSpan) curSpan.textContent='—';
+      if (xIn) xIn.value=''; if (yIn) yIn.value=''; if (sIn) sIn.value='';
+      return;
+    }
+    const x = view.getFloat32(off+0, false);
+    const y = view.getFloat32(off+4, false);
+    const s = view.getFloat32(off+8, false);
+    if (curSpan) curSpan.textContent = `x = ${x.toFixed(3)}, y = ${y.toFixed(3)}, scale = ${s.toFixed(3)}`;
+    if (xIn) xIn.value = String(x.toFixed(3));
+    if (yIn) yIn.value = String(y.toFixed(3));
+    if (sIn) sIn.value = String(s.toFixed(3));
+  }
+
+  function writeMCDP(vals){
+    const off = mcdpOffset();
+    if (off==null) return;
+    const {x,y,s} = vals;
+    if (Number.isFinite(x)) view.setFloat32(off+0, x, false);
+    if (Number.isFinite(y)) view.setFloat32(off+4, y, false);
+    if (Number.isFinite(s)) view.setFloat32(off+8, s, false);
+    enableSave();
+    refreshMCDPUI();
+  }
+
+  // Wire up MCDP UI
+  document.getElementById('btnLoadMCDP').addEventListener('click', refreshMCDPUI);
+  document.getElementById('btnWriteMCDP').addEventListener('click', ()=>{
+    const x = parseFloat(document.getElementById('mcdpX').value);
+    const y = parseFloat(document.getElementById('mcdpY').value);
+    const s = parseFloat(document.getElementById('mcdpS').value);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(s)){
+      writeMCDP({x,y,s});
+    }
+  });
+  document.getElementById('btnResetMCDP').addEventListener('click', ()=>{
+    writeMCDP({x:MCDP_STD.x, y:MCDP_STD.y, s:MCDP_STD.s});
+  });
+  // Update inputs write-on-change (optional for instant apply)
+  ['mcdpX','mcdpY','mcdpS'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener('change', ()=>{
+      const x = parseFloat(document.getElementById('mcdpX').value);
+      const y = parseFloat(document.getElementById('mcdpY').value);
+      const s = parseFloat(document.getElementById('mcdpS').value);
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(s)){
+        writeMCDP({x,y,s});
+      }
+    });
+  });
+
+  // ===== Race Points (Offline / Friend) =====
+  // Base offsets per region (start of 144-byte block).
+  const PTS_BASE = { 'PAL':0x0037FD50, 'NTSC-U':0x0037FC60, 'NTSC-J':0x0037FA20, 'NTSC-K':0x00380130 };
+  const PTS_GROUP_STRIDE = 0x0C; // 12 bytes per player-count group
+  // Standard values per player count (only first N entries used).
+  const PTS_STD = {
+    1:  [15],
+    2:  [15, 7],
+    3:  [15, 8, 2],
+    4:  [15, 9, 4, 1],
+    5:  [15, 9, 5, 2, 1],
+    6:  [15, 10, 6, 3, 1, 0],
+    7:  [15, 10, 7, 5, 3, 1, 0],
+    8:  [15, 11, 8, 6, 4, 2, 1, 0],
+    9:  [15, 11, 8, 6, 4, 3, 2, 1, 0],
+    10: [15, 12, 10, 8, 6, 4, 3, 2, 1, 0],
+    11: [15, 12, 10, 8, 6, 5, 4, 3, 2, 1, 0],
+    12: [15, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+  };
+
+  function ptsBaseOffset(){
+    const reg = currentRegion();
+    if (!bytes || !reg) return null;
+    const off = PTS_BASE[reg];
+    return (typeof off==='number') ? off : null;
+  }
+
+  function ptsGroupOffset(playerCount){
+    const base = ptsBaseOffset();
+    if (base==null) return null;
+    const idx = Math.max(1, Math.min(12, playerCount|0)) - 1;
+    return base + idx * PTS_GROUP_STRIDE;
+  }
+
+  function fmtArr(arr, n){
+    return arr.slice(0, n).map(v=>String(v)).join(', ');
+  }
+
+  function rebuildPtsInputs(n, values){
+    const host = document.getElementById('ptsInputs');
+    host.innerHTML = '';
+    for (let i=0;i<n;i++){
+      const inp = document.createElement('input');
+      inp.type='number'; inp.step='1'; inp.min='0'; inp.max='255';
+      inp.style.width='64px';
+      inp.value = String(values && Number.isFinite(values[i]) ? values[i] : 0);
+      inp.dataset.index = String(i);
+      const label = document.createElement('label');
+      label.className='small muted';
+      label.textContent = (i+1)+': ';
+      label.style.display='flex'; label.style.alignItems='center'; label.style.gap='4px';
+      label.appendChild(inp);
+      host.appendChild(label);
+    }
+  }
+
+  function refreshPtsUI(){
+    const baseSpan = document.getElementById('ptsBaseOff');
+    const grpSpan = document.getElementById('ptsGroupOff');
+    const stdSpan = document.getElementById('ptsStd');
+    const curSpan = document.getElementById('ptsCur');
+    const sel = document.getElementById('ptsPlayerCount');
+    const n = parseInt(sel.value,10);
+    const base = ptsBaseOffset();
+    if (baseSpan) baseSpan.textContent = (base!=null) ? hex(base,6) : '—';
+
+    const grp = ptsGroupOffset(n);
+    if (grpSpan) grpSpan.textContent = (grp!=null) ? hex(grp,6) : '—';
+
+    const std = PTS_STD[n];
+    if (stdSpan) stdSpan.textContent = std ? fmtArr(std, n) : '—';
+
+    // Read current values
+    if (grp!=null && bytes){
+      const arr = [];
+      for (let i=0;i<n;i++){
+        arr.push(view.getUint8(grp+i));
+      }
+      if (curSpan) curSpan.textContent = fmtArr(arr, n);
+      rebuildPtsInputs(n, arr);
+    } else {
+      if (curSpan) curSpan.textContent = '—';
+      rebuildPtsInputs(n, null);
+    }
+  }
+
+  function readPtsInputs(){
+    const sel = document.getElementById('ptsPlayerCount');
+    const n = parseInt(sel.value,10);
+    const host = document.getElementById('ptsInputs');
+    const values = [];
+    const inputs = host.querySelectorAll('input');
+    for (let i=0;i<Math.min(n, inputs.length); i++){
+      const v = parseInt(inputs[i].value,10);
+      values.push(Number.isFinite(v) ? Math.max(0, Math.min(255, v)) : 0);
+    }
+    return values;
+  }
+
+  function writePts(values){
+    const sel = document.getElementById('ptsPlayerCount');
+    const n = parseInt(sel.value,10);
+    const grp = ptsGroupOffset(n);
+    if (grp==null) return;
+    for (let i=0;i<values.length && i<n; i++){
+      view.setUint8(grp+i, values[i] & 0xFF);
+    }
+    enableSave();
+    refreshPtsUI();
+  }
+
+  // Wire up Race Points UI
+  document.getElementById('btnPtsLoad').addEventListener('click', refreshPtsUI);
+  document.getElementById('ptsPlayerCount').addEventListener('change', refreshPtsUI);
+  document.getElementById('btnPtsWrite').addEventListener('click', ()=>{
+    const values = readPtsInputs();
+    writePts(values);
+  });
+  document.getElementById('btnPtsReset').addEventListener('click', ()=>{
+    const n = parseInt(document.getElementById('ptsPlayerCount').value,10);
+    writePts(PTS_STD[n].slice(0, n));
+  });
+
+  // ===== Character Order Table (COT) =====
+  // Region base offsets for the 0x60-byte table (24 * 4 bytes).
+  const COT_BASE = { 'PAL':0x00397B00, 'NTSC-U':0x003971A8, 'NTSC-J':0x003972E0, 'NTSC-K':0x00397F40 };
+
+  // Character identifiers table (from identifiers doc). Use code numbers as the 32-bit value.
+  const CHAR_IDS = [
+    {desc:'Mario', code:0x00, codename:'mr'},
+    {desc:'Baby Peach', code:0x01, codename:'bpc'},
+    {desc:'Waluigi', code:0x02, codename:'wl'},
+    {desc:'Bowser', code:0x03, codename:'kp'},
+    {desc:'Baby Daisy', code:0x04, codename:'bds'},
+    {desc:'Dry Bones', code:0x05, codename:'ka'},
+    {desc:'Baby Mario', code:0x06, codename:'bmr'},
+    {desc:'Luigi', code:0x07, codename:'lg'},
+    {desc:'Toad', code:0x08, codename:'ko'},
+    {desc:'Donkey Kong', code:0x09, codename:'dk'},
+    {desc:'Yoshi', code:0x0A, codename:'ys'},
+    {desc:'Wario', code:0x0B, codename:'wr'},
+    {desc:'Baby Luigi', code:0x0C, codename:'blg'},
+    {desc:'Toadette', code:0x0D, codename:'kk'},
+    {desc:'Koopa Troopa', code:0x0E, codename:'nk'},
+    {desc:'Daisy', code:0x0F, codename:'ds'},
+    {desc:'Peach', code:0x10, codename:'pc'},
+    {desc:'Birdo', code:0x11, codename:'ca'},
+    {desc:'Diddy Kong', code:0x12, codename:'dd'},
+    {desc:'King Boo', code:0x13, codename:'kt'},
+    {desc:'Bowser Jr.', code:0x14, codename:'jr'},
+    {desc:'Dry Bowser', code:0x15, codename:'bk'},
+    {desc:'Funky Kong', code:0x16, codename:'fk'},
+    {desc:'Rosalina', code:0x17, codename:'rs'},
+    {desc:'Small Mii Outfit A (Male)', code:0x18, codename:'sa_mii_m'},
+    {desc:'Small Mii Outfit A (Female)', code:0x19, codename:'sa_mii_f'},
+    {desc:'Small Mii Outfit B (Male)', code:0x1A, codename:'sb_mii_m'},
+    {desc:'Small Mii Outfit B (Female)', code:0x1B, codename:'sb_mii_f'},
+    {desc:'Small Mii Outfit C (Male)', code:0x1C, codename:'sc_mii_m'},
+    {desc:'Small Mii Outfit C (Female)', code:0x1D, codename:'sc_mii_f'},
+    {desc:'Medium Mii Outfit A (Male)', code:0x1E, codename:'ma_mii_m'},
+    {desc:'Medium Mii Outfit A (Female)', code:0x1F, codename:'ma_mii_f'},
+    {desc:'Medium Mii Outfit B (Male)', code:0x20, codename:'mb_mii_m'},
+    {desc:'Medium Mii Outfit B (Female)', code:0x21, codename:'mb_mii_f'},
+    {desc:'Medium Mii Outfit C (Male)', code:0x22, codename:'mc_mii_m'},
+    {desc:'Medium Mii Outfit C (Female)', code:0x23, codename:'mc_mii_f'},
+    {desc:'Large Mii Outfit A (Male)', code:0x24, codename:'la_mii_m'},
+    {desc:'Large Mii Outfit A (Female)', code:0x25, codename:'la_mii_f'},
+    {desc:'Large Mii Outfit B (Male)', code:0x26, codename:'lb_mii_m'},
+    {desc:'Large Mii Outfit B (Female)', code:0x27, codename:'lb_mii_f'},
+    {desc:'Large Mii Outfit C (Male)', code:0x28, codename:'lc_mii_m'},
+    {desc:'Large Mii Outfit C (Female)', code:0x29, codename:'lc_mii_f'},
+    {desc:'Medium Mii', code:0x2A, codename:'m_mii'},
+    {desc:'Small Mii', code:0x2B, codename:'s_mii'},
+    {desc:'Large Mii', code:0x2C, codename:'l_mii'},
+    {desc:'Peach (Character/Vehicle Selection)', code:0x2D, codename:'pc_menu'},
+    {desc:'Daisy (Character/Vehicle Selection)', code:0x2E, codename:'ds_menu'},
+    {desc:'Rosalina (Character/Vehicle Selection)', code:0x2F, codename:'rs_menu'},
+  ];
+  const CHAR_BY_CODE = new Map(CHAR_IDS.map(o=>[o.code, o]));
+
+  function cotBaseOffset(){
+    const reg = currentRegion();
+    if (!bytes || !reg) return null;
+    const off = COT_BASE[reg];
+    return (typeof off==='number') ? off : null;
+  }
+
+  function cotBuildSelect(idx, valueCode){
+    const sel = document.createElement('select');
+    sel.id = 'cotSel'+idx;
+    sel.style.minWidth = '260px';
+    CHAR_IDS.forEach(obj=>{
+      const opt = document.createElement('option');
+      opt.value = String(obj.code);
+      opt.textContent = `${(obj.code>>>0).toString(16).toUpperCase().padStart(2,'0')} — ${obj.desc} (${obj.codename})`;
+      sel.appendChild(opt);
+    });
+    if (Number.isFinite(valueCode)) sel.value = String(valueCode>>>0);
+    return sel;
+  }
+
+  
+function cotRebuildGrid(codes){
+  const grid = document.getElementById('cotGrid');
+  if (!grid) return; // guard if DOM not ready
+  grid.innerHTML = '';
+  const count = 24;
+  for (let i=0;i<count;i++){
+    const wrap = document.createElement('div');
+    wrap.style.display='flex';
+    wrap.style.flexDirection='column';
+    wrap.style.gap='4px';
+    const lab = document.createElement('div');
+    lab.className='small muted';
+    lab.textContent = `Slot ${i+1}`;
+    const sel = cotBuildSelect(i, codes ? codes[i] : undefined);
+    wrap.appendChild(lab);
+    wrap.appendChild(sel);
+    grid.appendChild(wrap);
+  }
+  // After building selects, attach change listeners and rebuild DnD mirror
+  for (let i=0;i<24;i++){
+    const sel = document.getElementById('cotSel'+i);
+    if (sel) sel.addEventListener('change', cotUpdateDnDFromSelects);
+  }
+  cotRebuildDnD(codes || new Array(24).fill(0));
+  cotUpdateWarning();
+}
+
+  function cotReadCodes(){
+    const base = cotBaseOffset();
+    if (base==null) return null;
+    const codes = [];
+    for (let i=0;i<24;i++){
+      const v = view.getUint32(base + i*4, false)>>>0; // big-endian
+      // Treat table value as code number (low byte), per identifiers doc.
+      const code = v & 0xFF;
+      codes.push(code);
+    }
+    return codes;
+  }
+
+  function cotWriteCodes(codes){
+    const base = cotBaseOffset();
+    if (base==null) return;
+    for (let i=0;i<24;i++){
+      const code = (codes[i]>>>0) & 0xFF;
+      view.setUint32(base + i*4, code>>>0, false); // write as 32-bit value of the identifier
+    }
+    enableSave();
+  }
+
+  function cotSelectedCodes(){
+    const codes = [];
+    for (let i=0;i<24;i++){
+      const sel = document.getElementById('cotSel'+i);
+      const v = parseInt(sel.value,10);
+      codes.push(Number.isFinite(v) ? (v&0xFF) : 0);
+    }
+    return codes;
+  }
+
+  function cotFormatList(codes){
+    return codes.map(c=>{
+      const o = CHAR_BY_CODE.get(c);
+      return o ? `${(c>>>0).toString(16).toUpperCase().padStart(2,'0')} ${o.codename}` : `?? ${c}`;
+    }).join(', ');
+  }
+
+  function refreshCOTUI(){
+    const baseSpan = document.getElementById('cotBaseOff');
+    const curSpan = document.getElementById('cotCur');
+    const base = cotBaseOffset();
+    if (baseSpan) baseSpan.textContent = (base!=null) ? hex(base,6) : '—';
+    const codes = (base!=null && bytes) ? cotReadCodes() : null;
+    if (codes){
+      if (curSpan) curSpan.textContent = cotFormatList(codes);
+      cotRebuildGrid(codes);
+    } else {
+      if (curSpan) curSpan.textContent = '—';
+      cotRebuildGrid(null);
+    }
+  }
+
+  function cotFillAscending(){
+    const codes = CHAR_IDS.map(o=>o.code).slice(0,24);
+    cotRebuildGrid(codes);
+    for (let i=0;i<24;i++){
+      const el = document.getElementById('cotSel'+i);
+      el.value = String(codes[i]>>>0);
+    }
+  cotUpdateWarning();
+   cotUpdateDnDFromSelects(); }
+
+  // Wire up Character Order Table UI
+  document.getElementById('btnCOTLoad').addEventListener('click', refreshCOTUI);
+  document.getElementById('btnCOTWrite').addEventListener('click', ()=>{
+    const codes = cotSelectedCodes();
+    cotWriteCodes(codes);
+    refreshCOTUI();
+  });
+  document.getElementById('btnCOTFillAsc').addEventListener('click', ()=>{
+    cotFillAscending();
+  });
+
+  // ----- Drag-and-Drop support for Character Order Table -----
+  function cotCodeLabel(code){
+    const o = CHAR_BY_CODE.get(code);
+    const hex = (code>>>0).toString(16).toUpperCase().padStart(2,'0');
+    return o ? `${hex} ${o.codename}` : `${hex} ??`;
+  }
+
+  function cotBuildChip(code, idx){
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.draggable = true;
+    chip.dataset.index = String(idx);
+    chip.dataset.code = String(code>>>0);
+    chip.style.border = '1px solid #ccc';
+    chip.style.borderRadius = '8px';
+    chip.style.padding = '6px 10px';
+    chip.style.cursor = 'grab';
+    chip.style.userSelect = 'none';
+    chip.style.background = '#fafafa';
+    chip.style.boxShadow = '0 1px 2px rgba(0,0,0,.05)';
+    chip.textContent = cotCodeLabel(code);
+    chip.style.color = '#111827';
+    return chip;
+  }
+
+  
+function cotGetDnDCodes(){
+  const host = document.getElementById('cotDnD');
+  const codes = [];
+  if (!host) return new Array(24).fill(0);
+  host.querySelectorAll('[draggable="true"]').forEach(el=>{
+    const c = parseInt(el.dataset.code,10);
+    codes.push(Number.isFinite(c)? (c&0xFF) : 0);
+  });
+  while (codes.length < 24) codes.push(0);
+  return codes.slice(0,24);
+  cotUpdateWarning();
+}
+
+  
+function cotRebuildDnD(codes){
+  const host = document.getElementById('cotDnD');
+  if (!host) return;
+  host.innerHTML = '';
+  const arr = (codes && codes.length===24) ? codes.slice() : new Array(24).fill(0);
+  arr.forEach((code, i)=> host.appendChild(cotBuildChip(code, i)));
+  cotAttachDnDHandlers();
+  cotUpdateWarning();
+}
+
+  function cotUpdateSelectsFromDnD(){
+    const codes = cotGetDnDCodes();
+    for (let i=0;i<24;i++){
+      const sel = document.getElementById('cotSel'+i);
+      if (sel) sel.value = String(codes[i]>>>0);
+    }
+  }
+
+  function cotUpdateDnDFromSelects(){
+    const codes = [];
+    for (let i=0;i<24;i++){
+      const sel = document.getElementById('cotSel'+i);
+      const v = parseInt(sel.value,10);
+      codes.push(Number.isFinite(v)? (v&0xFF) : 0);
+    }
+    cotRebuildDnD(codes);
+  }
+
+  
+function cotAttachDnDHandlers(){
+  const host = document.getElementById('cotDnD');
+  if (!host) return;
+  let dragIndex = -1;
+  host.querySelectorAll('[draggable="true"]').forEach(el=>{
+    el.addEventListener('dragstart', (e)=>{
+      dragIndex = Array.from(host.children).indexOf(el);
+      el.style.opacity = '0.5';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', ()=>{
+      el.style.opacity = '';
+      dragIndex = -1;
+    });
+    el.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    el.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const tgtIndex = Array.from(host.children).indexOf(el);
+      if (dragIndex<0 || tgtIndex<0 || dragIndex===tgtIndex) return;
+      const codes = cotGetDnDCodes();
+      const tmp = codes[dragIndex];
+      codes[dragIndex] = codes[tgtIndex];
+      codes[tgtIndex] = tmp;
+      cotRebuildDnD(codes);
+      cotUpdateSelectsFromDnD();
+    });
+  });
+  cotUpdateWarning();
+  cotUpdateWarning();
+}
+
+  // ----- Duplicate detection for Character Order Table -----
+  function cotDuplicateReport(codes){
+    // Build a map: code -> array of slot indexes (1-based) where it appears
+    const slotsByCode = new Map();
+    for (let i=0;i<codes.length;i++){
+      const c = (codes[i]>>>0) & 0xFF;
+      if (!slotsByCode.has(c)) slotsByCode.set(c, []);
+      slotsByCode.get(c).push(i+1);
+    }
+    // Keep only entries with duplicates (count >= 2)
+    const dups = [];
+    slotsByCode.forEach((slots, c)=>{
+      if (slots.length >= 2){
+        const o = CHAR_BY_CODE.get(c);
+        const hex = (c>>>0).toString(16).toUpperCase().padStart(2,'0');
+        const label = o ? `${hex} ${o.codename}` : `${hex} ??`;
+        dups.append ? dups.append({code:c, label, slots}) : dups.push({code:c, label, slots});
+      }
+    });
+    return dups;
+  }
+
+  function cotUpdateWarning(){
+    const warn = document.getElementById('cotWarn');
+    if (!warn) return;
+    const codes = cotSelectedCodes(); // canonical source: the selects
+    const dups = cotDuplicateReport(codes);
+    if (!dups || dups.length===0){
+      warn.style.display = 'none';
+      warn.textContent = '';
+      return;
+    }
+    const parts = dups.map(d => `${d.label} in slots ${d.slots.join(', ')}`);
+    warn.innerHTML = `<strong>Duplicate entries detected:</strong> ${parts.join('; ')} <span class="muted">(soft warning — allowed, but often unintended)</span>`;
+    warn.style.display = '';
+  }
+</script>
+</body>
+</html>
