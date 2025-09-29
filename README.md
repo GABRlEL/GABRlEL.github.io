@@ -21,3 +21,5 @@
 [MKMii — MKWii Main.dol — Mii Color Editor](https://gabrlel.github.io/mii.html)
 
 [StaticAR — MKWii StaticR.rel — AR Code Patcher](https://gabrlel.github.io/ar.html)
+
+[DynamicR — MKWii StaticR.rel — Editor Suite](https://gabrlel.github.io/rel.html)
