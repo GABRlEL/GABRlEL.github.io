@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StaticAR — MKWii StaticR.rel — AR Code Patcher</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#171a20; --muted:#a0a4ae; --text:#e6e7ea; --brand:#7aa2ff; --ok:#4cc38a; --warn:#f5a623; --bad:#ef4e4e; }
+    html, body { height: 100%; }
+    body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; color:var(--text); background:radial-gradient(1200px 600px at 10% -10%, #1a2030, #0d0f14 55%, #0a0c10 100%) fixed; }
+    a { color: var(--brand); text-decoration: none; }
+    .container { max-width: 1100px; margin: 28px auto 64px; padding: 0 18px; }
+    header { display:flex; gap:16px; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+    .title { font-weight: 700; font-size: 20px; letter-spacing: 0.3px; }
+    .subtitle { color: var(--muted); font-size: 12px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 16px; }
+    .card { background: linear-gradient(180deg, #1c2130, #151924); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); overflow: hidden; }
+    .card h2 { margin: 0; padding: 18px 24px; font-size: 14px; letter-spacing: 0.2px; background: linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.07)); border-bottom: 1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; }
+    .card .body { padding: 14px 16px; }
+    .muted { color: var(--muted); }
+    .kv { display:grid; grid-template-columns: 150px 1fr; gap: 8px; align-items:center; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .drop { border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 16px; text-align: center; transition: border-color .2s, background .2s; }
+    .drop.drag { border-color: var(--brand); background: rgba(122,162,255,0.06); }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .btn { display:inline-flex; align-items:center; gap:8px; background: #1e2433; color: var(--text); border: 1px solid rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 10px; cursor:pointer; transition: transform .02s ease, background .2s, border-color .2s; user-select:none; }
+    .btn:hover { background: #232a3e; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: #27314a; border-color: rgba(122,162,255,0.35); color:#eaf0ff; }
+    .btn.ok { background: #1c2b24; border-color: rgba(76,195,138,0.3); color:#c8f5e3; }
+    .btn.warn { background: #2d2515; border-color: rgba(245,166,35,0.3); color:#ffe4bf; }
+    .btn.bad { background: #2a1922; border-color: rgba(239,78,78,0.35); color:#ffdee1; }
+    .status { display:inline-flex; align-items:center; gap:6px; padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+    .status.ok { background: rgba(76,195,138,0.14); color:#c8f5e3; }
+    .status.warn { background: rgba(245,166,35,0.12); color:#ffe4bf; }
+    .status.bad { background: rgba(239,78,78,0.12); color:#ffdee1; }
+    .textarea { width:100%; min-height: 160px; box-sizing:border-box; background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:10px; }
+    input[type="file"], select, input[type="text"] { background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12px; }
+    .small { font-size: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+    .hr { height: 1px; background: rgba(255,255,255,0.08); margin: 10px 0; }
+    .mono.small { font-size: 11.5px; }
+    details > summary { cursor: pointer; color: var(--muted); }
+    /* Width/padding tweaks per request */
+    .card.load, .card.narrow { max-width: 100%; margin-left: auto; margin-right: auto; }
+    .card.load .body, .card.narrow .body { padding: 28px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">StaticAR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">AR Code Patcher</span></div>
+        <div class="subtitle">Paste Action Replay <span class="mono">04/02/00</span> codes → map to file offsets using region base → patch <span class="mono">StaticR.rel</span>. 100% client‑side. Sponsored by ChatGPT 5 Thinking. Tested on PAL only.<br>Credits to <a href="https://mariokartwii.com/member.php?action=profile&uid=1">Vega</a> and <a href="https://mariokartwii.com/member.php?action=profile&uid=447">Ro</a> for their research and documentations.</div>
+      </div>
+      <div class="row">
+        <button id="btnPatch" class="btn ok" disabled>⬇ Apply & download patched <span class="mono">StaticR.rel</span></button>
+        <button id="btnRevert" class="btn" disabled>↩ Revert unsaved changes</button>
+      </div>
+    </header>
+
+    <section class="card load">
+      <h2>1) Load <code class="mono">StaticR.rel</code></h2>
+      <div class="body">
+        <div id="drop" class="drop">
+          <div class="row" style="justify-content:center; gap:12px;">
+            <label class="btn primary" for="file">Choose file…</label>
+            <input id="file" type="file" accept=",.rel" hidden />
+            <div class="muted">…or drag & drop your <span class="mono">StaticR.rel</span> here</div>
+          <div class="hr"></div>
+          <div class="kv">
+            <div class="muted">Loaded file</div>
+            <div id="fileInfo" class="mono">—</div>
+            <div class="muted">Region</div>
+            <div>
+              <select id="region">
+                <option value="auto">Auto (detect from addresses)</option>
+                <option value="NTSC-U">NTSC-U (USA)</option>
+                <option value="PAL">PAL (EUR)</option>
+                <option value="NTSC-J">NTSC-J (JPN)</option>
+                <option value="NTSC-K">NTSC-K (KOR)</option>
+              </select>
+            </div>
+            <div class="muted">Assumed base</div>
+            <div id="base" class="mono">—</div>
+          </div>
+        </div>
+      </div>          <div class="hr"></div>
+          <details id="detExplain"><summary class="small muted">How region was chosen</summary><div id="detectExplain" class="mono small muted" style="padding-top:6px">Load a file and click Analyze to see details.</div></details>
+      </div>
+    </section>
+
+    <section class="card narrow">
+      <h2>2) Paste AR codes</h2>
+      <div class="body">
+        <textarea id="codes" class="textarea mono" spellcheck="false" placeholder="Paste your codes, one per line (example Force Unused Error When Selecting Nintendo WFC by Ro):
+04831CCC 38000001
+04831DC0 38000001"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <button id="btnAnalyze" class="btn">🔎 Analyze</button>
+          <span class="muted small">Supported: <span class="mono">04</span> (32‑bit), <span class="mono">02</span> (16‑bit), <span class="mono">00</span> (8‑bit). Values written big‑endian.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card narrow">
+      <h2>3) Results</h2>
+      <div class="body">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Type</th>
+              <th>RAM addr</th>
+              <th>File off</th>
+              <th>Size</th>
+              <th>Before</th>
+              <th>After</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="small muted" style="margin-top:8px">Auto region picks the base which yields the most in‑range targets. For MKWii, REL bases are: NTSC‑U <span class="mono">0x8050BF60</span>, PAL <span class="mono">0x805102E0</span>, NTSC‑J <span class="mono">0x8050FC60</span>, NTSC‑K <span class="mono">0x804FE300</span>. Offsets computed as <span class="mono">file_off = addr - base</span>.</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  // ===== Constants =====
+  const BASES = {
+    'NTSC-U': 0x8050BF60, // from Vega's RAM-to-file ranges
+    'PAL':    0x805102E0,
+    'NTSC-J': 0x8050FC60,
+    'NTSC-K': 0x804FE300,
+  };
+  // Heuristic bundle #1 (addresses credited to Ro):
+  // For each region, these RAM addresses should contain the original word 0x88030014 (lbz r0,0x14(r3)) in retail RELs.
+  const HEUR_BUNDLE1 = {
+    'NTSC-U': [0x80831CCC, 0x80831DC0],
+    'PAL':    [0x808512E0, 0x808513D4],
+    'NTSC-J': [0x8085094C, 0x80850A40],
+    'NTSC-K': [0x8083F6A0, 0x8083F794],
+  };
+  const HEUR_BUNDLE1_WORD = 0x88030014; // expected original
+  
+  // Heuristic bundle #2 (also credited to Ro):
+  // These additional addresses should also read the original word 0x88030014 on retail RELs.
+  const HEUR_BUNDLE2 = {
+    'NTSC-U': [0x80831BD8],
+    'PAL':    [0x808511EC],
+    'NTSC-J': [0x80850858],
+    'NTSC-K': [0x8083F5AC],
+  };
+  const HEUR_BUNDLE2_WORD = HEUR_BUNDLE1_WORD; // same expected original
+  
+  // Known MKWii StaticR.rel signatures (retail dumps provided by user) (retail dumps provided by user)
+  const KNOWN_SHA256 = {
+    '16d9d146112541fefea701ecb5bc1a496f9d50e4a752fbb5b6778e7c6399f67d': 'PAL',
+    '1168107f8fdef27a356df76036db55afe4fbf7752606dbac991726701133a617': 'NTSC-U',
+    '88539012d357a1420724e51dc7e351192ce696da4b0045994895518a3fad6fae': 'NTSC-J',
+    'f441b08e4ccc2d64aadcac8429973f10ea6b1cc8f175500fc084983775f7b3e5': 'NTSC-K',
+  };
+  const KNOWN_SIZE = {
+    4903876: 'PAL',
+    4902804: 'NTSC-U',
+    4901564: 'NTSC-J',
+    4905468: 'NTSC-K',
+  };
+  let detectedRegion = null;
+  let lastSha = null;
+  let detectInfo = null;
+
+  // ===== State =====
+  let fileHandle = null;        // File
+  let original = null;          // Uint8Array (pristine)
+  let bytes = null;             // Uint8Array (mutable)
+  let view = null;              // DataView
+
+  // ===== Helpers =====
+  const $ = s => document.querySelector(s);
+  const hex = (n,w=2) => '0x' + (n>>>0).toString(16).toUpperCase().padStart(w,'0');
+  const toHexBytes = (arr) => Array.from(arr, b=>b.toString(16).toUpperCase().padStart(2,'0')).join(' ');
+
+  async function computeSHA256(u8){
+    const h = await crypto.subtle.digest('SHA-256', u8);
+    return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  function renderDetectExplain(info){
+    const el = document.getElementById('detectExplain');
+    if (!el) return;
+    if (!info){ el.textContent = 'Load a file and click Analyze to see details.'; return; }
+    let html = '';
+    if (info.chosen){
+      html += `<div>Chosen: <span class="mono">${info.chosen.region}</span> <span class="muted">(${info.chosen.reason})</span></div>`;
+    }
+    if (info.sha){
+      html += `<div>Signature: ${info.sigRegion?('match '+info.sigRegion):'no match'} <span class="mono">SHA-256 ${info.sha.slice(0,8)}…</span> • size ${(info.size||0).toLocaleString()} bytes</div>`;
+    }
+    if (info.heur){
+      const parts = Object.keys(info.heur).map(reg=>`${reg} ${info.heur[reg].match}/${info.heur[reg].total}`);
+      html += `<div style=\"margin-top:6px\">Heuristic #1 (Ro): ${parts.join(' • ')}</div>`;
+    }
+    if (info.heur2){
+      const partsB = Object.keys(info.heur2).map(reg=>`${reg} ${info.heur2[reg].match}/${info.heur2[reg].total}`);
+      html += `<div style=\"margin-top:6px\">Heuristic #2 (Ro): ${partsB.join(' • ')}</div>`;
+    }
+    if (info.autoScores){
+      const parts2 = info.autoScores.map(e=>`${e.reg} ${e.score}`);
+      html += `<div style=\"margin-top:6px\">Auto in-range hits: ${parts2.join(' • ')}</div>`;
+    }
+    el.innerHTML = html || '—';
+  }
+
+  function computeDetectInfo(codes, picked){
+    const info = { size: bytes?.length||0, sha: lastSha||null, sigRegion: detectedRegion||KNOWN_SIZE[bytes?.length]||null };
+    if (picked) info.chosen = { region: picked.region, reason: picked.reason };
+    // Heuristic bundle #1 summary counts
+    const heur = {};
+    for (const [reg, base] of Object.entries(BASES)){
+      const addrs = HEUR_BUNDLE1[reg]||[]; let m=0, t=addrs.length;
+      for (const a of addrs){ const off = (a-base)>>>0; if (off+4 <= (bytes?.length||0)) { const w=view.getUint32(off,false); if (w===HEUR_BUNDLE1_WORD) m++; } }
+      heur[reg] = { match:m, total:t };
+    }
+    info.heur = heur;
+    // Heuristic bundle #2 summary counts
+    const heur2 = {};
+    for (const [reg, base] of Object.entries(BASES)){
+      const addrs = HEUR_BUNDLE2[reg]||[]; let m=0, t=addrs.length;
+      for (const a of addrs){ const off = (a-base)>>>0; if (off+4 <= (bytes?.length||0)) { const w=view.getUint32(off,false); if (w===HEUR_BUNDLE2_WORD) m++; } }
+      heur2[reg] = { match:m, total:t };
+    }
+    info.heur2 = heur2;
+    // Auto scores
+    const entries = Object.entries(BASES).map(([reg,base])=>{ let s=0; for (const c of (codes||[])){ const off=(c.addr-base)>>>0; if (off+(c.size||0) <= (bytes?.length||0)) s++; } return {reg, score:s}; });
+    info.autoScores = entries;
+    return info;
+  }
+
+  function loadFile(f){
+    if (!f) return;
+    fileHandle = f;
+    const fr = new FileReader();
+    fr.onload = async () => {
+      const buf = fr.result;
+      original = new Uint8Array(buf);
+      bytes = new Uint8Array(buf.slice(0));
+      view = new DataView(bytes.buffer);
+      $('#fileInfo').textContent = `${f.name} — ${bytes.length.toLocaleString()} bytes`;
+      $('#btnRevert').disabled = true;
+      $('#btnPatch').disabled = true;
+      $('#rows').innerHTML = '';
+      $('#base').textContent = '—';
+
+      // Content-based region detection
+      detectedRegion = null;
+      if (KNOWN_SIZE[bytes.length]) detectedRegion = KNOWN_SIZE[bytes.length];
+      try {
+        const sha = await computeSHA256(bytes);
+        lastSha = sha;
+        if (KNOWN_SHA256[sha]) detectedRegion = KNOWN_SHA256[sha];
+      } catch {}
+      if (detectedRegion && BASES[detectedRegion]) {
+        const sel = document.getElementById('region');
+        if (sel) sel.value = detectedRegion; // preselect detected
+        $('#base').textContent = hex(BASES[detectedRegion],8) + ' (detected)';
+      }
+      // Initial explain
+      renderDetectExplain({ size: bytes.length, sha: lastSha, sigRegion: detectedRegion||KNOWN_SIZE[bytes.length]||null, chosen: detectedRegion?{region:detectedRegion, reason:'detected'}:null });
+    };
+    fr.readAsArrayBuffer(f);
+  }
+
+  function parseCodes(text){
+    const lines = text.split(/\r?\n/).map(x=>x.trim()).filter(x=>x && !x.startsWith('//') && !x.startsWith('#'));
+    const out = [];
+    for (const line of lines){
+      const m = line.match(/^([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]{8})$/);
+      if (!m) { out.push({ raw:line, err:'Unrecognized format' }); continue; }
+      const head = parseInt(m[1],16) >>> 0;
+      const val  = parseInt(m[2],16) >>> 0;
+      const type = (head>>>24)&0xFF;
+      const addr = 0x80000000 | (head & 0x00FFFFFF);
+      let size = 0;
+      if (type===0x04) size = 4; else if (type===0x02) size = 2; else if (type===0x00) size = 1; else { out.push({ raw:line, type: type.toString(16), addr, val, err:'Unsupported AR type (only 00/02/04)' }); continue; }
+      out.push({ raw:line, type, addr, val, size });
+    }
+    return out;
+  }
+
+  function chooseRegion(codes, explicit){
+    if (explicit && explicit!=="auto") return { region: explicit, base: BASES[explicit], reason: "manual" };
+    if (detectedRegion && BASES[detectedRegion]) return { region: detectedRegion, base: BASES[detectedRegion], reason: 'detected' };
+    // Heuristic bundle #1: verify region by checking pinned addresses (thanks Ro)
+    const candidates = [];
+    for (const [reg, base] of Object.entries(BASES)){
+      const addrs = HEUR_BUNDLE1[reg];
+      if (!addrs) continue;
+      let okAll = true;
+      for (const a of addrs){
+        const off = (a - base) >>> 0;
+        if (off + 4 > (bytes?.length||0)) { okAll = false; break; }
+        const w = view.getUint32(off, false);
+        if (w !== HEUR_BUNDLE1_WORD) { okAll = false; break; }
+      }
+      if (okAll) candidates.push({reg, base});
+    }
+    if (candidates.length === 1) return { region: candidates[0].reg, base: candidates[0].base, reason: 'heuristic1' };
+    // Heuristic bundle #2: single extra pin per region (thanks Ro)
+    const candidates2 = [];
+    for (const [reg, base] of Object.entries(BASES)){
+      const addrs = HEUR_BUNDLE2[reg];
+      if (!addrs) continue;
+      let okAll = true;
+      for (const a of addrs){
+        const off = (a - base) >>> 0;
+        if (off + 4 > (bytes?.length||0)) { okAll = false; break; }
+        const w = view.getUint32(off, false);
+        if (w !== HEUR_BUNDLE2_WORD) { okAll = false; break; }
+      }
+      if (okAll) candidates2.push({reg, base});
+    }
+    if (candidates2.length === 1) return { region: candidates2[0].reg, base: candidates2[0].base, reason: 'heuristic2' };
+    // Compute in-range scores per region; be conservative: only pick a UNIQUE best.
+    const entries = Object.entries(BASES).map(([reg, base]) => {
+      let score = 0;
+      for (const c of codes) {
+        const off = (c.addr - base) >>> 0;
+        if (off + (c.size || 0) <= (bytes?.length || 0)) score++;
+      }
+      return { reg, base, score };
+    });
+    const maxScore = Math.max(0, ...entries.map(e => e.score));
+    if (maxScore === 0) return null; // nothing fits; require manual
+    const top = entries.filter(e => e.score === maxScore);
+    if (top.length !== 1) return null; // ambiguous; require manual selection
+    return { region: top[0].reg, base: top[0].base, reason: "auto" };
+  }
+
+  function analyze(){
+    if (!bytes){ alert('Load a StaticR.rel first.'); return; }
+    const codes = parseCodes($('#codes').value);
+    if (!codes.length){ $('#rows').innerHTML = ''; return; }
+    const regionSel = $('#region').value;
+    const picked = chooseRegion(codes.filter(c=>!c.err), regionSel);
+    if (!picked) {
+      // ambiguous or no fit
+      const info = computeDetectInfo(codes.filter(c=>!c.err), null);
+      renderDetectExplain(info);
+      $('#base').textContent = '(ambiguous) choose region';
+      $('#btnPatch').disabled = true;
+      $('#rows').innerHTML = '';
+      return;
+    }
+    const base = picked.base; const region = picked.region;
+    $('#base').textContent = hex(base,8) + (picked.reason==='manual' ? ' (manual)' : picked.reason==='detected' ? ' (detected)' : (picked.reason==='heuristic1' || picked.reason==='heuristic2') ? ' (heuristic: Ro)' : ' (auto)');
+
+    // Render explanation with full context
+    const info = computeDetectInfo(codes.filter(c=>!c.err), picked);
+    renderDetectExplain(info);
+
+    const tbody = $('#rows'); tbody.innerHTML='';
+    let allGood = true;
+
+    codes.forEach((c, idx)=>{
+      const tr = document.createElement('tr');
+      if (c.err){
+        tr.innerHTML = `<td class="mono">${idx+1}</td><td colspan=6 class="mono">${c.raw}</td><td><span class="status bad">${c.err}</span></td>`;
+        allGood=false; tbody.appendChild(tr); return;
+      }
+      const off = base!=null ? ((c.addr - base)>>>0) : NaN;
+      let status = '<span class="status bad">no base</span>';
+      let before = '—';
+      let ok=false;
+      if (Number.isFinite(off)){
+        if (off + c.size <= bytes.length){
+          before = toHexBytes(bytes.slice(off, off+c.size));
+          ok = true; status = '<span class="status ok">ok</span>';
+        } else {
+          status = '<span class="status bad">out of file</span>';
+          allGood=false;
+        }
+      } else { allGood=false; }
+      const afterBytes = c.size===4 ? toHexBytes(new Uint8Array([(c.val>>>24)&255,(c.val>>>16)&255,(c.val>>>8)&255,c.val&255]))
+                       : c.size===2 ? toHexBytes(new Uint8Array([(c.val>>>8)&255,c.val&255]))
+                                    : toHexBytes(new Uint8Array([c.val&255]));
+      tr.innerHTML = `<td class="mono">${idx+1}</td>
+                      <td class="mono">${c.type.toString(16).padStart(2,'0')}</td>
+                      <td class="mono">${hex(c.addr,8)}</td>
+                      <td class="mono">${Number.isFinite(off)?hex(off,6):'—'}</td>
+                      <td class="mono">${c.size}</td>
+                      <td class="mono small">${before}</td>
+                      <td class="mono small">${afterBytes}</td>
+                      <td>${status}</td>`;
+      tr.dataset.offset = Number.isFinite(off)?String(off):'';
+      tr.dataset.size = String(c.size);
+      tr.dataset.after = afterBytes;
+      tbody.appendChild(tr);
+    });
+
+    $('#btnPatch').disabled = !allGood;
+    $('#btnRevert').disabled = true;
+  }
+
+  function patchAndDownload(){
+    const rows = Array.from($('#rows').querySelectorAll('tr'));
+    if (!rows.length){ alert('Analyze codes first.'); return; }
+    // apply in order
+    for (const r of rows){
+      const off = parseInt(r.dataset.offset,10);
+      const size = parseInt(r.dataset.size,10);
+      if (!Number.isFinite(off)||!Number.isFinite(size)) continue;
+      const hexs = r.dataset.after.split(/\s+/).filter(Boolean);
+      for (let i=0;i<size;i++) bytes[off+i] = parseInt(hexs[i],16);
+    }
+    const blob = new Blob([bytes], { type:'application/octet-stream' });
+    const a = document.createElement('a');
+    const baseName = (fileHandle?.name||'StaticR.rel').replace(/\.[^.]+$/,'');
+    a.href = URL.createObjectURL(blob);
+    a.download = baseName + '.patched.rel';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    $('#btnRevert').disabled = false;
+  }
+
+  function revert(){
+    if (!original || !bytes) return;
+    bytes.set(original);
+    view = new DataView(bytes.buffer);
+    $('#btnRevert').disabled = true;
+    $('#btnPatch').disabled = true;
+    $('#rows').innerHTML = '';
+  }
+
+  // Wire up UI
+  $('#file').addEventListener('change', e => loadFile(e.target.files[0]));
+  const drop = $('#drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); const f = e.dataTransfer.files[0]; loadFile(f); });
+  $('#btnAnalyze').addEventListener('click', analyze);
+  $('#btnPatch').addEventListener('click', patchAndDownload);
+  $('#btnRevert').addEventListener('click', revert);
+  $('#region').addEventListener('change', analyze);
+  </script>
+</body>
+</html>
