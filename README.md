@@ -19,3 +19,5 @@
 [Edit the Byte — MKW Region ID Patcher](https://gabrlel.github.io/line.html)
 
 [MKMii — MKWii Main.dol — Mii Color Editor](https://gabrlel.github.io/mii.html)
+
+[StaticAR — MKWii StaticR.rel — AR Code Patcher](https://gabrlel.github.io/ar.html)
