@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MKWii Param Editors</title>
+  <style>
+    :root {
+      --bg: #0b0d10; --panel: #12151a; --muted: #2a3039; --text: #e9eef7; --sub: #b2bfd6;
+      --accent: #7aa2ff; --ok:#5ad786; --warn:#ffc857; --danger:#ff6b6b; --radius:14px;
+    }
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;border-bottom:1px solid var(--muted);backdrop-filter:blur(10px);background:linear-gradient(180deg,rgba(11,13,16,.85),rgba(11,13,16,.4))}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    h1{font-size:20px;margin:0;display:flex;gap:10px;align-items:center}
+    .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--muted);color:var(--sub)}
+    .tabs{display:flex;gap:8px;margin-top:12px}
+    .tab-btn{appearance:none;background:var(--panel);color:var(--sub);border:1px solid var(--muted);border-bottom:none;padding:10px 14px;border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);cursor:pointer;font-weight:600}
+    .tab-btn.active{color:var(--text);background:#151922}
+    .tab-btn:disabled{opacity:.5;cursor:not-allowed}
+    main{background:#151922;border:1px solid var(--muted);border-radius:0 0 var(--radius) var(--radius);padding:18px}
+    .hidden{display:none!important}
+    .grid{display:grid;gap:12px}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .panel{background:var(--panel);border:1px solid var(--muted);border-radius:var(--radius);padding:14px}
+    .panel>h3{margin:0 0 8px;font-size:14px;color:var(--sub)}
+    label{display:block;font-size:12px;color:var(--sub);margin:6px 0}
+    .row{display:grid;grid-template-columns:180px 1fr;align-items:center;gap:10px}
+    input[type=number],select{width:100%;background:#0f131a;border:1px solid var(--muted);color:var(--text);padding:8px 10px;border-radius:10px;font-size:13px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn{appearance:none;border:1px solid var(--muted);background:#10151c;color:var(--text);border-radius:10px;padding:9px 12px;font-weight:600;cursor:pointer}
+    .btn.good{background:linear-gradient(180deg,#1d3b2d,#173125);border-color:#2b5a45}
+    .pill{border:1px solid var(--muted);color:var(--sub);padding:4px 8px;border-radius:999px;font-size:12px}
+    .two-col{display:grid;grid-template-columns:260px 1fr;gap:16px}
+    .list{background:var(--panel);border:1px solid var(--muted);border-radius:var(--radius);padding:8px;max-height:60vh;overflow:auto}
+    .list button{width:100%;text-align:left;padding:8px 10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer}
+    .list button.active{background:#18202c;border-color:#263247}
+    .kcl-table{width:100%;border-collapse:collapse;font-size:12px}
+    .kcl-table th,.kcl-table td{border:1px solid var(--muted);padding:6px;text-align:center}
+    footer{color:var(--sub);font-size:12px;margin-top:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>MKWii Param Editors <span class="tag">Client-side • Big-endian</span></h1>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="load">Load</button>
+        <button class="tab-btn" data-tab="kart" disabled>kartParam Editor</button>
+        <button class="tab-btn" data-tab="driver" disabled>driverParam Editor</button>
+        <button class="tab-btn" data-tab="settings">Settings</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <main>
+      <!-- LOAD TAB -->
+      <section id="tab-load">
+        <div class="grid cols-2">
+          <section class="panel">
+            <h3>Open a kartParam.bin</h3>
+            <div class="grid">
+              <input type="file" id="fileInput" accept=".bin" />
+              <div id="dropArea" class="panel" style="padding:10px">Drop a <strong>kartParam.bin</strong> here or use the picker above. All parsing stays in-browser.</div>
+              <div class="toolbar">
+                <span class="pill" id="fileInfo">No file loaded</span>
+                <span class="pill" id="vehCount"></span>
+                <span class="pill" id="byteSize"></span>
+                <span class="pill" id="validation"></span>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            <h3>Open a driverParam.bin</h3>
+            <div class="grid">
+              <input type="file" id="driverFileInput" accept=".bin" />
+              <div id="driverDropArea" class="panel" style="padding:10px">Drop a <strong>driverParam.bin</strong> here or use the picker above. All parsing stays in-browser.</div>
+              <div class="toolbar">
+                <span class="pill" id="charFileInfo">No file loaded</span>
+                <span class="pill" id="charCount"></span>
+                <span class="pill" id="charByteSize"></span>
+                <span class="pill" id="charValidation"></span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- KART TAB -->
+      <section id="tab-kart" class="hidden">
+        <div class="toolbar" style="margin-bottom:14px">
+          <button class="btn" id="prevVeh">◀ Prev</button>
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Vehicle ID <input type="number" id="vehIndex" min="0" step="1" value="0" style="width:100px"></label>
+          <button class="btn" id="nextVeh">Next ▶</button>
+          <span class="pill" id="vehMeta"></span>
+          <span class="pill" id="dirtyFlag">No edits</span>
+          <span style="flex:1"></span>
+          <button class="btn good" id="exportBin">Save as .bin</button>
+          <button class="btn" id="exportJson">Export JSON</button>
+          <label class="btn" for="importJsonInput">Import JSON</label>
+          <input id="importJsonInput" type="file" accept="application/json" style="display:none"/>
+        </div>
+
+        <div class="two-col">
+          <div class="list" id="vehList"></div>
+          <div id="editorRoot" class="grid">
+            <section class="panel">
+              <h3>General</h3>
+              <div class="grid cols-2">
+                <div class="row"><label>Number of tires</label>
+                  <select id="f_tires">
+                    <option value="0">0 = 4 tires</option>
+                    <option value="1">1 = 2 tires (handle relative)</option>
+                    <option value="2">2 = 2 tires (vehicle relative)</option>
+                    <option value="3">3 = 3 tires (Blue Falcon)</option>
+                  </select>
+                </div>
+                <div class="row"><label>Drift type</label>
+                  <select id="f_driftType">
+                    <option value="0">0 = Outside (karts)</option>
+                    <option value="1">1 = Outside (bikes)</option>
+                    <option value="2">2 = Inside drift</option>
+                  </select>
+                </div>
+                <div class="row"><label>Weight class</label>
+                  <select id="f_weightClass">
+                    <option value="0">0 = Light</option>
+                    <option value="1">1 = Medium</option>
+                    <option value="2">2 = Heavy</option>
+                  </select>
+                </div>
+                <div class="row"><label>Unknown @0x0C</label><input type="number" step="any" id="f_unk0C"></div>
+                <div class="row"><label>Weight</label><input type="number" step="any" id="f_weight"></div>
+                <div class="row"><label>Bump Deviation Level</label><input type="number" step="any" id="f_bumpDev"></div>
+                <div class="row"><label>Top Speed</label><input type="number" step="any" id="f_speed"></div>
+                <div class="row"><label>Speed in Turn (no drift)</label><input type="number" step="any" id="f_speedTurn"></div>
+                <div class="row"><label>Tilt</label><input type="number" step="any" id="f_tilt"></div>
+                <div class="row"><label>Mini-Turbo Duration (frames)</label><input type="number" step="1" id="f_mtFrames"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Acceleration (no drift)</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>A0</label><input type="number" step="any" id="f_accA0"></div>
+                <div class="row"><label>A1</label><input type="number" step="any" id="f_accA1"></div>
+                <div class="row"><label>A2</label><input type="number" step="any" id="f_accA2"></div>
+                <div class="row"><label>A3</label><input type="number" step="any" id="f_accA3"></div>
+                <div class="row"><label>T1</label><input type="number" step="any" id="f_accT1"></div>
+                <div class="row"><label>T2</label><input type="number" step="any" id="f_accT2"></div>
+                <div class="row"><label>T3</label><input type="number" step="any" id="f_accT3"></div>
+              </div>
+              <div class="pill">T0 is 0 and T4=A3 (implicit)</div>
+            </section>
+
+            <section class="panel">
+              <h3>Acceleration (drift)</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>A0</label><input type="number" step="any" id="f_daccA0"></div>
+                <div class="row"><label>A1</label><input type="number" step="any" id="f_daccA1"></div>
+                <div class="row"><label>T1</label><input type="number" step="any" id="f_daccT1"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Handling & Drift</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>Handling Tightness (Manual)</label><input type="number" step="any" id="f_handTightM"></div>
+                <div class="row"><label>Handling Tightness (Auto)</label><input type="number" step="any" id="f_handTightA"></div>
+                <div class="row"><label>Handling Reactivity</label><input type="number" step="any" id="f_handReact"></div>
+                <div class="row"><label>Drift Tightness (Manual)</label><input type="number" step="any" id="f_driftTightM"></div>
+                <div class="row"><label>Drift Tightness (Auto)</label><input type="number" step="any" id="f_driftTightA"></div>
+                <div class="row"><label>Drift Reactivity</label><input type="number" step="any" id="f_driftReact"></div>
+                <div class="row"><label>Outside drift angle (°)</label><input type="number" step="any" id="f_outsideAngle"></div>
+                <div class="row"><label>Outside drift decrement (°)</label><input type="number" step="any" id="f_outsideDec"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Off-road Speed Multipliers (32)</h3>
+              <table class="kcl-table" id="kclSpeedTable"></table>
+            </section>
+            <section class="panel">
+              <h3>Off-road Rotation Multipliers (32)</h3>
+              <table class="kcl-table" id="kclRotTable"></table>
+            </section>
+
+            <section class="panel">
+              <h3>Items & Misc</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>Rotating Items Z Radius</label><input type="number" step="any" id="f_itemZRadius"></div>
+                <div class="row"><label>Rotating Items X Radius</label><input type="number" step="any" id="f_itemXRadius"></div>
+                <div class="row"><label>Trailing Items Y Distance</label><input type="number" step="any" id="f_itemYDist"></div>
+                <div class="row"><label>Trailing Items Z Distance</label><input type="number" step="any" id="f_itemZDist"></div>
+                <div class="row"><label>Max normal acceleration</label><input type="number" step="any" id="f_maxAccel"></div>
+                <div class="row"><label>Mega Mushroom scale</label><input type="number" step="any" id="f_megaScale"></div>
+                <div class="row"><label>Wheelbase (rear↔front tires)</label><input type="number" step="any" id="f_wheelbase"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+        <footer><span id="status">Ready.</span></footer>
+      </section>
+
+      <!-- DRIVER TAB -->
+      <section id="tab-driver" class="hidden">
+        <div class="toolbar" style="margin-bottom:14px">
+          <button class="btn" id="prevChar">◀ Prev</button>
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Driver ID <input type="number" id="charIndex" min="0" step="1" value="0" style="width:100px"></label>
+          <button class="btn" id="nextChar">Next ▶</button>
+          <span class="pill" id="charMeta"></span>
+          <span class="pill" id="charDirty">No edits</span>
+          <span style="flex:1"></span>
+          <button class="btn good" id="exportDriverBin">Save as .bin</button>
+          <button class="btn" id="exportDriverJson">Export JSON</button>
+          <label class="btn" for="importDriverJsonInput">Import JSON</label>
+          <input id="importDriverJsonInput" type="file" accept="application/json" style="display:none"/>
+        </div>
+
+        <div class="two-col">
+          <div class="list" id="charList"></div>
+          <div id="driverEditorRoot" class="grid">
+            <section class="panel">
+              <h3>General</h3>
+              <div class="grid cols-2">
+                <div class="row"><label>Weight</label><input type="number" step="any" id="df_weight"></div>
+                <div class="row"><label>Top Speed</label><input type="number" step="any" id="df_speed"></div>
+                <div class="row"><label>Speed in Turn (no drift)</label><input type="number" step="any" id="df_speedTurn"></div>
+                <div class="row"><label>Mini-Turbo Duration (frames)</label><input type="number" step="1" id="df_mtFrames"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Acceleration (no drift)</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>A0</label><input type="number" step="any" id="df_accA0"></div>
+                <div class="row"><label>A1</label><input type="number" step="any" id="df_accA1"></div>
+                <div class="row"><label>A2</label><input type="number" step="any" id="df_accA2"></div>
+                <div class="row"><label>A3</label><input type="number" step="any" id="df_accA3"></div>
+                <div class="row"><label>T1</label><input type="number" step="any" id="df_accT1"></div>
+                <div class="row"><label>T2</label><input type="number" step="any" id="df_accT2"></div>
+                <div class="row"><label>T3</label><input type="number" step="any" id="df_accT3"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Handling & Drift</h3>
+              <div class="grid cols-3">
+                <div class="row"><label>Handling Tightness (Manual)</label><input type="number" step="any" id="df_handTightM"></div>
+                <div class="row"><label>Handling Tightness (Auto)</label><input type="number" step="any" id="df_handTightA"></div>
+                <div class="row"><label>Handling Reactivity</label><input type="number" step="any" id="df_handReact"></div>
+                <div class="row"><label>Drift Tightness (Manual)</label><input type="number" step="any" id="df_driftTightM"></div>
+                <div class="row"><label>Drift Tightness (Auto)</label><input type="number" step="any" id="df_driftTightA"></div>
+                <div class="row"><label>Drift Reactivity</label><input type="number" step="any" id="df_driftReact"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h3>Off-road Speed Multipliers (32)</h3>
+              <table class="kcl-table" id="charKclSpeedTable"></table>
+            </section>
+            <section class="panel">
+              <h3>Off-road Rotation Multipliers (32)</h3>
+              <table class="kcl-table" id="charKclRotTable"></table>
+            </section>
+          </div>
+        </div>
+        <footer><span id="driverStatus">Ready.</span></footer>
+      </section>
+
+      <!-- SETTINGS TAB -->
+      <section id="tab-settings" class="hidden">
+        <section class="panel">
+          <h3>Preferences</h3>
+          <div class="row"><label>Theme</label>
+            <select id="themeSelect"><option value="dark" selected>Dark</option><option value="light">Light</option></select>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    // ===== Utilities =====
+    const $ = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+    const byId = (id) => document.getElementById(id);
+    const hex2 = (n)=> '0x'+Number(n).toString(16).padStart(2,'0').toUpperCase();
+
+    // ===== Endian helpers =====
+    const u32 = (dv,o)=>dv.getUint32(o,false), i32=(dv,o)=>dv.getInt32(o,false), f32=(dv,o)=>dv.getFloat32(o,false);
+    const wU32=(dv,o,v)=>dv.setUint32(o,v,false), wI32=(dv,o,v)=>dv.setInt32(o,v,false), wF32=(dv,o,v)=>dv.setFloat32(o,v,false);
+
+    // ===== Constants & Identifiers =====
+    const SECTION_SIZE = 99*4; // 396 bytes per entry
+    const VEH_IDENT = [
+      {desc:'Standard Kart S', code:'sdf_kart'},{desc:'Standard Kart M', code:'mdf_kart'},{desc:'Standard Kart L', code:'ldf_kart'},
+      {desc:'Booster Seat', code:'sa_kart'},{desc:'Classic Dragster', code:'ma_kart'},{desc:'Offroader', code:'la_kart'},
+      {desc:'Mini Beast', code:'sb_kart'},{desc:'Wild Wing', code:'mb_kart'},{desc:'Flame Flyer', code:'lb_kart'},
+      {desc:'Cheep Charger', code:'sc_kart'},{desc:'Super Blooper', code:'mc_kart'},{desc:'Piranha Prowler', code:'lc_kart'},
+      {desc:'Tiny Titan', code:'sd_kart'},{desc:'Daytripper', code:'md_kart'},{desc:'Jetsetter', code:'ld_kart'},
+      {desc:'Blue Falcon', code:'se_kart'},{desc:'Sprinter', code:'me_kart'},{desc:'Honeycoupe', code:'le_kart'},
+      {desc:'Standard Bike S', code:'sdf_bike'},{desc:'Standard Bike M', code:'mdf_bike'},{desc:'Standard Bike L', code:'ldf_bike'},
+      {desc:'Bullet Bike', code:'sa_bike'},{desc:'Mach Bike', code:'ma_bike'},{desc:'Flame Runner', code:'la_bike'},
+      {desc:'Bit Bike', code:'sb_bike'},{desc:'Sugarscoot', code:'mb_bike'},{desc:'Wario Bike', code:'lb_bike'},
+      {desc:'Quacker', code:'sc_bike'},{desc:'Zip Zip', code:'mc_bike'},{desc:'Shooting Star', code:'lc_bike'},
+      {desc:'Magikruiser', code:'sd_bike'},{desc:'Sneakster', code:'md_bike'},{desc:'Spear', code:'ld_bike'},
+      {desc:'Jet Bubble', code:'se_bike'},{desc:'Dolphin Dasher', code:'me_bike'},{desc:'Phantom', code:'le_bike'},
+    ];
+
+    const CHAR_IDENT = [
+      {desc:'Mario', code:'mr'},{desc:'Baby Peach', code:'bpc'},{desc:'Waluigi', code:'wl'},{desc:'Bowser', code:'kp'},
+      {desc:'Baby Daisy', code:'bds'},{desc:'Dry Bones', code:'ka'},{desc:'Baby Mario', code:'bmr'},{desc:'Luigi', code:'lg'},
+      {desc:'Toad', code:'ko'},{desc:'Donkey Kong', code:'dk'},{desc:'Yoshi', code:'ys'},{desc:'Wario', code:'wr'},
+      {desc:'Baby Luigi', code:'blg'},{desc:'Toadette', code:'kk'},{desc:'Koopa Troopa', code:'nk'},{desc:'Daisy', code:'ds'},
+      {desc:'Peach', code:'pc'},{desc:'Birdo', code:'ca'},{desc:'Diddy Kong', code:'dd'},{desc:'King Boo', code:'kt'},
+      {desc:'Bowser Jr.', code:'jr'},{desc:'Dry Bowser', code:'bk'},{desc:'Funky Kong', code:'fk'},{desc:'Rosalina', code:'rs'},
+      {desc:'Small Mii Outfit A (M)', code:'sa_mii_m'},{desc:'Small Mii Outfit A (F)', code:'sa_mii_f'},
+      {desc:'Small Mii Outfit B (M)', code:'sb_mii_m'},{desc:'Small Mii Outfit B (F)', code:'sb_mii_f'},
+      {desc:'Small Mii Outfit C (M)', code:'sc_mii_m'},{desc:'Small Mii Outfit C (F)', code:'sc_mii_f'},
+      {desc:'Medium Mii Outfit A (M)', code:'ma_mii_m'},{desc:'Medium Mii Outfit A (F)', code:'ma_mii_f'},
+      {desc:'Medium Mii Outfit B (M)', code:'mb_mii_m'},{desc:'Medium Mii Outfit B (F)', code:'mb_mii_f'},
+      {desc:'Medium Mii Outfit C (M)', code:'mc_mii_m'},{desc:'Medium Mii Outfit C (F)', code:'mc_mii_f'},
+      {desc:'Large Mii Outfit A (M)', code:'la_mii_m'},{desc:'Large Mii Outfit A (F)', code:'la_mii_f'},
+      {desc:'Large Mii Outfit B (M)', code:'lb_mii_m'},{desc:'Large Mii Outfit B (F)', code:'lb_mii_f'},
+      {desc:'Large Mii Outfit C (M)', code:'lc_mii_m'},{desc:'Large Mii Outfit C (F)', code:'lc_mii_f'},
+      {desc:'Medium Mii', code:'m_mii'},{desc:'Small Mii', code:'s_mii'},{desc:'Large Mii', code:'l_mii'},
+    ];
+
+    // ===== State =====
+    const state = {
+      // kart
+      fileBuf:null, filename:null, model:null, currentIndex:0, dirty:false,
+      // driver
+      driverFileBuf:null, driverFilename:null, driverModel:null, currentCharIndex:0, driverDirty:false,
+    };
+
+    // ===== Tabs =====
+    function showTab(name){
+      $$('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
+      $$('#tab-load, #tab-kart, #tab-driver, #tab-settings').forEach(s=> s.classList.add('hidden'));
+      byId('tab-'+name).classList.remove('hidden');
+    }
+    $$('.tab-btn').forEach(b=> b.addEventListener('click',()=>{ if(!b.disabled) showTab(b.dataset.tab) }));
+    const setKartEnabled = (en)=> {$('.tab-btn[data-tab="kart"]').disabled = !en;};
+    const setDriverEnabled = (en)=> {$('.tab-btn[data-tab="driver"]').disabled = !en;};
+
+    // ===== Section read/write =====
+    function readSection(dv, base){
+      const v={};
+      v.tires=i32(dv,base+0x00); v.driftType=i32(dv,base+0x04); v.weightClass=i32(dv,base+0x08); v.unk0C=f32(dv,base+0x0C);
+      v.weight=f32(dv,base+0x10); v.bumpDev=f32(dv,base+0x14); v.speed=f32(dv,base+0x18); v.speedTurn=f32(dv,base+0x1C); v.tilt=f32(dv,base+0x20);
+      v.accA0=f32(dv,base+0x24); v.accA1=f32(dv,base+0x28); v.accA2=f32(dv,base+0x2C); v.accA3=f32(dv,base+0x30);
+      v.accT1=f32(dv,base+0x34); v.accT2=f32(dv,base+0x38); v.accT3=f32(dv,base+0x3C);
+      v.daccA0=f32(dv,base+0x40); v.daccA1=f32(dv,base+0x44); v.daccT1=f32(dv,base+0x48);
+      v.handTightM=f32(dv,base+0x4C); v.handTightA=f32(dv,base+0x50); v.handReact=f32(dv,base+0x54);
+      v.driftTightM=f32(dv,base+0x58); v.driftTightA=f32(dv,base+0x5C); v.driftReact=f32(dv,base+0x60);
+      v.outsideAngle=f32(dv,base+0x64); v.outsideDec=f32(dv,base+0x68); v.mtFrames=i32(dv,base+0x6C);
+      v.kclSpeed=Array.from({length:32},(_,i)=> f32(dv,base+0x70+i*4));
+      v.kclRot=Array.from({length:32},(_,i)=> f32(dv,base+0xF0+i*4));
+      v.itemZRadius=f32(dv,base+0x170); v.itemXRadius=f32(dv,base+0x174); v.itemYDist=f32(dv,base+0x178);
+      v.itemZDist=f32(dv,base+0x17C); v.maxAccel=f32(dv,base+0x180); v.megaScale=f32(dv,base+0x184); v.wheelbase=f32(dv,base+0x188);
+      return v;
+    }
+    function writeSection(dv,base,v){
+      wI32(dv,base+0x00,v.tires|0); wI32(dv,base+0x04,v.driftType|0); wI32(dv,base+0x08,v.weightClass|0); wF32(dv,base+0x0C,+v.unk0C);
+      wF32(dv,base+0x10,+v.weight); wF32(dv,base+0x14,+v.bumpDev); wF32(dv,base+0x18,+v.speed); wF32(dv,base+0x1C,+v.speedTurn); wF32(dv,base+0x20,+v.tilt);
+      wF32(dv,base+0x24,+v.accA0); wF32(dv,base+0x28,+v.accA1); wF32(dv,base+0x2C,+v.accA2); wF32(dv,base+0x30,+v.accA3);
+      wF32(dv,base+0x34,+v.accT1); wF32(dv,base+0x38,+v.accT2); wF32(dv,base+0x3C,+v.accT3);
+      wF32(dv,base+0x40,+v.daccA0); wF32(dv,base+0x44,+v.daccA1); wF32(dv,base+0x48,+v.daccT1);
+      wF32(dv,base+0x4C,+v.handTightM); wF32(dv,base+0x50,+v.handTightA); wF32(dv,base+0x54,+v.handReact);
+      wF32(dv,base+0x58,+v.driftTightM); wF32(dv,base+0x5C,+v.driftTightA); wF32(dv,base+0x60,+v.driftReact);
+      wF32(dv,base+0x64,+v.outsideAngle); wF32(dv,base+0x68,+v.outsideDec); wI32(dv,base+0x6C,v.mtFrames|0);
+      for(let i=0;i<32;i++) wF32(dv,base+0x70+i*4,+v.kclSpeed[i]);
+      for(let i=0;i<32;i++) wF32(dv,base+0xF0+i*4,+v.kclRot[i]);
+      wF32(dv,base+0x170,+v.itemZRadius); wF32(dv,base+0x174,+v.itemXRadius); wF32(dv,base+0x178,+v.itemYDist);
+      wF32(dv,base+0x17C,+v.itemZDist); wF32(dv,base+0x180,+v.maxAccel); wF32(dv,base+0x184,+v.megaScale); wF32(dv,base+0x188,+v.wheelbase);
+    }
+
+    // ===== Parse/Serialize files =====
+    function parseKartParam(buf){
+      const dv=new DataView(buf); const n=u32(dv,0); const expected=4+n*SECTION_SIZE; if(expected!==buf.byteLength) throw new Error(`Size mismatch: expected ${expected}, got ${buf.byteLength}`);
+      const vehicles=[]; let off=4; for(let i=0;i<n;i++){ vehicles.push(readSection(dv,off)); off+=SECTION_SIZE; } return {count:n, vehicles};
+    }
+    function serializeKartParam(model){
+      const n=model.vehicles.length|0; const buf=new ArrayBuffer(4+n*SECTION_SIZE); const dv=new DataView(buf); wU32(dv,0,n); let off=4; for(let i=0;i<n;i++){ writeSection(dv,off,model.vehicles[i]); off+=SECTION_SIZE; } return buf;
+    }
+    function parseDriverParam(buf){
+      const dv=new DataView(buf); const n=u32(dv,0); const expected=4+n*SECTION_SIZE; if(expected!==buf.byteLength) throw new Error(`Size mismatch: expected ${expected}, got ${buf.byteLength}`);
+      const drivers=[]; let off=4; for(let i=0;i<n;i++){ drivers.push(readSection(dv,off)); off+=SECTION_SIZE; } return {count:n, drivers};
+    }
+    function serializeDriverParam(model){
+      const n=model.drivers.length|0; const buf=new ArrayBuffer(4+n*SECTION_SIZE); const dv=new DataView(buf); wU32(dv,0,n); let off=4; for(let i=0;i<n;i++){ writeSection(dv,off,model.drivers[i]); off+=SECTION_SIZE; } return buf;
+    }
+
+    // ===== KCL table builder =====
+    function buildKclTable(tblId, arr, onChange){
+      const tbl=byId(tblId); let html='<tr><th>Idx</th><th>×</th></tr>';
+      for(let i=0;i<32;i++){ html+=`<tr><th>${hex2(i)}</th><td><input type="number" step="any" data-idx="${i}" value="${Number(arr[i])}"></td></tr>`; }
+      tbl.innerHTML=html; $$('input[data-idx]',tbl).forEach(inp=> inp.addEventListener('input',()=> onChange(+inp.dataset.idx, parseFloat(inp.value||'0'))));
+    }
+
+    // ===== Render (kart) =====
+    function renderVehList(){
+      const list=byId('vehList'); list.innerHTML='';
+      state.model.vehicles.forEach((_,i)=>{ const b=document.createElement('button'); const info=VEH_IDENT[i]; b.textContent=info? `${hex2(i)} ${info.desc}`:`${hex2(i)} Vehicle ${i}`; if(info) b.title=info.code; if(i===state.currentIndex) b.classList.add('active'); b.addEventListener('click',()=>{state.currentIndex=i; renderEditor();}); list.appendChild(b); });
+    }
+    function renderVehMeta(){
+      const v=state.model.vehicles[state.currentIndex]; const idx=state.currentIndex; const info=VEH_IDENT[idx]; const name=info?info.desc:`Vehicle ${idx}`; const code=info?info.code:'n/a';
+      byId('vehMeta').textContent = `${hex2(idx)} ${name} • ${code} • class ${v.weightClass} • drift ${v.driftType} • tires ${v.tires}`;
+    }
+    function fillKartInputs(){
+      const v=state.model.vehicles[state.currentIndex]; const set=(id,val)=>{const el=byId(id); if(el) el.value=String(val)};
+      set('f_tires',v.tires); set('f_driftType',v.driftType); set('f_weightClass',v.weightClass); set('f_unk0C',v.unk0C);
+      set('f_weight',v.weight); set('f_bumpDev',v.bumpDev); set('f_speed',v.speed); set('f_speedTurn',v.speedTurn); set('f_tilt',v.tilt);
+      set('f_accA0',v.accA0); set('f_accA1',v.accA1); set('f_accA2',v.accA2); set('f_accA3',v.accA3);
+      set('f_accT1',v.accT1); set('f_accT2',v.accT2); set('f_accT3',v.accT3);
+      set('f_daccA0',v.daccA0); set('f_daccA1',v.daccA1); set('f_daccT1',v.daccT1);
+      set('f_handTightM',v.handTightM); set('f_handTightA',v.handTightA); set('f_handReact',v.handReact);
+      set('f_driftTightM',v.driftTightM); set('f_driftTightA',v.driftTightA); set('f_driftReact',v.driftReact);
+      set('f_outsideAngle',v.outsideAngle); set('f_outsideDec',v.outsideDec); set('f_mtFrames',v.mtFrames);
+      set('f_itemZRadius',v.itemZRadius); set('f_itemXRadius',v.itemXRadius); set('f_itemYDist',v.itemYDist); set('f_itemZDist',v.itemZDist);
+      set('f_maxAccel',v.maxAccel); set('f_megaScale',v.megaScale); set('f_wheelbase',v.wheelbase);
+      buildKclTable('kclSpeedTable', v.kclSpeed, (i,val)=>{v.kclSpeed[i]=val; state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits';});
+      buildKclTable('kclRotTable', v.kclRot, (i,val)=>{v.kclRot[i]=val; state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits';});
+    }
+    function bindKartInputs(){
+      const map={
+        f_tires:['tires','i'], f_driftType:['driftType','i'], f_weightClass:['weightClass','i'], f_unk0C:['unk0C','f'],
+        f_weight:['weight','f'], f_bumpDev:['bumpDev','f'], f_speed:['speed','f'], f_speedTurn:['speedTurn','f'], f_tilt:['tilt','f'],
+        f_accA0:['accA0','f'], f_accA1:['accA1','f'], f_accA2:['accA2','f'], f_accA3:['accA3','f'], f_accT1:['accT1','f'], f_accT2:['accT2','f'], f_accT3:['accT3','f'],
+        f_daccA0:['daccA0','f'], f_daccA1:['daccA1','f'], f_daccT1:['daccT1','f'],
+        f_handTightM:['handTightM','f'], f_handTightA:['handTightA','f'], f_handReact:['handReact','f'],
+        f_driftTightM:['driftTightM','f'], f_driftTightA:['driftTightA','f'], f_driftReact:['driftReact','f'],
+        f_outsideAngle:['outsideAngle','f'], f_outsideDec:['outsideDec','f'], f_mtFrames:['mtFrames','i'],
+        f_itemZRadius:['itemZRadius','f'], f_itemXRadius:['itemXRadius','f'], f_itemYDist:['itemYDist','f'], f_itemZDist:['itemZDist','f'], f_maxAccel:['maxAccel','f'], f_megaScale:['megaScale','f'], f_wheelbase:['wheelbase','f'],
+      };
+      Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.model.vehicles[state.currentIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits'; });});
+      byId('prevVeh').addEventListener('click',()=>{state.currentIndex=Math.max(0,state.currentIndex-1); renderEditor();});
+      byId('nextVeh').addEventListener('click',()=>{state.currentIndex=Math.min(state.model.vehicles.length-1,state.currentIndex+1); renderEditor();});
+      byId('vehIndex').addEventListener('change',()=>{ const i=Math.max(0,Math.min(state.model.vehicles.length-1, parseInt(byId('vehIndex').value||'0',10))); state.currentIndex=i; renderEditor(); });
+      byId('exportBin').addEventListener('click',()=>{ const out=serializeKartParam(state.model); const name=(state.filename?.replace(/\.bin$/i,'')||'kartParam')+'-edited.bin'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out])); a.download=name; a.click(); byId('status').textContent='Exported '+name; state.dirty=false; byId('dirtyFlag').textContent='No edits'; });
+      byId('exportJson').addEventListener('click',()=>{ const json=JSON.stringify({format:'kartParam',version:1,model:state.model},null,2); const name=(state.filename?.replace(/\.bin$/i,'')||'kartParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); });
+      byId('importJsonInput').addEventListener('change',e=>{ const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ try{ const j=JSON.parse(t); if(j.format!=='kartParam') throw new Error('Wrong format'); state.model=j.model; renderEditor(); byId('status').textContent='Imported JSON'; state.dirty=true; }catch(err){ alert('JSON import failed: '+err.message);} }); });
+    }
+    function renderEditor(){ renderVehList(); renderVehMeta(); byId('vehIndex').value=String(state.currentIndex); fillKartInputs(); }
+
+    // ===== Render (driver) =====
+    function renderCharList(){ const list=byId('charList'); list.innerHTML=''; state.driverModel.drivers.forEach((_,i)=>{ const b=document.createElement('button'); const info=CHAR_IDENT[i]; b.textContent=info? `${hex2(i)} ${info.desc}`:`${hex2(i)} Driver ${i}`; if(info) b.title=info.code; if(i===state.currentCharIndex) b.classList.add('active'); b.addEventListener('click',()=>{state.currentCharIndex=i; renderDriverEditor();}); list.appendChild(b); }); }
+    function renderCharMeta(){ const idx=state.currentCharIndex; const info=CHAR_IDENT[idx]; const name=info?info.desc:`Driver ${idx}`; const code=info?info.code:'n/a'; byId('charMeta').textContent=`${hex2(idx)} ${name} • ${code}`; }
+    function fillDriverInputs(){ const v=state.driverModel.drivers[state.currentCharIndex]; const set=(id,val)=>{const el=byId(id); if(el) el.value=String(val)}; set('df_weight',v.weight); set('df_speed',v.speed); set('df_speedTurn',v.speedTurn); set('df_mtFrames',v.mtFrames); set('df_accA0',v.accA0); set('df_accA1',v.accA1); set('df_accA2',v.accA2); set('df_accA3',v.accA3); set('df_accT1',v.accT1); set('df_accT2',v.accT2); set('df_accT3',v.accT3); set('df_handTightM',v.handTightM); set('df_handTightA',v.handTightA); set('df_handReact',v.handReact); set('df_driftTightM',v.driftTightM); set('df_driftTightA',v.driftTightA); set('df_driftReact',v.driftReact); buildKclTable('charKclSpeedTable', v.kclSpeed, (i,val)=>{v.kclSpeed[i]=val; state.driverDirty=true; byId('charDirty').textContent='Unsaved edits';}); buildKclTable('charKclRotTable', v.kclRot, (i,val)=>{v.kclRot[i]=val; state.driverDirty=true; byId('charDirty').textContent='Unsaved edits';}); }
+    function bindDriverInputs(){ const map={ df_weight:['weight','f'], df_speed:['speed','f'], df_speedTurn:['speedTurn','f'], df_mtFrames:['mtFrames','i'], df_accA0:['accA0','f'], df_accA1:['accA1','f'], df_accA2:['accA2','f'], df_accA3:['accA3','f'], df_accT1:['accT1','f'], df_accT2:['accT2','f'], df_accT3:['accT3','f'], df_handTightM:['handTightM','f'], df_handTightA:['handTightA','f'], df_handReact:['handReact','f'], df_driftTightM:['driftTightM','f'], df_driftTightA:['driftTightA','f'], df_driftReact:['driftReact','f'] }; Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.driverModel.drivers[state.currentCharIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.driverDirty=true; byId('charDirty').textContent='Unsaved edits'; });}); byId('prevChar').addEventListener('click',()=>{state.currentCharIndex=Math.max(0,state.currentCharIndex-1); renderDriverEditor();}); byId('nextChar').addEventListener('click',()=>{state.currentCharIndex=Math.min(state.driverModel.drivers.length-1,state.currentCharIndex+1); renderDriverEditor();}); byId('charIndex').addEventListener('change',()=>{ const i=Math.max(0,Math.min(state.driverModel.drivers.length-1, parseInt(byId('charIndex').value||'0',10))); state.currentCharIndex=i; renderDriverEditor(); }); byId('exportDriverBin').addEventListener('click',()=>{ const out=serializeDriverParam(state.driverModel); const name=(state.driverFilename?.replace(/\.bin$/i,'')||'driverParam')+'-edited.bin'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out])); a.download=name; a.click(); byId('driverStatus').textContent='Exported '+name; state.driverDirty=false; byId('charDirty').textContent='No edits'; }); byId('exportDriverJson').addEventListener('click',()=>{ const json=JSON.stringify({format:'driverParam',version:1,model:state.driverModel},null,2); const name=(state.driverFilename?.replace(/\.bin$/i,'')||'driverParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); }); byId('importDriverJsonInput').addEventListener('change',e=>{ const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ try{ const j=JSON.parse(t); if(j.format!=='driverParam') throw new Error('Wrong format'); state.driverModel=j.model; renderDriverEditor(); byId('driverStatus').textContent='Imported JSON'; state.driverDirty=true; }catch(err){ alert('JSON import failed: '+err.message);} }); }); }
+    function renderDriverEditor(){ renderCharList(); renderCharMeta(); byId('charIndex').value=String(state.currentCharIndex); fillDriverInputs(); }
+
+    // ===== File loading & drag/drop =====
+    function onKartLoaded(buf, name){ try{ const model=parseKartParam(buf); state.fileBuf=buf; state.filename=name; state.model=model; state.currentIndex=0; setKartEnabled(true); showTab('kart'); renderEditor(); byId('fileInfo').textContent=name; byId('vehCount').textContent=model.count+' vehicles'; byId('byteSize').textContent=buf.byteLength+' bytes'; byId('validation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('validation').textContent='✖ '+err.message; alert('Failed to parse kartParam: '+err.message);} }
+    function onDriverLoaded(buf, name){ try{ const model=parseDriverParam(buf); state.driverFileBuf=buf; state.driverFilename=name; state.driverModel=model; state.currentCharIndex=0; setDriverEnabled(true); showTab('driver'); renderDriverEditor(); byId('charFileInfo').textContent=name; byId('charCount').textContent=model.count+' drivers'; byId('charByteSize').textContent=buf.byteLength+' bytes'; byId('charValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('charValidation').textContent='✖ '+err.message; alert('Failed to parse driverParam: '+err.message);} }
+
+    byId('fileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
+    byId('driverFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
+    const dropK = byId('dropArea'); ['dragover','dragenter'].forEach(ev=> dropK.addEventListener(ev, e=>{ e.preventDefault(); })); dropK.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
+    const dropD = byId('driverDropArea'); ['dragover','dragenter'].forEach(ev=> dropD.addEventListener(ev, e=>{ e.preventDefault(); })); dropD.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
+    // ===== Theme =====
+    byId('themeSelect').addEventListener('change',()=>{
+      const v=byId('themeSelect').value; if(v==='light'){ document.documentElement.style.setProperty('--bg','#f5f7fb'); document.documentElement.style.setProperty('--panel','#ffffff'); document.documentElement.style.setProperty('--text','#0b0d10'); document.documentElement.style.setProperty('--sub','#3b4a66'); document.documentElement.style.setProperty('--muted','#dfe6f1'); } else { document.documentElement.style.removeProperty('--bg'); document.documentElement.style.removeProperty('--panel'); document.documentElement.style.removeProperty('--text'); document.documentElement.style.removeProperty('--sub'); document.documentElement.style.removeProperty('--muted'); }
+    });
+
+    // ===== Initial bindings =====
+    bindKartInputs();
+    bindDriverInputs();
+  </script>
+</body>
+</html>
