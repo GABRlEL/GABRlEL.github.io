@@ -55,6 +55,7 @@
         <button class="tab-btn" data-tab="driverik" disabled>DriverIKParam Editor</button>
         <button class="tab-btn" data-tab="kartai" disabled>kartAIActionParam Editor</button>
         <button class="tab-btn" data-tab="kartaispd" disabled>kartAISpdParam Editor</button>
+        <button class="tab-btn" data-tab="kartcam" disabled>kartCameraParam Editor</button>
         <button class="tab-btn" data-tab="settings">Settings</button>
       </div>
     </div>
@@ -170,6 +171,19 @@
                 <span class="pill" id="kartAiSpdInfo"></span>
                 <span class="pill" id="kartAiSpdByteSize"></span>
                 <span class="pill" id="kartAiSpdValidation"></span>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            <h3>Open a kartCameraParam.bin</h3>
+            <div class="grid">
+              <input type="file" id="kartCamFileInput" accept=".bin" />
+              <div id="kartCamDropArea" class="panel" style="padding:10px">Drop a <strong>kartCameraParam.bin</strong> here.</div>
+              <div class="toolbar">
+                <span class="pill" id="kartCamFileInfo">No file loaded</span>
+                <span class="pill" id="kartCamInfo"></span>
+                <span class="pill" id="kartCamByteSize"></span>
+                <span class="pill" id="kartCamValidation"></span>
               </div>
             </div>
           </section>
@@ -542,6 +556,23 @@
         <footer><span id="kartAiSpdStatus">Ready.</span></footer>
       </section>
 
+      <!-- KART CAMERA TAB -->
+      <section id="tab-kartcam" class="hidden">
+        <div class="toolbar" style="margin-bottom:14px">
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Entry <select id="kartCamEntrySelect"></select></label>
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Camera <select id="kartCamCameraSelect"></select></label>
+          <span class="pill" id="kartCamDirty">No edits</span>
+          <span style="flex:1"></span>
+          <button class="btn good" id="exportKartCamBin">Save as .bin</button>
+          <button class="btn" id="exportKartCamJson">Export JSON</button>
+          <label class="btn" for="importKartCamJsonInput">Import JSON</label>
+          <input id="importKartCamJsonInput" type="file" accept="application/json" style="display:none"/>
+        </div>
+        <div id="kartCamEditorRoot" class="grid cols-2">
+        </div>
+        <footer><span id="kartCamStatus">Ready.</span></footer>
+      </section>
+
       <!-- SETTINGS TAB -->
       <section id="tab-settings" class="hidden">
         <section class="panel">
@@ -645,12 +676,14 @@
       kartAiFileBuf:null, kartAiFilename:null, kartAiModel:null, currentKartAiDifficulty:0, currentKartAiPlayer:0, kartAiDirty:false,
       // kart AI Spd
       kartAiSpdFileBuf:null, kartAiSpdFilename:null, kartAiSpdModel:null, currentKartAiSpdSection:0, currentKartAiSpdTrack:0, currentKartAiSpdMode:0, kartAiSpdDirty:false,
+      // kart Camera
+      kartCamFileBuf:null, kartCamFilename:null, kartCamModel:null, currentKartCamEntry:0, currentKartCamCamera:0, kartCamDirty:false,
     };
 
     // ===== Tabs =====
     function showTab(name){
       $$('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
-      $$('#tab-load, #tab-kart, #tab-driver, #tab-bike, #tab-driverdisp, #tab-itemslot, #tab-driverik, #tab-kartai, #tab-kartaispd, #tab-settings').forEach(s=> s.classList.add('hidden'));
+      $$('#tab-load, #tab-kart, #tab-driver, #tab-bike, #tab-driverdisp, #tab-itemslot, #tab-driverik, #tab-kartai, #tab-kartaispd, #tab-kartcam, #tab-settings').forEach(s=> s.classList.add('hidden'));
       byId('tab-'+name).classList.remove('hidden');
     }
     $$('.tab-btn').forEach(b=> b.addEventListener('click',()=>{ if(!b.disabled) showTab(b.dataset.tab) }));
@@ -662,6 +695,7 @@
     const setDriverIkEnabled = (en)=> {$('.tab-btn[data-tab="driverik"]').disabled = !en;};
     const setKartAiEnabled = (en)=> {$('.tab-btn[data-tab="kartai"]').disabled = !en;};
     const setKartAiSpdEnabled = (en)=> {$('.tab-btn[data-tab="kartaispd"]').disabled = !en;};
+    const setKartCamEnabled = (en)=> {$('.tab-btn[data-tab="kartcam"]').disabled = !en;};
 
     // ===== Section read/write =====
     function readKartSection(dv, base){
@@ -941,6 +975,44 @@
         wF32(dv, offset + 0x04, entry.gapRate);
         wF32(dv, offset + 0x08, entry.minSpeed);
       });
+      return buf;
+    }
+
+    function parseKartCameraParam(buf) {
+      const dv = new DataView(buf);
+      if (buf.byteLength !== 576) {
+        throw new Error(`Size mismatch: expected 576, got ${buf.byteLength}`);
+      }
+      const entries = [];
+      for (let i = 0; i < 9; i++) {
+        const cameras = [];
+        for (let j = 0; j < 4; j++) {
+          const offset = i * 0x40 + j * 0x10;
+          cameras.push({
+            fov: f32(dv, offset + 0x00),
+            dist: f32(dv, offset + 0x04),
+            posY: f32(dv, offset + 0x08),
+            targetY: f32(dv, offset + 0x0C),
+          });
+        }
+        entries.push(cameras);
+      }
+      return { entries };
+    }
+
+    function serializeKartCameraParam(model) {
+      const buf = new ArrayBuffer(576);
+      const dv = new DataView(buf);
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 4; j++) {
+          const offset = i * 0x40 + j * 0x10;
+          const cam = model.entries[i][j];
+          wF32(dv, offset + 0x00, cam.fov);
+          wF32(dv, offset + 0x04, cam.dist);
+          wF32(dv, offset + 0x08, cam.posY);
+          wF32(dv, offset + 0x0C, cam.targetY);
+        }
+      }
       return buf;
     }
 
@@ -1486,6 +1558,106 @@
       });
     }
 
+    // ===== Render (kart Camera) =====
+    function renderKartCamEditor() {
+      const entrySelect = byId('kartCamEntrySelect');
+      const cameraSelect = byId('kartCamCameraSelect');
+
+      const entryNames = [
+        'Small vehicles, race', 'Medium vehicles, race', 'Large vehicles, race',
+        'Small vehicles, battle', 'Medium vehicles, battle', 'Large vehicles, battle',
+        'Small vehicles, missions (cam 7)', 'Medium vehicles, missions (cam 7)', 'Large vehicles, missions (cam 7)'
+      ];
+      const cameraNames = ['1/3/4 players 4:3', '1/3/4 players 16:9', '2 players 4:3', '2 players 16:9'];
+
+      if (entrySelect.options.length === 0) { // Populate only once
+        entryNames.forEach((name, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = name;
+          entrySelect.appendChild(opt);
+        });
+        cameraNames.forEach((name, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = name;
+          cameraSelect.appendChild(opt);
+        });
+      }
+      entrySelect.value = state.currentKartCamEntry;
+      cameraSelect.value = state.currentKartCamCamera;
+
+      const cam = state.kartCamModel.entries[state.currentKartCamEntry][state.currentKartCamCamera];
+      const root = byId('kartCamEditorRoot');
+      root.innerHTML = `
+        <div class="panel"><h3>Camera Parameters</h3>
+          <div class="row"><label>Field of View</label><input type="number" step="any" id="kcam_fov" value="${cam.fov}"></div>
+          <div class="row"><label>Distance</label><input type="number" step="any" id="kcam_dist" value="${cam.dist}"></div>
+          <div class="row"><label>Y Position</label><input type="number" step="any" id="kcam_posY" value="${cam.posY}"></div>
+          <div class="row"><label>Target Y Position</label><input type="number" step="any" id="kcam_targetY" value="${cam.targetY}"></div>
+        </div>
+      `;
+
+      $$('input', root).forEach(inp => {
+        inp.addEventListener('input', () => {
+          const currentCam = state.kartCamModel.entries[state.currentKartCamEntry][state.currentKartCamCamera];
+          const key = inp.id.replace('kcam_', '');
+          currentCam[key] = parseFloat(inp.value || '0');
+          state.kartCamDirty = true;
+          byId('kartCamDirty').textContent = 'Unsaved edits';
+        });
+      });
+    }
+
+    function bindKartCamInputs() {
+      byId('kartCamEntrySelect').addEventListener('change', (e) => {
+        state.currentKartCamEntry = +e.target.value;
+        renderKartCamEditor();
+      });
+      byId('kartCamCameraSelect').addEventListener('change', (e) => {
+        state.currentKartCamCamera = +e.target.value;
+        renderKartCamEditor();
+      });
+
+      byId('exportKartCamBin').addEventListener('click', () => {
+        const out = serializeKartCameraParam(state.kartCamModel);
+        const name = (state.kartCamFilename || 'kartCameraParam') + '-edited.bin';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([out]));
+        a.download = name;
+        a.click();
+        byId('kartCamStatus').textContent = 'Exported ' + name;
+        state.kartCamDirty = false;
+        byId('kartCamDirty').textContent = 'No edits';
+      });
+      byId('exportKartCamJson').addEventListener('click', () => {
+        const json = JSON.stringify({ format: 'kartCameraParam', version: 1, model: state.kartCamModel }, null, 2);
+        const name = (state.kartCamFilename || 'kartCameraParam') + '.json';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        a.download = name;
+        a.click();
+      });
+      byId('importKartCamJsonInput').addEventListener('change', e => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        f.text().then(t => {
+          try {
+            const j = JSON.parse(t);
+            if (j.format !== 'kartCameraParam') throw new Error('Wrong format');
+            state.kartCamModel = j.model;
+            state.currentKartCamEntry = 0;
+            state.currentKartCamCamera = 0;
+            renderKartCamEditor();
+            byId('kartCamStatus').textContent = 'Imported JSON';
+            state.kartCamDirty = true;
+          } catch (err) {
+            alert('JSON import failed: ' + err.message);
+          }
+        });
+      });
+    }
+
     // ===== File loading & drag/drop =====
     function onKartLoaded(buf, name){ try{ const model=parseKartParam(buf); state.fileBuf=buf; state.filename=name; state.model=model; state.currentIndex=0; setKartEnabled(true); showTab('kart'); renderEditor(); byId('fileInfo').textContent=name; byId('vehCount').textContent=model.count+' vehicles'; byId('byteSize').textContent=buf.byteLength+' bytes'; byId('validation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('validation').textContent='✖ '+err.message; alert('Failed to parse kartParam: '+err.message);} }
     function onDriverLoaded(buf, name){ try{ const model=parseDriverParam(buf); state.driverFileBuf=buf; state.driverFilename=name; state.driverModel=model; state.currentCharIndex=0; setDriverEnabled(true); showTab('driver'); renderDriverEditor(); byId('charFileInfo').textContent=name; byId('charCount').textContent=model.count+' drivers'; byId('charByteSize').textContent=buf.byteLength+' bytes'; byId('charValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('charValidation').textContent='✖ '+err.message; alert('Failed to parse driverParam: '+err.message);} }
@@ -1495,6 +1667,7 @@
     function onDriverIkLoaded(buf, name) { try { const model = parseDriverIkParam(buf); state.driverIkFileBuf = buf; state.driverIkFilename = name; state.driverIkModel = model; state.currentDriverIkVehicle = 0; state.currentDriverIkChar = 0; setDriverIkEnabled(true); showTab('driverik'); renderDriverIkEditor(); byId('driverIkFileInfo').textContent = name; byId('driverIkInfo').textContent = `${model.vehicleCount} veh, ${model.charCount} char`; byId('driverIkByteSize').textContent = buf.byteLength + ' bytes'; byId('driverIkValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('driverIkValidation').textContent = '✖ ' + err.message; alert('Failed to parse DriverIKParam: ' + err.message); } }
     function onKartAiLoaded(buf, name) { try { const model = parseKartAiParam(buf); state.kartAiFileBuf = buf; state.kartAiFilename = name; state.kartAiModel = model; state.currentKartAiDifficulty = 0; state.currentKartAiPlayer = 0; setKartAiEnabled(true); showTab('kartai'); renderKartAiEditor(); byId('kartAiFileInfo').textContent = name; byId('kartAiInfo').textContent = `3 difficulties, 12 players`; byId('kartAiByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAIActionParam: ' + err.message); } }
     function onKartAiSpdLoaded(buf, name) { try { const model = parseKartAiSpdParam(buf); state.kartAiSpdFileBuf = buf; state.kartAiSpdFilename = name; state.kartAiSpdModel = model; state.currentKartAiSpdSection = 0; state.currentKartAiSpdTrack = 0; state.currentKartAiSpdMode = 0; setKartAiSpdEnabled(true); showTab('kartaispd'); renderKartAiSpdEditor(); byId('kartAiSpdFileInfo').textContent = name; byId('kartAiSpdInfo').textContent = `${model.entries.length} entries`; byId('kartAiSpdByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiSpdValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiSpdValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAISpdParam: ' + err.message); } }
+    function onKartCamLoaded(buf, name) { try { const model = parseKartCameraParam(buf); state.kartCamFileBuf = buf; state.kartCamFilename = name; state.kartCamModel = model; state.currentKartCamEntry = 0; state.currentKartCamCamera = 0; setKartCamEnabled(true); showTab('kartcam'); renderKartCamEditor(); byId('kartCamFileInfo').textContent = name; byId('kartCamInfo').textContent = `${model.entries.length} entries`; byId('kartCamByteSize').textContent = buf.byteLength + ' bytes'; byId('kartCamValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartCamValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartCameraParam: ' + err.message); } }
     byId('driverFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
     byId('bikeFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
     byId('driverDispFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverDispLoaded(buf,f.name)); });
@@ -1502,6 +1675,7 @@
     byId('driverIkFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
     byId('kartAiFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
     byId('kartAiSpdFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
+    byId('kartCamFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartCamLoaded(buf, f.name)); });
     const dropK = byId('dropArea'); ['dragover','dragenter'].forEach(ev=> dropK.addEventListener(ev, e=>{ e.preventDefault(); })); dropK.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
     const dropD = byId('driverDropArea'); ['dragover','dragenter'].forEach(ev=> dropD.addEventListener(ev, e=>{ e.preventDefault(); })); dropD.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
     const dropB = byId('bikeDropArea'); ['dragover','dragenter'].forEach(ev=> dropB.addEventListener(ev, e=>{ e.preventDefault(); })); dropB.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
@@ -1510,6 +1684,7 @@
     const dropDIK = byId('driverIkDropArea'); ['dragover', 'dragenter'].forEach(ev => dropDIK.addEventListener(ev, e => { e.preventDefault(); })); dropDIK.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
     const dropKAI = byId('kartAiDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAI.addEventListener(ev, e => { e.preventDefault(); })); dropKAI.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
     const dropKAISPD = byId('kartAiSpdDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAISPD.addEventListener(ev, e => { e.preventDefault(); })); dropKAISPD.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
+    const dropKCAM = byId('kartCamDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKCAM.addEventListener(ev, e => { e.preventDefault(); })); dropKCAM.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartCamLoaded(buf, f.name)); });
     // ===== Theme =====
     byId('themeSelect').addEventListener('change',()=>{
       const v=byId('themeSelect').value; if(v==='light'){ document.documentElement.style.setProperty('--bg','#f5f7fb'); document.documentElement.style.setProperty('--panel','#ffffff'); document.documentElement.style.setProperty('--text','#0b0d10'); document.documentElement.style.setProperty('--sub','#3b4a66'); document.documentElement.style.setProperty('--muted','#dfe6f1'); } else { document.documentElement.style.removeProperty('--bg'); document.documentElement.style.removeProperty('--panel'); document.documentElement.style.removeProperty('--text'); document.documentElement.style.removeProperty('--sub'); document.documentElement.style.removeProperty('--muted'); }
@@ -1524,6 +1699,7 @@
     bindDriverIkInputs();
     bindKartAiInputs();
     bindKartAiSpdInputs();
+    bindKartCamInputs();
   ;
 </script>
 </body>
