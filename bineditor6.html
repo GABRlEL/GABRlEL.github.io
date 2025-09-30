@@ -54,6 +54,7 @@
         <button class="tab-btn" data-tab="itemslot" disabled>ItemSlot Editor</button>
         <button class="tab-btn" data-tab="driverik" disabled>DriverIKParam Editor</button>
         <button class="tab-btn" data-tab="kartai" disabled>kartAIActionParam Editor</button>
+        <button class="tab-btn" data-tab="kartaispd" disabled>kartAISpdParam Editor</button>
         <button class="tab-btn" data-tab="settings">Settings</button>
       </div>
     </div>
@@ -156,6 +157,19 @@
                 <span class="pill" id="kartAiInfo"></span>
                 <span class="pill" id="kartAiByteSize"></span>
                 <span class="pill" id="kartAiValidation"></span>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            <h3>Open a kartAISpdParam.bin</h3>
+            <div class="grid">
+              <input type="file" id="kartAiSpdFileInput" accept=".bin" />
+              <div id="kartAiSpdDropArea" class="panel" style="padding:10px">Drop a <strong>kartAISpdParam.bin</strong> here.</div>
+              <div class="toolbar">
+                <span class="pill" id="kartAiSpdFileInfo">No file loaded</span>
+                <span class="pill" id="kartAiSpdInfo"></span>
+                <span class="pill" id="kartAiSpdByteSize"></span>
+                <span class="pill" id="kartAiSpdValidation"></span>
               </div>
             </div>
           </section>
@@ -510,6 +524,24 @@
         <footer><span id="kartAiStatus">Ready.</span></footer>
       </section>
 
+      <!-- KART AI SPD TAB -->
+      <section id="tab-kartaispd" class="hidden">
+        <div class="toolbar" style="margin-bottom:14px">
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Section <select id="kartAiSpdSectionSelect"></select></label>
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Track <select id="kartAiSpdTrackSelect"></select></label>
+          <label style="margin:0;display:flex;align-items:center;gap:8px;">Mode/Difficulty <select id="kartAiSpdModeSelect"></select></label>
+          <span class="pill" id="kartAiSpdDirty">No edits</span>
+          <span style="flex:1"></span>
+          <button class="btn good" id="exportKartAiSpdBin">Save as .bin</button>
+          <button class="btn" id="exportKartAiSpdJson">Export JSON</button>
+          <label class="btn" for="importKartAiSpdJsonInput">Import JSON</label>
+          <input id="importKartAiSpdJsonInput" type="file" accept="application/json" style="display:none"/>
+        </div>
+        <div id="kartAiSpdEditorRoot" class="grid cols-2">
+        </div>
+        <footer><span id="kartAiSpdStatus">Ready.</span></footer>
+      </section>
+
       <!-- SETTINGS TAB -->
       <section id="tab-settings" class="hidden">
         <section class="panel">
@@ -552,6 +584,16 @@
     const SPECIAL_BOX_COLS = [
       'Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5', 'Set 6', 'Set 7', 'Set 8',
       'Set 9', 'Set 10', 'Set 11', 'Set 12', 'Set 13 (Unused)', 'Set 14 (Unused)', 'Set 15 (Unused)', 'Set 16 (Unused)'
+    ];
+    const TRACK_NAMES = [
+      "Luigi Circuit", "Moo Moo Meadows", "Mushroom Gorge", "Toad's Factory",
+      "Mario Circuit", "Coconut Mall", "DK Summit", "Wario's Gold Mine",
+      "Daisy Circuit", "Koopa Cape", "Maple Treeway", "Grumble Volcano",
+      "Dry Dry Ruins", "Moonview Highway", "Bowser's Castle", "Rainbow Road",
+      "GCN Peach Beach", "DS Yoshi Falls", "SNES Ghost Valley 2", "N64 Mario Raceway",
+      "N64 Sherbet Land", "GBA Shy Guy Beach", "DS Delfino Square", "GCN Waluigi Stadium",
+      "DS Desert Hills", "GBA Bowser Castle 3", "N64 DK's Jungle Parkway", "GCN Mario Circuit",
+      "SNES Mario Circuit 3", "DS Peach Gardens", "GCN DK Mountain", "N64 Bowser's Castle"
     ];
     const VEH_IDENT = [
       {desc:'Standard Kart S', code:'sdf_kart'},{desc:'Standard Kart M', code:'mdf_kart'},{desc:'Standard Kart L', code:'ldf_kart'},
@@ -601,12 +643,14 @@
       driverIkFileBuf:null, driverIkFilename:null, driverIkModel:null, currentDriverIkVehicle:0, currentDriverIkChar:0, driverIkDirty:false,
       // kart AI
       kartAiFileBuf:null, kartAiFilename:null, kartAiModel:null, currentKartAiDifficulty:0, currentKartAiPlayer:0, kartAiDirty:false,
+      // kart AI Spd
+      kartAiSpdFileBuf:null, kartAiSpdFilename:null, kartAiSpdModel:null, currentKartAiSpdSection:0, currentKartAiSpdTrack:0, currentKartAiSpdMode:0, kartAiSpdDirty:false,
     };
 
     // ===== Tabs =====
     function showTab(name){
       $$('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
-      $$('#tab-load, #tab-kart, #tab-driver, #tab-bike, #tab-driverdisp, #tab-itemslot, #tab-driverik, #tab-kartai, #tab-settings').forEach(s=> s.classList.add('hidden'));
+      $$('#tab-load, #tab-kart, #tab-driver, #tab-bike, #tab-driverdisp, #tab-itemslot, #tab-driverik, #tab-kartai, #tab-kartaispd, #tab-settings').forEach(s=> s.classList.add('hidden'));
       byId('tab-'+name).classList.remove('hidden');
     }
     $$('.tab-btn').forEach(b=> b.addEventListener('click',()=>{ if(!b.disabled) showTab(b.dataset.tab) }));
@@ -617,6 +661,7 @@
     const setItemSlotEnabled = (en)=> {$('.tab-btn[data-tab="itemslot"]').disabled = !en;};
     const setDriverIkEnabled = (en)=> {$('.tab-btn[data-tab="driverik"]').disabled = !en;};
     const setKartAiEnabled = (en)=> {$('.tab-btn[data-tab="kartai"]').disabled = !en;};
+    const setKartAiSpdEnabled = (en)=> {$('.tab-btn[data-tab="kartaispd"]').disabled = !en;};
 
     // ===== Section read/write =====
     function readKartSection(dv, base){
@@ -866,6 +911,36 @@
           wF32(dv, offset + 0x1C, entry.blockLine);
         }
       }
+      return buf;
+    }
+
+    function parseKartAiSpdParam(buf) {
+      const dv = new DataView(buf);
+      const entryCount = buf.byteLength / 12;
+      if (buf.byteLength % 12 !== 0) {
+        throw new Error(`File size ${buf.byteLength} is not a multiple of 12.`);
+      }
+      const entries = [];
+      for (let i = 0; i < entryCount; i++) {
+        const offset = i * 12;
+        entries.push({
+          offsetSpeed: f32(dv, offset + 0x00),
+          gapRate: f32(dv, offset + 0x04),
+          minSpeed: f32(dv, offset + 0x08),
+        });
+      }
+      return { entries };
+    }
+
+    function serializeKartAiSpdParam(model) {
+      const buf = new ArrayBuffer(model.entries.length * 12);
+      const dv = new DataView(buf);
+      model.entries.forEach((entry, i) => {
+        const offset = i * 12;
+        wF32(dv, offset + 0x00, entry.offsetSpeed);
+        wF32(dv, offset + 0x04, entry.gapRate);
+        wF32(dv, offset + 0x08, entry.minSpeed);
+      });
       return buf;
     }
 
@@ -1277,6 +1352,140 @@
       });
     }
 
+    // ===== Render (kart AI Spd) =====
+    function renderKartAiSpdEditor() {
+      const { entries } = state.kartAiSpdModel;
+      const sectionSelect = byId('kartAiSpdSectionSelect');
+      const trackSelect = byId('kartAiSpdTrackSelect');
+      const modeSelect = byId('kartAiSpdModeSelect');
+
+      const sections = [
+        { name: 'Grand Prix', tracks: 32, modes: ['50cc', '100cc', '150cc', 'Mirror'] },
+        { name: '50cc VS Race', tracks: 32, modes: ['Easy', 'Normal', 'Hard'] },
+        { name: '100cc VS Race', tracks: 32, modes: ['Easy', 'Normal', 'Hard'] },
+        { name: '150cc/Mirror VS Race', tracks: 32, modes: ['Easy', 'Normal', 'Hard'] },
+      ];
+
+      if (sectionSelect.options.length === 0) { // Populate only once
+        sections.forEach((s, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = s.name;
+          sectionSelect.appendChild(opt);
+        });
+      }
+      sectionSelect.value = state.currentKartAiSpdSection;
+
+      const currentSection = sections[state.currentKartAiSpdSection];
+      
+      trackSelect.innerHTML = '';
+      for (let i = 0; i < currentSection.tracks; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = TRACK_NAMES[i] || `Track ${i}`;
+        trackSelect.appendChild(opt);
+      }
+      trackSelect.value = state.currentKartAiSpdTrack;
+
+      modeSelect.innerHTML = '';
+      currentSection.modes.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = m;
+        modeSelect.appendChild(opt);
+      });
+      modeSelect.value = state.currentKartAiSpdMode;
+
+      let baseIndex = 0;
+      if (state.currentKartAiSpdSection > 0) {
+        baseIndex = 32 * 4; // GP entries
+        baseIndex += (state.currentKartAiSpdSection - 1) * 32 * 3;
+      }
+      
+      const entryIndex = baseIndex + state.currentKartAiSpdTrack * currentSection.modes.length + state.currentKartAiSpdMode;
+
+      const entry = entries[entryIndex];
+      const root = byId('kartAiSpdEditorRoot');
+      if (entry) {
+        root.innerHTML = `
+          <div class="panel"><h3>Speed Parameters</h3>
+            <div class="row"><label>Offset Speed</label><input type="number" step="any" id="kaispd_offsetSpeed" value="${entry.offsetSpeed}"></div>
+            <div class="row"><label>Gap Rate</label><input type="number" step="any" id="kaispd_gapRate" value="${entry.gapRate}"></div>
+            <div class="row"><label>Minimum Speed</label><input type="number" step="any" id="kaispd_minSpeed" value="${entry.minSpeed}"></div>
+          </div>
+        `;
+      } else {
+        root.innerHTML = `<div class="panel"><h3>Error</h3><p>Could not find data for the selected combination.</p></div>`;
+      }
+      
+
+      $$('input', root).forEach(inp => {
+        inp.addEventListener('input', () => {
+          const currentEntry = state.kartAiSpdModel.entries[entryIndex];
+          const key = inp.id.replace('kaispd_', '');
+          currentEntry[key] = parseFloat(inp.value || '0');
+          state.kartAiSpdDirty = true;
+          byId('kartAiSpdDirty').textContent = 'Unsaved edits';
+        });
+      });
+    }
+
+    function bindKartAiSpdInputs() {
+      byId('kartAiSpdSectionSelect').addEventListener('change', (e) => {
+        state.currentKartAiSpdSection = +e.target.value;
+        state.currentKartAiSpdTrack = 0;
+        state.currentKartAiSpdMode = 0;
+        renderKartAiSpdEditor();
+      });
+      byId('kartAiSpdTrackSelect').addEventListener('change', (e) => {
+        state.currentKartAiSpdTrack = +e.target.value;
+        renderKartAiSpdEditor();
+      });
+      byId('kartAiSpdModeSelect').addEventListener('change', (e) => {
+        state.currentKartAiSpdMode = +e.target.value;
+        renderKartAiSpdEditor();
+      });
+
+      byId('exportKartAiSpdBin').addEventListener('click', () => {
+        const out = serializeKartAiSpdParam(state.kartAiSpdModel);
+        const name = (state.kartAiSpdFilename || 'kartAISpdParam') + '-edited.bin';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([out]));
+        a.download = name;
+        a.click();
+        byId('kartAiSpdStatus').textContent = 'Exported ' + name;
+        state.kartAiSpdDirty = false;
+        byId('kartAiSpdDirty').textContent = 'No edits';
+      });
+      byId('exportKartAiSpdJson').addEventListener('click', () => {
+        const json = JSON.stringify({ format: 'kartAiSpdParam', version: 1, model: state.kartAiSpdModel }, null, 2);
+        const name = (state.kartAiSpdFilename || 'kartAISpdParam') + '.json';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        a.download = name;
+        a.click();
+      });
+      byId('importKartAiSpdJsonInput').addEventListener('change', e => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        f.text().then(t => {
+          try {
+            const j = JSON.parse(t);
+            if (j.format !== 'kartAiSpdParam') throw new Error('Wrong format');
+            state.kartAiSpdModel = j.model;
+            state.currentKartAiSpdSection = 0;
+            state.currentKartAiSpdTrack = 0;
+            state.currentKartAiSpdMode = 0;
+            renderKartAiSpdEditor();
+            byId('kartAiSpdStatus').textContent = 'Imported JSON';
+            state.kartAiSpdDirty = true;
+          } catch (err) {
+            alert('JSON import failed: ' + err.message);
+          }
+        });
+      });
+    }
+
     // ===== File loading & drag/drop =====
     function onKartLoaded(buf, name){ try{ const model=parseKartParam(buf); state.fileBuf=buf; state.filename=name; state.model=model; state.currentIndex=0; setKartEnabled(true); showTab('kart'); renderEditor(); byId('fileInfo').textContent=name; byId('vehCount').textContent=model.count+' vehicles'; byId('byteSize').textContent=buf.byteLength+' bytes'; byId('validation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('validation').textContent='✖ '+err.message; alert('Failed to parse kartParam: '+err.message);} }
     function onDriverLoaded(buf, name){ try{ const model=parseDriverParam(buf); state.driverFileBuf=buf; state.driverFilename=name; state.driverModel=model; state.currentCharIndex=0; setDriverEnabled(true); showTab('driver'); renderDriverEditor(); byId('charFileInfo').textContent=name; byId('charCount').textContent=model.count+' drivers'; byId('charByteSize').textContent=buf.byteLength+' bytes'; byId('charValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('charValidation').textContent='✖ '+err.message; alert('Failed to parse driverParam: '+err.message);} }
@@ -1285,14 +1494,14 @@
     function onItemSlotLoaded(buf, name) { try { const model = parseItemSlot(buf); state.itemSlotFileBuf = buf; state.itemSlotFilename = name; state.itemSlotModel = model; state.currentItemSlotTableIndex = 0; setItemSlotEnabled(true); showTab('itemslot'); renderItemSlotEditor(); byId('itemSlotFileInfo').textContent = name; byId('itemSlotTableCount').textContent = model.tableCount + ' tables'; byId('itemSlotByteSize').textContent = buf.byteLength + ' bytes'; byId('itemSlotValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('itemSlotValidation').textContent = '✖ ' + err.message; alert('Failed to parse ItemSlot: ' + err.message); } }
     function onDriverIkLoaded(buf, name) { try { const model = parseDriverIkParam(buf); state.driverIkFileBuf = buf; state.driverIkFilename = name; state.driverIkModel = model; state.currentDriverIkVehicle = 0; state.currentDriverIkChar = 0; setDriverIkEnabled(true); showTab('driverik'); renderDriverIkEditor(); byId('driverIkFileInfo').textContent = name; byId('driverIkInfo').textContent = `${model.vehicleCount} veh, ${model.charCount} char`; byId('driverIkByteSize').textContent = buf.byteLength + ' bytes'; byId('driverIkValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('driverIkValidation').textContent = '✖ ' + err.message; alert('Failed to parse DriverIKParam: ' + err.message); } }
     function onKartAiLoaded(buf, name) { try { const model = parseKartAiParam(buf); state.kartAiFileBuf = buf; state.kartAiFilename = name; state.kartAiModel = model; state.currentKartAiDifficulty = 0; state.currentKartAiPlayer = 0; setKartAiEnabled(true); showTab('kartai'); renderKartAiEditor(); byId('kartAiFileInfo').textContent = name; byId('kartAiInfo').textContent = `3 difficulties, 12 players`; byId('kartAiByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAIActionParam: ' + err.message); } }
-
-    byId('fileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
+    function onKartAiSpdLoaded(buf, name) { try { const model = parseKartAiSpdParam(buf); state.kartAiSpdFileBuf = buf; state.kartAiSpdFilename = name; state.kartAiSpdModel = model; state.currentKartAiSpdSection = 0; state.currentKartAiSpdTrack = 0; state.currentKartAiSpdMode = 0; setKartAiSpdEnabled(true); showTab('kartaispd'); renderKartAiSpdEditor(); byId('kartAiSpdFileInfo').textContent = name; byId('kartAiSpdInfo').textContent = `${model.entries.length} entries`; byId('kartAiSpdByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiSpdValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiSpdValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAISpdParam: ' + err.message); } }
     byId('driverFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
     byId('bikeFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
     byId('driverDispFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverDispLoaded(buf,f.name)); });
     byId('itemSlotFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onItemSlotLoaded(buf, f.name)); });
     byId('driverIkFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
     byId('kartAiFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
+    byId('kartAiSpdFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
     const dropK = byId('dropArea'); ['dragover','dragenter'].forEach(ev=> dropK.addEventListener(ev, e=>{ e.preventDefault(); })); dropK.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
     const dropD = byId('driverDropArea'); ['dragover','dragenter'].forEach(ev=> dropD.addEventListener(ev, e=>{ e.preventDefault(); })); dropD.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
     const dropB = byId('bikeDropArea'); ['dragover','dragenter'].forEach(ev=> dropB.addEventListener(ev, e=>{ e.preventDefault(); })); dropB.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
@@ -1300,6 +1509,7 @@
     const dropIS = byId('itemSlotDropArea'); ['dragover', 'dragenter'].forEach(ev => dropIS.addEventListener(ev, e => { e.preventDefault(); })); dropIS.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onItemSlotLoaded(buf, f.name)); });
     const dropDIK = byId('driverIkDropArea'); ['dragover', 'dragenter'].forEach(ev => dropDIK.addEventListener(ev, e => { e.preventDefault(); })); dropDIK.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
     const dropKAI = byId('kartAiDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAI.addEventListener(ev, e => { e.preventDefault(); })); dropKAI.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
+    const dropKAISPD = byId('kartAiSpdDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAISPD.addEventListener(ev, e => { e.preventDefault(); })); dropKAISPD.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
     // ===== Theme =====
     byId('themeSelect').addEventListener('change',()=>{
       const v=byId('themeSelect').value; if(v==='light'){ document.documentElement.style.setProperty('--bg','#f5f7fb'); document.documentElement.style.setProperty('--panel','#ffffff'); document.documentElement.style.setProperty('--text','#0b0d10'); document.documentElement.style.setProperty('--sub','#3b4a66'); document.documentElement.style.setProperty('--muted','#dfe6f1'); } else { document.documentElement.style.removeProperty('--bg'); document.documentElement.style.removeProperty('--panel'); document.documentElement.style.removeProperty('--text'); document.documentElement.style.removeProperty('--sub'); document.documentElement.style.removeProperty('--muted'); }
@@ -1313,6 +1523,8 @@
     bindItemSlotInputs();
     bindDriverIkInputs();
     bindKartAiInputs();
-  </script>
+    bindKartAiSpdInputs();
+  ;
+</script>
 </body>
 </html>
