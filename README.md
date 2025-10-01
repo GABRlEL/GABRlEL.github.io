@@ -23,3 +23,5 @@
 [StaticAR — MKWii StaticR.rel — AR Code Patcher](https://gabrlel.github.io/ar.html)
 
 [DynamicR — MKWii StaticR.rel — Editor Suite](https://gabrlel.github.io/rel.html)
+
+[Gabs Multi BIN Editor — Beta v1](https://gabrlel.github.io/bin.html)
