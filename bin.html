@@ -58,7 +58,7 @@
 <body>
   <header>
     <div class="wrap">
-      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • Beta 1 • Tool created by ChatGPT 5 Thinking and Gemini 2.5 Pro</span></h1>
+      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • Beta 2 • Tool created by ChatGPT 5 Thinking and Gemini 2.5 Pro</span></h1>
       <div class="tabs">
         <button class="tab-btn active" data-tab="load">Load</button>
         <button class="tab-btn" data-tab="kart" disabled>kartParam.bin</button>
@@ -910,6 +910,22 @@
       "DS Desert Hills", "GBA Bowser Castle 3", "N64 DK's Jungle Parkway", "GCN Mario Circuit",
       "SNES Mario Circuit 3", "DS Peach Gardens", "GCN DK Mountain", "N64 Bowser's Castle"
     ];
+// Code numbers (course IDs) aligned to TRACK_NAMES order (save/cup order).
+// This reflects the game's internal course "code number" (0x00..0x1F).
+// Using this as the on-disk order fixes alignment with Atlas and in-game behavior.
+const TRACK_CODE_NUM = [
+  // Wii
+  0x08, 0x01, 0x02, 0x04,
+  0x00, 0x05, 0x06, 0x07,
+  0x09, 0x0F, 0x0B, 0x03,
+  0x0E, 0x0A, 0x0C, 0x0D,
+  // Retro
+  0x10, 0x14, 0x19, 0x1A,
+  0x1B, 0x1F, 0x17, 0x12,
+  0x15, 0x1E, 0x1D, 0x11,
+  0x18, 0x16, 0x13, 0x1C
+];
+
     const VEH_IDENT = [
       {desc:'Standard Kart S', code:'sdf_kart'},{desc:'Standard Kart M', code:'mdf_kart'},{desc:'Standard Kart L', code:'ldf_kart'},
       {desc:'Booster Seat', code:'sa_kart'},{desc:'Classic Dragster', code:'ma_kart'},{desc:'Offroader', code:'la_kart'},
@@ -1911,22 +1927,21 @@ byId('kartAiStatus').textContent = 'Exported ' + name;
 
       let baseIndex = 0;
       if (state.currentKartAiSpdSection > 0) {
-        baseIndex = 32 * 4; // GP entries
+        baseIndex = 32 * 4; // GP block size
         baseIndex += (state.currentKartAiSpdSection - 1) * 32 * 3;
       }
-      
-      const entryIndex = baseIndex + state.currentKartAiSpdTrack * currentSection.modes.length + state.currentKartAiSpdMode;
+      // Map UI track index (save/cup order) -> file track index using CODE NUMBER order.
+      const fileTrackIndex = TRACK_CODE_NUM[state.currentKartAiSpdTrack] | 0;
+      const entryIndex = baseIndex + fileTrackIndex * currentSection.modes.length + state.currentKartAiSpdMode;
 
       const entry = entries[entryIndex];
       const root = byId('kartAiSpdEditorRoot');
       if (entry) {
-        root.innerHTML = `
-          <div class="panel"><h3>Speed Parameters</h3>
+        root.innerHTML = `\n          <div class="panel"><h3>Speed Parameters</h3>
             <div class="row"><label>Offset Speed</label><input type="number" step="any" id="kaispd_offsetSpeed" value="${entry.offsetSpeed}"></div>
             <div class="row"><label>Gap Rate</label><input type="number" step="any" id="kaispd_gapRate" value="${entry.gapRate}"></div>
             <div class="row"><label>Minimum Speed</label><input type="number" step="any" id="kaispd_minSpeed" value="${entry.minSpeed}"></div>
-          </div>
-        `;
+          </div>\n        <div class="panel"><h3>Debug</h3>\n          <div class="row"><span class="pill">Entry #${entryIndex}</span>\n          <span class="pill">Offset 0x${(entryIndex*12).toString(16).toUpperCase().padStart(4,'0')}</span></div>\n        </div>\n        `;
       } else {
         root.innerHTML = `<div class="panel"><h3>Error</h3><p>Could not find data for the selected combination.</p></div>`;
       }
