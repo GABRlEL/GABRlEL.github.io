@@ -67,7 +67,7 @@
   <div class="container">
     <header>
       <div>
-        <div class="title">DynamicR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">Editor Suite</span></div>
+        <div class="title">DynamicR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">Editor Suite</span> — v1.1</div>
         <div class="subtitle">Extensive <code>StaticR.rel</code> tool suite. Client-side only with region detection. Sponsored by ChatGPT 5 Thinking. Tested on PAL only.<br>Credits to <a href="https://mariokartwii.com/member.php?action=profile&uid=1">Vega</a> and <a href="https://mariokartwii.com/member.php?action=profile&uid=447">Ro</a> for their research and documentations. This tool is inspired by <a href="https://wiki.tockdom.com/wiki/User:Atlas">Atlas</a>' <a href="https://wiki.tockdom.com/wiki/StaticR.rel_Tool">StaticR.rel Tool</a>.</div>
       </div>
       <div class="row">
@@ -144,13 +144,12 @@
               <button class="btn" id="btnLoadMenu">Load</button>
               <span class="muted small">Encoding:</span>
               <select id="menuMode" title="Choose how Menu colors are stored">
-                <option value="rgb16" selected>RGB16 (00RR 00GG 00BB) — 24 entries, ChatGPT</option>
-                <option value="rgba8">RGBA8 (00RR 00GG 00BB 00AA) — 18 entries, Atlas</option>
+                <option value="rgba8" selected>RGBA8 (00RR 00GG 00BB 00AA) — 18 entries, Atlas</option>
               </select>
             </div>
             <div id="menuGrid" class="palette-grid"></div>
             <div class="small muted">
-              <span id="menuHint">RGB16 mode stores 24 entries as three BE16 lanes per color with zero high bytes: <span class="mono">00RR 00GG 00BB</span>.</span>
+              <span id="menuHint">RGBA8 mode treats the table as 18× entries at 8-byte stride: <span class="mono">00RR 00GG 00BB 00AA</span> (Atlas-style).</span>.</span>
             </div>
           </div>
 
@@ -532,20 +531,11 @@
 
   function fillMenu(){
     const off = fromHex(document.getElementById('offMenu').value);
-    const mode = document.getElementById('menuMode').value; // 'rgb16' | 'rgba8'
     const grid = document.getElementById('menuGrid'); grid.innerHTML='';
-
-    if (mode === 'rgb16') {
-      const count = 24;
-      const rgb = readRGB16(off, count);
-      rgb.forEach((rgb3,i)=> makeSwatch(grid, String(i+1), [rgb3[0],rgb3[1],rgb3[2],255], v=>{ const arr=readRGB16(off,count); arr[i]=[v[0],v[1],v[2]]; writeRGB16(off,arr); }, false));
-      document.getElementById('menuHint').textContent = 'RGB16 mode stores 24 entries as three BE16 lanes per color with zero high bytes: 00RR 00GG 00BB.';
-    } else {
-      const count = 18;
-      const rgba = readMenuRGBA8(off, count); // 00RR 00GG 00BB 00AA
-      rgba.forEach((px,i)=> makeSwatch(grid, String(i+1), px, v=>{ const arr=readMenuRGBA8(off,count); arr[i]=v; writeMenuRGBA8(off,arr); }, true));
-      document.getElementById('menuHint').textContent = 'RGBA8 mode treats the table as 18× entries at 8-byte stride: 00RR 00GG 00BB 00AA (Atlas-style).';
-    }
+    const count = 18;
+    const rgba = readMenuRGBA8(off, count); // 00RR 00GG 00BB 00AA
+    rgba.forEach((px,i)=> makeSwatch(grid, String(i+1), px, v=>{ const arr=readMenuRGBA8(off,count); arr[i]=v; writeMenuRGBA8(off,arr); }, true));
+    document.getElementById('menuHint').textContent = 'RGBA8 mode treats the table as 18× entries at 8-byte stride: 00RR 00GG 00BB 00AA (Atlas-style).';
   }
 
   function fillHUD(){
@@ -589,7 +579,7 @@
     document.getElementById('offMii').value=hex(OFFS_MII[reg],6);
     document.getElementById('offMenu').value=hex(OFFS_MENU_RGB[reg],6);
     document.getElementById('offHUD').value=hex(OFFS_HUD[reg],6);
-    document.getElementById('menuMode').value='rgb16';
+    document.getElementById('menuMode').value='rgba8';
     fillRegionLine(); fillMii(); fillMenu(); fillHUD(); readFakeBox();
   refreshItemBehaviorUI(); refreshEngineClassUI(); refreshMCDPUI(); refreshPtsUI(); refreshCOTUI(); }
 
