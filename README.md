@@ -24,4 +24,4 @@
 
 [DynamicR — MKWii StaticR.rel — Editor Suite](https://gabrlel.github.io/rel.html)
 
-[Gabs Multi BIN Editor — Beta 1](https://gabrlel.github.io/bin.html)
+[Gabs Multi BIN Editor](https://gabrlel.github.io/bin.html)
