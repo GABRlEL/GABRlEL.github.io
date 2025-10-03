@@ -67,7 +67,7 @@
   <div class="container">
     <header>
       <div>
-        <div class="title">DynamicR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">Editor Suite</span> — v1.1</div>
+        <div class="title">DynamicR — <span class="muted">MKWii StaticR.rel</span> — <span style="color:#c9e6ff">Editor Suite</span> — v1.2</div>
         <div class="subtitle">Extensive <code>StaticR.rel</code> tool suite. Client-side only with region detection. Sponsored by ChatGPT 5 Thinking. Tested on PAL only.<br>Credits to <a href="https://mariokartwii.com/member.php?action=profile&uid=1">Vega</a> and <a href="https://mariokartwii.com/member.php?action=profile&uid=447">Ro</a> for their research and documentations. This tool is inspired by <a href="https://wiki.tockdom.com/wiki/User:Atlas">Atlas</a>' <a href="https://wiki.tockdom.com/wiki/StaticR.rel_Tool">StaticR.rel Tool</a>.</div>
       </div>
       <div class="row">
@@ -159,7 +159,7 @@
               <div class="muted">Offset</div>
               <input id="offHUD" class="mono" size="12" />
               <button class="btn" id="btnLoadHUD">Load</button>
-              <span class="muted small">Reads 4× big-endian float from 4-byte aligned address near the given offset (wiki: <code>Change Color of HUD</code>).</span>
+              <span class="muted small">Mode:</span> <select id="hudMode" title="Choose how HUD color is stored"><option value="simple" selected>Simple (White / Yellow / Dark Green)</option><option value="f32">Floats (4× BE f32)</option><option value="atlas">Atlas (Beta, RGB @ (off&~3)+4)</option></select> <span class="muted small">Reads 4× big-endian float from 4-byte aligned address near the given offset (wiki: <code>Change Color of HUD</code>).</span>
             </div>
             <div id="hudGrid" class="palette-grid"></div>
           </div>
@@ -539,18 +539,159 @@
   }
 
   function fillHUD(){
-    const off=fromHex(document.getElementById('offHUD').value);
-    const base=(off&~3)>>>0; const dv=new DataView(bytes.buffer);
+  const off = fromHex(document.getElementById('offHUD').value);
+  const mode = (document.getElementById('hudMode')?.value) || 'f32';
+  const grid = document.getElementById('hudGrid');
+  grid.innerHTML = '';
+  if (!bytes || Number.isNaN(off)) { return; }
+
+    // simple mode: three presets by setting P2 (W1) only
+  if (mode === 'simple'){
+    const base = (off & ~3) >>> 0;
+    const addr = base + 4; // P2 (W1)
+    const grid = document.getElementById('hudGrid');
+    if (addr + 3 >= bytes.length){
+      const el=document.createElement('div'); el.className='muted mono'; el.textContent='Out of bounds at '+hex(addr,6); grid.appendChild(el);
+      return;
+    }
+    const dv=new DataView(bytes.buffer);
+    const cur = dv.getFloat32(addr, false);
+
+    const row=document.createElement('div'); row.className='swatch'; row.style.flexWrap='wrap';
+    const lab=document.createElement('div'); lab.textContent='Simple HUD Color'; lab.style.minWidth='160px';
+
+    function makeRadio(id, label, val){
+      const wrap=document.createElement('label'); 
+      wrap.style.marginRight='12px'; 
+      wrap.style.display='inline-flex'; 
+      wrap.style.alignItems='center'; 
+      wrap.style.gap='6px';
+      const r=document.createElement('input'); r.type='radio'; r.name='hudSimple'; r.value=String(val); r.id=id;
+      const span=document.createElement('span'); span.textContent=label;
+      wrap.append(r, span);
+      r.addEventListener('change', ()=>{
+        const f = parseFloat(r.value);
+        if (!Number.isFinite(f)) return;
+        dv.setFloat32(addr, f, false); 
+        enableSave();
+      });
+      return wrap;
+    }
+
+    const rWhite = makeRadio('hudSimpleWhite','White (P2 = 175.9)', 175.9);
+    const rYellow= makeRadio('hudSimpleYellow','Yellow (P2 = 176.0)', 176.0);
+    const rGreen = makeRadio('hudSimpleGreen','Dark Green (P2 = 176.1)', 176.1);
+
+    // select radio based on current value
+    const eps=1e-3;
+    if (Math.abs(cur - 175.9) < eps) rWhite.querySelector('input').checked = true;
+    else if (Math.abs(cur - 176.0) < eps) rYellow.querySelector('input').checked = true;
+    else if (cur > 176.0) rGreen.querySelector('input').checked = true;
+
+    const addrDiv=document.createElement('div'); addrDiv.className='mono muted'; addrDiv.textContent = hex(addr,6)+' (P2 @ W1, BE f32)'; addrDiv.style.flexBasis='100%';
+
+    row.append(lab, rWhite, rYellow, rGreen, addrDiv);
+    grid.appendChild(row);
+
+    const note=document.createElement('div'); note.className='small muted';
+    note.textContent = 'Rules (this PAL build): P2 < 176 → White; P2 = 176 → Yellow; P2 > 176 → Green. P4 ≥ ~1.10 also forces Green.';
+    grid.appendChild(note);
+    return;
+  }if (mode === 'f32'){
+    const base = (off & ~3) >>> 0;
+    if (base + 12 >= bytes.length){
+      const el=document.createElement('div'); el.className='muted mono'; el.textContent='Out of bounds for 4×f32 at '+hex(base,6); grid.appendChild(el);
+      return;
+    }
+    const dv=new DataView(bytes.buffer);
     const vals=[ dv.getFloat32(base+0,false), dv.getFloat32(base+4,false), dv.getFloat32(base+8,false), dv.getFloat32(base+12,false) ];
-    const grid=document.getElementById('hudGrid'); grid.innerHTML='';
-    vals.forEach((f,i)=>{ const el=document.createElement('div'); el.className='swatch';
+    vals.forEach((f,i)=>{
+      const el=document.createElement('div'); el.className='swatch';
       const lab=document.createElement('div'); lab.textContent='P'+(i+1); lab.style.minWidth='64px';
       const inp=document.createElement('input'); inp.type='number'; inp.step='0.01'; inp.value=Number.isFinite(f)?String(f):'0'; inp.style.width='120px';
       const hexv=document.createElement('div'); hexv.className='mono muted'; hexv.textContent = hex(base+4*i,6);
       inp.addEventListener('input',()=>{ let v=parseFloat(inp.value); if(!Number.isFinite(v)) v=0; dv.setFloat32(base+4*i, v, false); enableSave(); });
       el.append(lab, inp, hexv); grid.appendChild(el);
     });
+    return;
   }
+
+  // atlas mode (Beta): writes RGB as 4 bytes [R,G,B,0x00] at (off&~3)+4 (the second 32-bit word)
+  if (mode === 'atlas'){
+    const base = (off & ~3) >>> 0;
+    const addr = base + 4;
+    if (addr + 3 >= bytes.length){
+      const el=document.createElement('div'); el.className='muted mono'; el.textContent='Out of bounds at '+hex(addr,6); grid.appendChild(el);
+      return;
+    }
+
+    let r = bytes[addr], g = bytes[addr+1], b = bytes[addr+2], a = bytes[addr+3];
+    const toHex2 = x => (x&0xFF).toString(16).toUpperCase().padStart(2,'0');
+    const toCss = () => '#'+toHex2(r)+toHex2(g)+toHex2(b);
+
+    const row=document.createElement('div'); row.className='swatch'; row.style.flexWrap='wrap';
+
+    const lab=document.createElement('div'); lab.textContent='Color (Atlas RGB)'; lab.style.minWidth='140px';
+
+    // Color input and live preview
+    const color=document.createElement('input'); color.type='color'; color.value = toCss();
+    color.style.width='48px'; color.style.height='32px'; color.style.padding='0'; color.style.border='none';
+    const preview=document.createElement('div');
+    preview.title='Preview';
+    preview.style.width='24px'; preview.style.height='24px';
+    preview.style.border='1px solid #999'; preview.style.borderRadius='4px';
+    preview.style.backgroundColor = toCss();
+
+    color.addEventListener('input', ()=>{
+      const v = color.value.replace('#','');
+      if (v.length===6){
+        r = parseInt(v.slice(0,2),16); g = parseInt(v.slice(2,4),16); b = parseInt(v.slice(4,6),16);
+        bytes[addr] = r; bytes[addr+1] = g; bytes[addr+2] = b; bytes[addr+3] = 0x00;
+        rIn.value = String(r); gIn.value = String(g); bIn.value = String(b);
+        preview.style.backgroundColor = toCss();
+        enableSave();
+      }
+    });
+
+    // Numeric RGB inputs
+    const rIn=document.createElement('input'); rIn.type='number'; rIn.min='0'; rIn.max='255'; rIn.step='1'; rIn.style.width='70px'; rIn.value=String(r);
+    const gIn=document.createElement('input'); gIn.type='number'; gIn.min='0'; gIn.max='255'; gIn.step='1'; gIn.style.width='70px'; gIn.value=String(g);
+    const bIn=document.createElement('input'); bIn.type='number'; bIn.min='0'; bIn.max='255'; bIn.step='1'; bIn.style.width='70px'; bIn.value=String(b);
+
+    function writeRGB(){
+      let R = Math.max(0, Math.min(255, parseInt(rIn.value||'0',10)|0));
+      let G = Math.max(0, Math.min(255, parseInt(gIn.value||'0',10)|0));
+      let B = Math.max(0, Math.min(255, parseInt(bIn.value||'0',10)|0));
+      r = R; g = G; b = B;
+      bytes[addr] = r; bytes[addr+1] = g; bytes[addr+2] = b; bytes[addr+3] = 0x00;
+      color.value = toCss();
+      preview.style.backgroundColor = toCss();
+      enableSave();
+    }
+    rIn.addEventListener('change', writeRGB);
+    gIn.addEventListener('change', writeRGB);
+    bIn.addEventListener('change', writeRGB);
+
+    const addrDiv=document.createElement('div'); addrDiv.className='mono muted'; addrDiv.textContent = hex(addr,6)+' [R,G,B,00]';
+
+    // Alpha info on its own line to avoid clipping
+    const aLine=document.createElement('div'); aLine.style.flexBasis='100%';
+    const aInfo=document.createElement('div'); aInfo.className='mono muted';
+    aInfo.textContent = 'A=0x';
+    const aHex=document.createElement('span'); aHex.textContent = toHex2(a);
+    aInfo.appendChild(aHex);
+    aInfo.appendChild(document.createTextNode(' (written as 00)'));
+    aLine.appendChild(aInfo);
+
+    row.append(lab, color, preview, rIn, gIn, bIn, addrDiv, aLine);
+    grid.appendChild(row);
+
+    const note=document.createElement('div'); note.className='small muted';
+    note.textContent = 'Atlas mode writes RGB as 4 bytes [R,G,B,00] at (off&~3)+4 (the second 32-bit word).';
+    grid.appendChild(note);
+    return;
+  }
+}
 
   // ==== Fake Item Box helpers ====
   function u32toHex(u){ return (u>>>0).toString(16).toUpperCase().padStart(8,'0'); }
@@ -643,6 +784,7 @@
   document.getElementById('btnLoadMii').addEventListener('click', fillMii);
   document.getElementById('btnLoadMenu').addEventListener('click', fillMenu);
   document.getElementById('btnLoadHUD').addEventListener('click', fillHUD);
+  document.getElementById('hudMode')?.addEventListener('change', ()=>{ if(bytes) fillHUD(); });
   document.getElementById('menuMode').addEventListener('change', ()=>{ if(bytes) fillMenu(); });
 
   document.getElementById('btnSave').addEventListener('click', save);
