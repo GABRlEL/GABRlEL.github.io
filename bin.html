@@ -58,7 +58,7 @@
 <body>
   <header>
     <div class="wrap">
-      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • Beta 2 • Tool created by ChatGPT 5 Thinking and Gemini 2.5 Pro</span></h1>
+      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • v1 • Tool created by ChatGPT 5 Thinking and Gemini 2.5 Pro</span></h1>
       <div class="tabs">
         <button class="tab-btn active" data-tab="load">Load</button>
         <button class="tab-btn" data-tab="kart" disabled>kartParam.bin</button>
@@ -577,7 +577,9 @@
           <label style="margin:0;display:flex;align-items:center;gap:8px;">Table <select id="itemSlotTableSelect" style="width:300px"></select></label>
           <span class="pill" id="itemSlotMeta"></span>
           <span class="pill" id="itemSlotDirty">No edits</span>
-          <span style="flex:1"></span>
+          <button class="btn" id="itemSlotZeroRow" title="Set all values in the focused row to 0">Zero row</button>
+<button class="btn" id="itemSlotZeroCol" title="Set all values in the focused column to 0">Zero column</button>
+<span style="flex:1"></span>
           <button class="btn good" id="exportItemSlotBin">Save as .bin</button>
           <button class="btn" id="exportItemSlotJson">Export JSON</button>
           <label class="btn" for="importItemSlotJsonInput">Import JSON</label>
@@ -622,7 +624,9 @@
           <label style="margin:0;display:flex;align-items:center;gap:8px;">Difficulty <select id="kartAiDifficultySelect"></select></label>
           <label style="margin:0;display:flex;align-items:center;gap:8px;">Player <select id="kartAiPlayerSelect"></select></label>
           <span class="pill" id="kartAiDirty">No edits</span>
-          <span style="flex:1"></span>
+          <button class="btn" id="kai_applyDiff">Apply to all players (this difficulty)</button>
+<button class="btn" id="kai_applyAll">Apply to all players (all difficulties)</button>
+<span style="flex:1"></span>
           <button class="btn good" id="exportKartAiBin">Save as .bin</button>
           <button class="btn" id="exportKartAiJson">Export JSON</button>
           <label class="btn" for="importKartAiJsonInput">Import JSON</label>
@@ -1614,6 +1618,7 @@ byId('driverDispStatus').textContent='Exported '+name; state.driverDispDirty=fal
 
       tbl.innerHTML = html;
       $$('input', tbl).forEach(inp => {
+    inp.addEventListener('focus', () => { state.lastItemSlotR = +inp.dataset.r; state.lastItemSlotC = +inp.dataset.c; });
   inp.addEventListener('input', () => {
     const r = +inp.dataset.r;
     const c = +inp.dataset.c;
@@ -1655,6 +1660,38 @@ byId('driverDispStatus').textContent='Exported '+name; state.driverDispDirty=fal
         state.currentItemSlotTableIndex = +(e.target.value);
         renderItemSlotEditor();
       });
+      
+      // Zero row based on focused cell
+      byId('itemSlotZeroRow').addEventListener('click', () => {
+        const table = state.itemSlotModel.tables[state.currentItemSlotTableIndex];
+        let r = state.lastItemSlotR;
+        if (r == null) {
+          const active = document.activeElement;
+          if (active && active.dataset && active.dataset.r != null) r = +active.dataset.r;
+        }
+        if (r == null) { alert('Click a cell in the row you want to zero first.'); return; }
+        for (let c = 0; c < table.cols; c++) table.data[r][c] = 0;
+        state.itemSlotDirty = true;
+        byId('itemSlotDirty').textContent = 'Unsaved edits';
+        renderItemSlotTable();
+        byId('itemSlotStatus').textContent = 'Row ' + r + ' zeroed';
+      });
+      // Zero column based on focused cell
+      byId('itemSlotZeroCol').addEventListener('click', () => {
+        const table = state.itemSlotModel.tables[state.currentItemSlotTableIndex];
+        let c = state.lastItemSlotC;
+        if (c == null) {
+          const active = document.activeElement;
+          if (active && active.dataset && active.dataset.c != null) c = +active.dataset.c;
+        }
+        if (c == null) { alert('Click a cell in the column you want to zero first.'); return; }
+        for (let r = 0; r < table.rows; r++) table.data[r][c] = 0;
+        state.itemSlotDirty = true;
+        byId('itemSlotDirty').textContent = 'Unsaved edits';
+        renderItemSlotTable();
+        byId('itemSlotStatus').textContent = 'Column ' + c + ' zeroed';
+      });
+
       byId('exportItemSlotBin').addEventListener('click', () => {
         const out = serializeItemSlot(state.itemSlotModel);
         const name = (state.itemSlotFilename?.replace(/\.(bin|slt)$/i, '') || 'ItemSlot') + '-edited.bin';
@@ -1845,6 +1882,51 @@ byId('driverIkStatus').textContent = 'Exported ' + name;
         renderKartAiEditor();
       });
 
+
+      // Apply current player's probabilities to all players in current difficulty
+      byId('kai_applyDiff').addEventListener('click', () => {
+        const d = state.currentKartAiDifficulty|0;
+        const p = state.currentKartAiPlayer|0;
+        const src = state.kartAiModel.difficulties[d][p];
+        for (let i = 0; i < 12; i++) {
+          if (i === p) continue;
+          const dst = state.kartAiModel.difficulties[d][i];
+          dst.rocket = src.rocket;
+          dst.wheelSpin = src.wheelSpin;
+          dst.drift = src.drift;
+          dst.miniturbo = src.miniturbo;
+          dst.jumpAction = src.jumpAction;
+          dst.wheelie = src.wheelie;
+          dst.unknown = src.unknown;
+          dst.blockLine = src.blockLine;
+        }
+        state.kartAiDirty = true;
+        byId('kartAiDirty').textContent = 'Unsaved edits';
+        byId('kartAiStatus').textContent = 'Applied to all players (this difficulty)';
+      });
+      // Apply current player's probabilities to all players in all difficulties
+      byId('kai_applyAll').addEventListener('click', () => {
+        const p = state.currentKartAiPlayer|0;
+        const dMax = state.kartAiModel.difficulties.length;
+        for (let d = 0; d < dMax; d++) {
+          const src = state.kartAiModel.difficulties[state.currentKartAiDifficulty][p];
+          for (let i = 0; i < 12; i++) {
+            const dst = state.kartAiModel.difficulties[d][i];
+            dst.rocket = src.rocket;
+            dst.wheelSpin = src.wheelSpin;
+            dst.drift = src.drift;
+            dst.miniturbo = src.miniturbo;
+            dst.jumpAction = src.jumpAction;
+            dst.wheelie = src.wheelie;
+            dst.unknown = src.unknown;
+            dst.blockLine = src.blockLine;
+          }
+        }
+        state.kartAiDirty = true;
+        byId('kartAiDirty').textContent = 'Unsaved edits';
+        byId('kartAiStatus').textContent = 'Applied to all players (all difficulties)';
+      });
+    
       byId('exportKartAiBin').addEventListener('click', () => {
         const out = serializeKartAiParam(state.kartAiModel);
         const name = (state.kartAiFilename || 'kartAIActionParam') + '-edited.bin';
