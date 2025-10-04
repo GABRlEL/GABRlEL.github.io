@@ -25,3 +25,5 @@
 [DynamicR — MKWii StaticR.rel — Editor Suite](https://gabrlel.github.io/rel.html)
 
 [Gabs Multi BIN Editor](https://gabrlel.github.io/bin.html)
+
+[Work in progress: wstrt port](https://gabrlel.github.io) [license: GPL 2.0, web-based derivate from wstrt port](https://gabrlel.github.io/port/gpl-2.0.txt)
