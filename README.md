@@ -27,3 +27,5 @@
 [Gabs Multi BIN Editor](https://gabrlel.github.io/bin.html)
 
 [WebPort - wstrt port derivate](https://gabrlel.github.io/port/webport.html) [license: GPL 2.0, web-based derivate from wstrt port](https://gabrlel.github.io/port/gpl-2.0.txt)
+
+[WebPort Beta 2 - wstrt port & mkw-sp port derivate](https://gabrlel.github.io/port/webport-beta2.html) [license: GPL 2.0, web-based derivate from wstrt port](https://gabrlel.github.io/port/gpl-2.0.txt), [license: MIT, web-based derivate from mkw-sp port](https://gabrlel.github.io/port/license-mkw-sp.txt)
