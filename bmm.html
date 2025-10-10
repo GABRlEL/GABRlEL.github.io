@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>BMM Web</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0e0f12; --panel:#151821; --muted:#8b90a0; --text:#e9edf3; --accent:#5aa7ff;
+      --border:#2a2f3a; --danger:#ff6b6b; --ok:#47d18c; --warn:#ffd166;
+    }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji"}
+    .app{max-width:920px;margin:32px auto;padding:0 16px}
+    .menubar{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;position:sticky;top:12px;z-index:5}
+    .menu{display:flex;gap:4px}
+    .menu button{background:transparent;color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:8px;cursor:pointer}
+    .menu button[disabled]{opacity:.4;cursor:not-allowed}
+    .menu button:hover:not([disabled]){border-color:var(--accent)}
+    .title{margin-left:auto;color:var(--muted);font-weight:600}
+
+    .card{margin-top:16px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px}
+    .grid{display:grid;grid-template-columns:240px 1fr;gap:12px;align-items:center}
+    .row{display:contents}
+    label{color:var(--muted)}
+    input[type="text"], input[type="number"], select{width:220px;background:#0f1218;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+    input[disabled]{opacity:.6}
+
+    .color-swatch{width:120px;height:36px;border-radius:8px;border:1px solid var(--border);cursor:pointer;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);--rgba: rgba(220,220,220,1);background:
+      linear-gradient(45deg,#0000 25%,#fff2 25%,#fff2 50%,#0000 50%,#0000 75%,#fff2 75%) 0 0/12px 12px,
+      linear-gradient(45deg,#0000 25%,#fff2 25%,#fff2 50%,#0000 50%,#0000 75%,#fff2 75%) 6px 6px/12px 12px,#0f1218}
+    .color-swatch::before{content:"";position:absolute;inset:0;background:var(--rgba);border-radius:8px}
+    .color-grid{display:flex;gap:12px;align-items:center}
+    .color-pop{display:none;position:absolute;z-index:10;top:44px;left:0;background:#0f1218;border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 12px 24px rgba(0,0,0,.35)}
+    .color-pop.active{display:block}
+    .stack{display:flex;gap:8px;align-items:center}
+    .stack > *{flex:1}
+    .subtle{color:var(--muted)}
+    .hint{font-size:12px;color:var(--muted)}
+    .footer{margin:20px 0;color:var(--muted)}
+
+    .danger{color:var(--danger)}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111420;border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(10px);transition:all .2s}
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    .drop{position:fixed;inset:0;display:none;place-items:center;background:rgba(20,24,32,.75);backdrop-filter:blur(2px)}
+    .drop.show{display:grid}
+    .drop .zone{border:2px dashed var(--accent);color:#cfe6ff;padding:40px;border-radius:20px;background:#0b0e14}
+
+    .row .btn-inline{justify-self:start}
+    .btn-inline{background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn-inline:hover{border-color:var(--accent)}
+
+    .field{display:flex;gap:8px;align-items:center}
+    .value-hint{font-size:12px;color:var(--muted)}
+
+    a{color:#9ecaff}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="menubar">
+    <div class="menu" role="menubar" aria-label="File">
+      <button id="btnNew" title="New (start empty)">New</button>
+      <button id="btnOpen" title="Open .bmm file">Open</button>
+      <button id="btnSave" disabled>Save</button>
+      <button id="btnSaveAs" disabled>Save As</button>
+      
+    </div>
+    <div class="menu" role="menubar" aria-label="Help" style="margin-left:8px">
+      
+      <button id="btnAbout">About</button>
+      
+    </div>
+    <div class="title">BMM Web — web port of Atlas' BMM Editor tool <span class="subtle">v1.3.0.2</span></div>
+    <input id="fileOpen" type="file" accept=".bmm" style="display:none" />
+  </div>
+
+  <div class="card" id="editorCard" aria-live="polite">
+    <div class="grid">
+      <div class="row">
+        <label for="colorSwatch">Mii statue head color:</label>
+        <div class="color-grid">
+          <div class="color-swatch" id="colorSwatch" aria-haspopup="dialog" aria-expanded="false"></div>
+          <div class="color-pop" id="colorPop" role="dialog" aria-label="Pick color">
+            <div class="stack" style="margin-bottom:8px">
+              <input type="color" id="colorRGB" title="RGB color (alpha separate)" />
+              <input type="number" id="alpha" min="0" max="255" step="1" value="255" title="Alpha" />
+            </div>
+            <div class="stack">
+              <input type="number" id="r" min="0" max="255" step="1" title="R" />
+              <input type="number" id="g" min="0" max="255" step="1" title="G" />
+              <input type="number" id="b" min="0" max="255" step="1" title="B" />
+              <input type="text" id="hex" pattern="^#?[0-9a-fA-F]{6}$" title="#RRGGBB" />
+            </div>
+            <div class="hint" style="margin-top:6px">Note: Wii BMM stores color as R, G, B, A (big‑endian floats follow).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row"><label for="unk1">S scale:</label>
+        <div class="field"><input id="unk1" type="text" inputmode="decimal" disabled /><span class="value-hint" id="h1"></span></div>
+      </div>
+      <div class="row"><label for="unk2">S translation:</label>
+        <div class="field"><input id="unk2" type="text" inputmode="numeric" maxlength="10" disabled /><span class="value-hint" id="h2"></span></div>
+      </div>
+      <div class="row"><label for="unk3">T scale:</label>
+        <div class="field"><input id="unk3" type="text" inputmode="decimal" disabled /><span class="value-hint" id="h3"></span></div>
+      </div>
+      <div class="row"><label for="unk4">T translation:</label>
+        <div class="field"><input id="unk4" type="text" inputmode="numeric" maxlength="10" disabled /><span class="value-hint" id="h4"></span></div>
+      </div>
+      <div class="row"><label for="mode">Mode:</label>
+        <select id="mode">
+          <option value="float" selected>Float32 (per wiki)</option>
+          <option value="atlas">UInt32 (legacy, not recommended)</option>
+        </select>
+      </div>
+      <div class="row"><div></div><div class="hint">Mode controls how fields are read and saved. No auto-conversion, unsaved changes are discarded.</div></div>
+      <div class="row">
+        <div></div>
+        <button class="btn-inline" id="btnDefaults" disabled>Set unknown values to default</button>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:10px">Drag & drop a <code>.bmm</code> file anywhere on this page to open.</div>
+  </div>
+
+  <div class="footer">
+    Port of <em>BMM Editor</em> by <strong>Atlas</strong>. Atlas' wiki profile: <a href="https://wiki.tockdom.com/wiki/User:Atlas" target="_blank" rel="noopener">https://wiki.tockdom.com/wiki/User:Atlas</a>.<br>Tool made with ChatGPT 5 Thinking.
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="drop" id="drop">
+  <div class="zone">Drop <strong>.bmm</strong> file to open</div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // --- State ---
+  const state = {
+    enabled:false,
+    isNew:false,
+    fileName:null, // original name or suggested name
+    rgba:{r:220,g:220,b:220,a:255}, // Gainsboro default background
+    mode:'float',
+    lastBuffer:null,
+  };
+
+  // --- Elements ---
+  const el = id => document.getElementById(id);
+  const btnNew = el('btnNew');
+  const btnOpen = el('btnOpen');
+  const btnSave = el('btnSave');
+  const btnSaveAs = el('btnSaveAs');
+  
+  
+  const btnAbout = el('btnAbout');
+  
+  const fileOpen = el('fileOpen');
+  const colorSwatch = el('colorSwatch');
+  const colorPop = el('colorPop');
+  const colorRGB = el('colorRGB');
+  const alpha = el('alpha');
+  const r = el('r');
+  const g = el('g');
+  const b = el('b');
+  const hex = el('hex');
+  const unk1 = el('unk1');
+  const unk2 = el('unk2');
+  const unk3 = el('unk3');
+  const unk4 = el('unk4');
+  const btnDefaults = el('btnDefaults');
+  const mode = el('mode');
+  const h1 = el('h1');
+  const h2 = el('h2');
+  const h3 = el('h3');
+  const h4 = el('h4');
+  const drop = el('drop');
+  const toast = el('toast');
+
+  // --- Utilities ---
+  function showToast(msg){
+    toast.textContent = msg; toast.classList.add('show');
+    setTimeout(()=> toast.classList.remove('show'), 2200);
+  }
+  function enableUI(on){
+    state.enabled = !!on;
+    for (const input of [unk1,unk2,unk3,unk4,btnDefaults,btnSave,btnSaveAs,mode]){
+      input.disabled = !on;
+    }
+    updateValidationMode();
+    updateSwatch();
+    updateFloatHints();
+  }
+  function updateSwatch(){
+    const {r:rr,g:gg,b:bb,a:aa} = state.rgba;
+    colorSwatch.style.setProperty('--rgba', `rgba(${rr}, ${gg}, ${bb}, ${aa/255})`);
+    colorRGB.value = rgbToHex(rr,gg,bb);
+    alpha.value = aa; r.value = rr; g.value = gg; b.value = bb; hex.value = rgbToHex(rr,gg,bb);
+    colorSwatch.setAttribute('title', `RGBA ${rr}, ${gg}, ${bb}, ${aa}`);
+  }
+  function rgbToHex(r,g,b){
+    return '#' + [r,g,b].map(x=> x.toString(16).padStart(2,'0')).join('');
+  }
+  function clamp(n,min,max){return Math.min(max, Math.max(min, n));}
+
+  function setDefaultsUnknowns(){
+    unk1.value = '1';
+    unk2.value = '0';
+    unk3.value = '-30';
+    unk4.value = '0';
+    updateFloatHints();
+  }
+  function clearAll(){
+    state.fileName = null; state.isNew = false;
+    state.lastBuffer = null;
+    state.rgba = {r:220,g:220,b:220,a:255}; // Gainsboro background (placeholder)
+    updateSwatch();
+    setDefaultsUnknowns();
+    enableUI(false);
+  }
+
+  function parseFloatOrDefault(v, def){
+    const t = (v||'').trim(); if(!t) return def;
+    const n = Number.parseFloat(t); return Number.isFinite(n)? n : def;
+  }
+  function parseUInt32OrDefault(v, def){
+    const t=(v||'').trim(); if(!t) return def;
+    if(!/^[-+]?\d+$/.test(t)) return def;
+    let n = Number.parseInt(t,10); if(!Number.isFinite(n)) return def;
+    if(n<0) n = 0; if(n>0xFFFFFFFF) n = 0xFFFFFFFF; return n >>> 0;
+  }
+
+  // --- Float32 preview helpers ---
+  function f32(x){ return Math.fround(parseFloatOrDefault(x, 0)); }
+  function updateFloatHints(){
+    try{
+      h1.textContent = 'f32: ' + f32(unk1.value);
+      h3.textContent = 'f32: ' + f32(unk3.value);
+      if(state.mode === 'float'){
+        h2.textContent = 'f32: ' + f32(unk2.value);
+        h4.textContent = 'f32: ' + f32(unk4.value);
+      } else {
+        h2.textContent = '';
+        h4.textContent = '';
+      }
+    }catch(_){/* no-op */}
+  }
+
+  // --- BMM read/write (Big Endian) ---
+  function readBMM(arrayBuffer){
+    if(arrayBuffer.byteLength !== 0x14) throw new Error('The specified file is not a correct BMM.');
+    const dv = new DataView(arrayBuffer);
+    // bytes 0..3 : R, G, B, A
+    const R = dv.getUint8(0), G = dv.getUint8(1), B = dv.getUint8(2), A = dv.getUint8(3);
+    state.rgba = { r:R, g:G, b:B, a:A };
+    // 0x04: float (S scale) BE
+    const u1 = dv.getFloat32(0x04, false);
+    const u3 = dv.getFloat32(0x0C, false);
+    // 0x08 and 0x10 depend on read mode
+    let u2, u4;
+    if(state.mode === 'atlas'){
+      u2 = dv.getUint32(0x08, false) >>> 0;
+      u4 = dv.getUint32(0x10, false) >>> 0;
+      unk2.value = String(u2);
+      unk4.value = String(u4);
+    } else {
+      u2 = dv.getFloat32(0x08, false);
+      u4 = dv.getFloat32(0x10, false);
+      unk2.value = String(+u2);
+      unk4.value = String(+u4);
+    }
+
+    updateSwatch();
+    // normalize like the original (text boxes)
+    unk1.value = String(+u1);
+    unk3.value = String(+u3);
+    updateFloatHints();
+  }
+
+  function writeBMM(){
+    const buf = new ArrayBuffer(0x14); const dv = new DataView(buf);
+    const {r:R,g:G,b:B,a:A} = state.rgba;
+    dv.setUint8(0, R); dv.setUint8(1,G); dv.setUint8(2,B); dv.setUint8(3,A);
+    // Floats big-endian
+    const f1 = parseFloatOrDefault(unk1.value, 0);
+    const f3 = parseFloatOrDefault(unk3.value, 0);
+    dv.setFloat32(0x04, f1, false);
+    if(state.mode === 'float'){
+      const f2 = parseFloatOrDefault(unk2.value, 0);
+      const f4 = parseFloatOrDefault(unk4.value, 0);
+      dv.setFloat32(0x08, f2, false);
+      dv.setFloat32(0x10, f4, false);
+    } else {
+      const u2 = parseUInt32OrDefault(unk2.value, 0);
+      const u4 = parseUInt32OrDefault(unk4.value, 0);
+      dv.setUint32(0x08, u2 >>> 0, false);
+      dv.setUint32(0x10, u4 >>> 0, false);
+    }
+    dv.setFloat32(0x0C, f3, false);
+    return buf;
+  }
+
+  function triggerDownload(filename, arrayBuffer){
+    const blob = new Blob([arrayBuffer], {type:'application/octet-stream'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'course.bmm';
+    document.body.appendChild(a); a.click();
+    requestAnimationFrame(()=>{ URL.revokeObjectURL(url); a.remove(); });
+  }
+
+  // --- Menu actions ---
+  btnNew.addEventListener('click', ()=>{
+    clearAll();
+    enableUI(true);
+    setDefaultsUnknowns();
+    state.isNew = true; state.fileName = 'course.bmm';
+  });
+
+  btnOpen.addEventListener('click', ()=> fileOpen.click());
+  fileOpen.addEventListener('change', async (e)=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    try{
+      const ab = await f.arrayBuffer();
+      clearAll();
+      state.lastBuffer = ab;
+      readBMM(ab);
+      state.fileName = f.name || 'course.bmm';
+      enableUI(true);
+    }catch(err){
+      console.error(err);
+      showToast(err.message || 'Failed to open file');
+    }finally{
+      fileOpen.value = '';
+    }
+  });
+
+  btnSave.addEventListener('click', ()=>{
+    if(!state.enabled) return;
+    const buf = writeBMM();
+    const name = state.fileName || 'course.bmm';
+    // In desktop app this overwrote the file; on the web we download with same name.
+    triggerDownload(name, buf);
+    showToast('File saved successfully as ' + name);
+  });
+
+  btnSaveAs.addEventListener('click', ()=>{
+    if(!state.enabled) return;
+    const suggested = state.fileName || 'course.bmm';
+    const name = prompt('Save As… Enter file name', suggested) || suggested;
+    state.fileName = name;
+    const buf = writeBMM();
+    triggerDownload(name, buf);
+    showToast('File saved successfully as ' + name);
+  });
+  btnAbout.addEventListener('click', ()=>{
+    alert("This original tool was made by Atlas. It allows you to edit Mario Kart Wii's BMM files.\n\nThis tool wouldn't have been possible without Atlas.");
+  });
+
+  // --- Color popover ---
+  function toggleColorPop(show){
+    if(show === undefined) show = !colorPop.classList.contains('active');
+    colorPop.classList.toggle('active', !!show);
+    colorSwatch.setAttribute('aria-expanded', String(!!show));
+  }
+  colorSwatch.addEventListener('click', ()=> toggleColorPop());
+  document.addEventListener('click', (e)=>{
+    if(!colorPop.contains(e.target) && e.target!==colorSwatch) toggleColorPop(false);
+  });
+
+  function applyColorFromInputs(){
+    const rr = clamp(+r.value|0,0,255);
+    const gg = clamp(+g.value|0,0,255);
+    const bb = clamp(+b.value|0,0,255);
+    const aa = clamp(+alpha.value|0,0,255);
+    state.rgba = {r:rr,g:gg,b:bb,a:aa};
+    updateSwatch();
+  }
+  colorRGB.addEventListener('input', ()=>{
+    const v = colorRGB.value; if(/^#?[0-9a-fA-F]{6}$/.test(v)){
+      const s = v.replace('#','');
+      r.value = parseInt(s.slice(0,2),16);
+      g.value = parseInt(s.slice(2,4),16);
+      b.value = parseInt(s.slice(4,6),16);
+      hex.value = '#' + s.toLowerCase();
+      applyColorFromInputs();
+    }
+  });
+  for (const c of [r,g,b,alpha,hex]){
+    c.addEventListener('input', ()=>{
+      if(c===hex){
+        const v = hex.value; if(/^#?[0-9a-fA-F]{6}$/.test(v)){
+          const s = v.replace('#','');
+          r.value = parseInt(s.slice(0,2),16);
+          g.value = parseInt(s.slice(2,4),16);
+          b.value = parseInt(s.slice(4,6),16);
+          colorRGB.value = '#' + s.toLowerCase();
+        } else return; // wait until valid
+      }
+      applyColorFromInputs();
+    });
+  }
+
+  // --- Validation (mirror original WinForms behavior) ---
+  // Floats: allow digits, sign and dot; normalize to valid on blur
+  function normalizeFloatInput(e){
+    const v = e.target.value.trim();
+    if(v===''){ e.target.value = '0'; return; }
+    const n = Number.parseFloat(v);
+    e.target.value = Number.isFinite(n)? String(+n) : '0';
+  }
+  function normalizeUIntInput(e){
+    const v = e.target.value.trim();
+    if(v===''){ e.target.value = '0'; return; }
+    const n = Number.parseInt(v,10);
+    e.target.value = Number.isFinite(n) && n>=0 ? String(clamp(n,0,0xFFFFFFFF)) : '0';
+  }
+  for (const f of [unk1,unk3]){ f.addEventListener('blur', normalizeFloatInput); f.addEventListener('change', normalizeFloatInput); }
+  // Keypress filters (similar to WinForms):
+  function keyFilterFloat(ev){
+    const ch = ev.key;
+    if(!(ch>='0'&&ch<='9') && ch!=='.' && ch!=='-' && ch!=='+' && ch!=='e' && ch!=='E' && ch!== 'Backspace' && ch!=='Delete' && ch!=='ArrowLeft' && ch!=='ArrowRight' && ch!=='Tab'){
+      ev.preventDefault();
+    }
+  }
+  function keyFilterUInt(ev){
+    const ch = ev.key;
+    if(!(ch>='0'&&ch<='9') && ch!=='Backspace' && ch!=='Delete' && ch!=='ArrowLeft' && ch!=='ArrowRight' && ch!=='Tab'){
+      ev.preventDefault();
+    }
+  }
+  for (const f of [unk1,unk3]) f.addEventListener('keydown', keyFilterFloat);
+  for (const f of [unk1,unk2,unk3,unk4]) f.addEventListener('input', updateFloatHints);
+
+  // Dynamic validation for Unknown2/4 based on write mode
+  function setUIntValidation(elem){
+    elem.removeEventListener('blur', normalizeFloatInput);
+    elem.removeEventListener('change', normalizeFloatInput);
+    elem.removeEventListener('keydown', keyFilterFloat);
+    elem.addEventListener('blur', normalizeUIntInput);
+    elem.addEventListener('change', normalizeUIntInput);
+    elem.addEventListener('keydown', keyFilterUInt);
+    elem.setAttribute('inputmode','numeric');
+    elem.setAttribute('maxlength','10');
+    elem.title = 'UInt32';
+  }
+  function setFloatValidation(elem){
+    elem.removeEventListener('blur', normalizeUIntInput);
+    elem.removeEventListener('change', normalizeUIntInput);
+    elem.removeEventListener('keydown', keyFilterUInt);
+    elem.addEventListener('blur', normalizeFloatInput);
+    elem.addEventListener('change', normalizeFloatInput);
+    elem.addEventListener('keydown', keyFilterFloat);
+    elem.setAttribute('inputmode','decimal');
+    elem.removeAttribute('maxlength');
+    elem.title = 'Float32';
+  }
+  function updateValidationMode(){
+    state.mode = mode.value || 'float';
+    if(state.mode === 'float'){
+      setFloatValidation(unk2); setFloatValidation(unk4);
+    } else {
+      setUIntValidation(unk2); setUIntValidation(unk4);
+    }
+    updateFloatHints();
+  }
+  mode && mode.addEventListener('change', ()=>{
+    state.mode = mode.value || 'float';
+    updateValidationMode();
+    if(state.lastBuffer){
+      try{
+        readBMM(state.lastBuffer);
+        showToast('Re-read using ' + (state.mode==='atlas'?'Legacy (UInt32)':'Float32') + ' mode');
+      }catch(err){
+        console.error(err);
+        showToast('Failed to re-read');
+      }
+    }
+  });
+
+  // Defaults button
+  btnDefaults.addEventListener('click', ()=> setDefaultsUnknowns());
+
+  // --- Drag & drop ---
+  window.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('show'); });
+  window.addEventListener('dragleave', (e)=>{ if(e.target===document || e.target===drop) drop.classList.remove('show'); });
+  window.addEventListener('drop', async (e)=>{
+    e.preventDefault(); drop.classList.remove('show');
+    const f = e.dataTransfer?.files?.[0]; if(!f) return;
+    try{
+      const ab = await f.arrayBuffer();
+      clearAll();
+      state.lastBuffer = ab;
+      readBMM(ab);
+      state.fileName = f.name || 'course.bmm';
+      enableUI(true);
+    }catch(err){
+      console.error(err);
+      showToast(err.message || 'Failed to open file');
+    }
+  });
+
+  // init
+  clearAll();
+  updateValidationMode();
+})();
+</script>
+</body>
+</html>
