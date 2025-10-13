@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Wheel Wizard — Badges & Holders</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --muted: #9fb0c3;
+      --text: #edf2f7;
+      --accent: #7aa2ff;
+      --chip: #1b2230;
+      --border: #1f2a3a;
+      --good: #7ee787;
+      --acc-max: 820px; /* max width of a badge card in the accordion */
+    }
+
+    * { box-sizing: border-box; }
+
+    /* FIX: make the gradient cover the whole document (not just viewport) */
+    html {
+      min-height: 100%;
+      background: linear-gradient(180deg, #0b0f14 0%, #0e131b 100%);
+    }
+    body {
+      min-height: 100%;
+      margin: 0;
+      background: transparent; /* inherit gradient from html */
+      color: var(--text);
+      font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    header {
+      padding: 20px clamp(16px, 5vw, 40px);
+      border-bottom: 1px solid var(--border);
+      background: rgba(10, 14, 20, 0.6);
+      backdrop-filter: blur(6px);
+      position: sticky; top: 0; z-index: 3;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(20px, 2.2vw, 28px); letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 12px; }
+    .controls {
+      margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+    label span.inline-help { color: var(--muted); font-size: 12px; margin-top: 2px; display: inline-block; }
+    select, button {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    main { padding: 20px clamp(16px, 5vw, 40px); }
+
+    /* Leaderboard grid (unchanged) */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      grid-auto-flow: dense;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.2);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .card h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: .2px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .stack { display: grid; gap: 8px; }
+
+    .muted { color: var(--muted); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--chip);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      text-decoration: none; color: var(--text);
+      min-width: 0; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chip:hover { border-color: var(--accent); }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: flex-start;
+      align-content: flex-start;
+      justify-content: flex-start;
+    }
+    .kpi {
+      display: inline-block;
+      font-weight: 800;
+      color: var(--good);
+      background: #0d1a12;
+      border: 1px solid #123a23;
+      padding: 3px 8px; border-radius: 8px; font-size: 12px;
+    }
+
+    /* Accordion layout for Badges view: single column, one card per row */
+    .accordion {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr; /* single column always */
+    }
+    details.acc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: clip;
+      box-shadow: 0 6px 18px rgba(0,0,0,.2);
+      width: 100%;
+      max-width: var(--acc-max); /* keep width pleasantly narrow */
+      margin-inline: auto;       /* center card in the row */
+    }
+    details.acc > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    details.acc > summary::-webkit-details-marker { display: none; }
+    .acc-title { font-weight: 700; font-size: 15px; }
+    .acc-body  { padding: 0 14px 14px; }
+
+    footer { padding: 24px; color: var(--muted); text-align: center; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .error, .status {
+      margin: 12px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: #251313; color: #ffb4b4;
+    }
+    .status { background: #111826; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Wheel Wizard — Badges & Holders</h1>
+    <div class="sub">
+      Data source:
+      <a href="https://raw.githubusercontent.com/TeamWheelWizard/WheelWizard-Data/main/badges.json" target="_blank" rel="noopener">badges.json</a>
+    </div>
+    <div class="controls">
+      <label>
+        <span class="inline-help">View</span><br />
+        <select id="mode">
+          <option value="badges" selected>Badges → friend codes</option>
+          <option value="leaderboard">Friend codes (leaderboard)</option>
+        </select>
+      </label>
+      <button id="reload" title="Re-fetch badges.json">Reload</button>
+      <div id="status" class="status" role="status" aria-live="polite" style="display:none;"></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="content"></div>
+  </main>
+
+  <footer>
+    Friend code links go to <span class="mono">https://rwfc.net/player/&lt;code&gt;</span>.
+  </footer>
+
+  <script>
+    // --- Configuration -------------------------------------------------------
+    const JSON_URL = 'https://raw.githubusercontent.com/TeamWheelWizard/WheelWizard-Data/main/badges.json';
+
+    // Badge title mapping (explicit)
+    const EXPLICIT_TITLES = new Map(Object.entries({
+      "WhWzDev": "Wheel Wizard Developer",
+      "RrDev": "Retro Rewind Developer",
+      "Translator": "Translator",
+      "TranslatorLead": "Translator Lead",
+      "Translator Lead": "Translator Lead"
+    }));
+
+    // Pinned order (by pretty title)
+    const PINNED_TITLES = [
+      "Wheel Wizard Developer",
+      "Retro Rewind Developer",
+      "Translator Lead",
+      "Translator",
+    ];
+
+    const RANK_WEIGHT = { Gold: 0, Silver: 1, Bronze: 2 };
+
+    // --- Utilities -----------------------------------------------------------
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const h = (tag, attrs = {}, children = []) => {
+      const el = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') el.className = v;
+        else if (k === 'html') el.innerHTML = v;
+        else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+        else if (v !== null && v !== undefined) el.setAttribute(k, v);
+      }
+      for (const child of [].concat(children)) {
+        if (child === null || child === undefined) continue;
+        el.append(child.nodeType ? child : document.createTextNode(String(child)));
+      }
+      return el;
+    };
+
+    const friendCodeRe = /^\d{4}-\d{4}-\d{4}$/;
+
+    function prettyBadgeName(key) {
+      if (!key) return key;
+      if (EXPLICIT_TITLES.has(key)) return EXPLICIT_TITLES.get(key);
+      if (key.includes('_')) {
+        const [series, suffix] = key.split('_', 2);
+        return series + ' ' + splitCamel(suffix);
+      }
+      return splitCamel(key);
+    }
+
+    function splitCamel(s) {
+      return (s || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .trim();
+    }
+
+    // Parse event badge (generic, no hard-coded series)
+    function parseEventBadge(key) {
+      // supports "Series_GoldWinner" or "Series Gold Winner"
+      let series = null, rank = null;
+      if (key.includes('_')) {
+        const [s, suf] = key.split('_', 2);
+        const m = (suf || '').match(/(Gold|Silver|Bronze)/i);
+        if (m) { series = s; rank = cap(m[1]); }
+      } else {
+        const m = key.match(/^(.+?)\s+(Gold|Silver|Bronze)\s+Winner$/i);
+        if (m) { series = m[1]; rank = cap(m[2]); }
+      }
+      return { series, rank };
+    }
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+
+    function sortAlpha(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); }
+
+    function linkForFriend(code) {
+      const url = `https://rwfc.net/player/${encodeURIComponent(code)}`;
+      return h('a', { href: url, target: '_blank', rel: 'noopener', class: 'chip mono' }, [code]);
+    }
+
+    function showStatus(msg) {
+      const box = $('#status');
+      box.style.display = '';
+      box.textContent = msg;
+    }
+    function hideStatus() { $('#status').style.display = 'none'; }
+
+    // --- Data loading & normalization ---------------------------------------
+    async function fetchBadges() {
+      showStatus('Fetching badges.json …');
+      const res = await fetch(JSON_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const raw = await res.json();
+      hideStatus();
+
+      const friendToBadges = new Map();
+      const allDeclared = Array.isArray(raw.all) ? new Set(raw.all) : new Set();
+
+      for (const [k, v] of Object.entries(raw)) {
+        if (k === 'all') continue;
+        if (!friendCodeRe.test(k)) continue;
+        const badges = Array.isArray(v) ? Array.from(new Set(v)) : [];
+        friendToBadges.set(k, badges);
+        for (const b of badges) allDeclared.add(b);
+      }
+
+      const badgeToFriends = new Map();
+      for (const b of allDeclared) badgeToFriends.set(b, new Set());
+      for (const [code, badges] of friendToBadges.entries()) {
+        for (const b of badges) {
+          if (!badgeToFriends.has(b)) badgeToFriends.set(b, new Set());
+          badgeToFriends.get(b).add(code);
+        }
+      }
+
+      return { friendToBadges, badgeToFriends };
+    }
+
+    // --- Renderers -----------------------------------------------------------
+    function renderLeaderboard(friendToBadges) {
+      const arr = Array.from(friendToBadges.entries()).map(([code, badges]) => ({
+        code, badges: Array.from(new Set(badges))
+      }));
+
+      arr.sort((a, b) => {
+        const diff = b.badges.length - a.badges.length;
+        return diff !== 0 ? diff : sortAlpha(a.code, b.code);
+      });
+
+      const grid = h('div', { class: 'grid' });
+      for (const row of arr) {
+        const card = h('div', { class: 'card stack' });
+        const header = h('div', { class: 'row' }, [
+          h('h3', {}, [linkForFriend(row.code)]),
+          h('span', { class: 'kpi', title: 'Badge count' }, [`${row.badges.length} badge${row.badges.length === 1 ? '' : 's'}`])
+        ]);
+        const chips = h('div', { class: 'chips' });
+        for (const b of row.badges.sort((a, b) => sortAlpha(prettyBadgeName(a), prettyBadgeName(b)))) {
+          chips.append(h('span', { class: 'chip' }, [prettyBadgeName(b)]));
+        }
+        card.append(header, chips);
+        grid.append(card);
+      }
+      return grid;
+    }
+
+    // Accordion layout (only view for Badges → friend codes), auto-expanded & custom sorting
+    function renderByBadgeAccordion(badgeToFriends) {
+      const items = Array.from(badgeToFriends.entries()).map(([badge, set]) => {
+        const title = prettyBadgeName(badge);
+        const { series, rank } = parseEventBadge(badge);
+        const isEvent = !!series && !!rank && (rank in RANK_WEIGHT);
+        return {
+          badge,
+          title,
+          series: isEvent ? series : null,
+          seriesLower: isEvent ? series.toLowerCase() : null,
+          rank: isEvent ? rank : null,
+          rankWeight: isEvent ? RANK_WEIGHT[rank] : null,
+          isEvent,
+          holders: Array.from(set).sort(sortAlpha)
+        };
+      });
+
+      items.sort((a, b) => {
+        // 1) Pinned titles first, in given order
+        const ai = PINNED_TITLES.indexOf(a.title);
+        const bi = PINNED_TITLES.indexOf(b.title);
+        if (ai !== -1 || bi !== -1) {
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        }
+
+        // 2) Event-series grouping: by series name, then Gold→Silver→Bronze
+        if (a.isEvent && b.isEvent) {
+          if (a.seriesLower === b.seriesLower) {
+            return a.rankWeight - b.rankWeight;
+          }
+          return sortAlpha(a.seriesLower, b.seriesLower);
+        }
+
+        // 3) Otherwise alphabetical by title
+        return sortAlpha(a.title, b.title);
+      });
+
+      const acc = h('div', { class: 'accordion' });
+
+      for (const item of items) {
+        const total = item.holders.length;
+        const d = h('details', { class: 'acc', open: true }); // auto-expanded
+        const sum = h('summary', {}, [
+          h('span', { class: 'acc-title' }, [item.title]),
+          h('span', { class: 'kpi', title: 'Number of holders' }, [`${total}`])
+        ]);
+
+        const body = h('div', { class: 'acc-body' });
+        if (total === 0) {
+          body.append(h('div', { class: 'muted' }, ['No holders yet.']));
+        } else {
+          const chips = h('div', { class: 'chips' });
+          item.holders.forEach(code => chips.append(linkForFriend(code)));
+          body.append(chips);
+        }
+
+        d.append(sum, body);
+        acc.append(d);
+      }
+      return acc;
+    }
+
+    // --- Controller ----------------------------------------------------------
+    let cache = null;
+
+    async function loadAndRender() {
+      try {
+        $('#content').innerHTML = '';
+        showStatus('Loading…');
+        cache = await fetchBadges();
+        hideStatus();
+        updateView();
+      } catch (err) {
+        hideStatus();
+        console.error(err);
+        $('#content').innerHTML = '';
+        $('#content').append(h('div', { class: 'error' }, [
+          'Failed to load badges.json: ', err.message,
+          ' — check network/CORS or try Reload.'
+        ]));
+      }
+    }
+
+    function updateView() {
+      if (!cache) return;
+      const mode = $('#mode').value;
+      const content = $('#content');
+      content.innerHTML = '';
+
+      if (mode === 'leaderboard') {
+        content.append(renderLeaderboard(cache.friendToBadges));
+      } else {
+        content.append(renderByBadgeAccordion(cache.badgeToFriends));
+      }
+    }
+
+    // --- Wire up ---
+    $('#mode').addEventListener('change', updateView);
+    $('#reload').addEventListener('click', loadAndRender);
+
+    // Default view: Badges → friend codes
+    loadAndRender();
+  </script>
+</body>
+</html>
