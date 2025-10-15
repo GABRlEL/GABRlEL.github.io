@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IKP Web v1.0</title>
+<style>
+  :root{
+    --bg:#0b0f14;--fg:#e6ecf2;--muted:#9fb3c8;--accent:#7cc0ff;--err:#ff5c5c;--ok:#7cf58a;--card:#121923;--border:#1e2a3a;
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);border-bottom:1px solid var(--border);}
+  .toolbar{display:flex;gap:.5rem;align-items:center;padding:.75rem 1rem;flex-wrap:wrap}
+  .title{font-weight:600;letter-spacing:.3px;margin-right:auto}
+  button,.linkbtn{appearance:none;border:1px solid var(--border);background:var(--card);color:var(--fg);padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
+  button:hover,.linkbtn:hover{border-color:var(--accent)}
+  button[disabled]{opacity:.5;cursor:not-allowed}
+  .linkbtn{text-decoration:none;display:inline-flex;align-items:center;gap:.35rem}
+  .container{max-width:900px;margin:1rem auto;padding:0 1rem 3rem}
+  .drop{border:2px dashed var(--border);border-radius:.75rem;padding:1rem 1.25rem;background:rgba(255,255,255,.02);text-align:center;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(4, 1fr);row-gap:1rem;column-gap:2.5rem;margin-top:1rem}
+  .offset{background:var(--card);border:1px solid var(--border);border-radius:.4rem;padding:.5rem;width:90px;display:inline-flex;align-items:center;justify-content:flex-end;gap:.35rem;color:var(--muted)}
+  .pair{display:flex;align-items:center;gap:.5rem}
+  input[type="text"]{width:100%;padding:.5rem .6rem;border-radius:.4rem;border:1px solid var(--border);background:#0f1620;color:var(--fg)}
+  input[disabled]{opacity:.6}
+  .desc{color:var(--muted);font-size:.85em;margin:-.25rem 0 .5rem 0}
+  .hint{color:var(--muted);font-size:.9em;margin-top:.5rem}
+  .credits{margin-top:1rem;color:var(--muted)}
+  .badge{display:inline-block;background:#132033;border:1px solid var(--border);padding:.15rem .4rem;border-radius:.4rem;color:var(--accent);font-size:.8em}
+  .spacer{flex:1}
+  .ok{color:var(--ok)} .err{color:var(--err)}
+  /* tiny hover tooltip for (i) icon */
+  .info{display:inline-flex;align-items:center;justify-content:center;margin-left:6px;width:16px;height:16px;border-radius:50%;border:1px solid var(--border);color:var(--accent);font-size:11px;cursor:help;user-select:none;position:relative}
+  .info::before{content:"i";}
+  .info::after{content:attr(data-tip);position:absolute;left:50%;bottom:125%;transform:translateX(-50%);white-space:nowrap;background:var(--card);border:1px solid var(--border);padding:.35rem .5rem;border-radius:.35rem;color:var(--fg);font-size:.85em;opacity:0;pointer-events:none;transition:opacity .12s ease}
+  .info:hover::after{opacity:1}
+  .info:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+</style>
+</head>
+<body>
+  <header>
+    <div class="toolbar">
+      <div class="title">IKP Web <span class="badge">v1.0</span></div>
+      <input id="file" type="file" accept=".ikp" style="display:none" />
+      <button id="openBtn" title="Open .ikp">Open</button>
+      <button id="saveBtn" disabled title="Save">Save</button>
+      <a class="linkbtn" id="infoBtn" href="#">Info</a>
+      <a class="linkbtn" id="helpBtn" href="https://wiki.tockdom.com/wiki/IKP_(File_Format)" target="_blank" rel="noopener">Online Help</a>
+      <span class="spacer"></span>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="drop" class="drop"><strong>Drag & drop</strong> an <code>.ikp</code> file here, or click <em>Open</em>.
+      <div class="hint">Expected file size: <code>0x110</code> (272) bytes. Big-endian IEEE-754 floats. Shows 68 entries (0x00–0x10C).</div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div class="credits">
+      Ported to single-file HTML from the original Windows tool by <a href="https://wiki.tockdom.com/wiki/User:Atlas" target="_blank" rel="noopener">Atlas</a>.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const COUNT = 68; // 0x00 .. 0x10C inclusive, step 4
+  const OFFSETS = Array.from({length: COUNT}, (_,i)=>i*4);
+  const inputs = [];
+  function normalizeNumericInput(raw){
+    let s = String(raw).trim();
+    // Remove common thousands separators: spaces, NBSP, underscores, apostrophes
+    s = s.split(' ').join('').split('_').join('').split(' ').join('').split("'").join('');
+    const lastComma = s.lastIndexOf(',');
+    const lastDot   = s.lastIndexOf('.');
+    if (lastComma !== -1 && lastDot !== -1){
+      if (lastComma > lastDot){ s = s.split('.').join(''); s = s.replace(',', '.'); }
+      else { s = s.split(',').join(''); }
+    } else if (lastComma !== -1){ s = s.replace(',', '.'); }
+    return s;
+  }
+  
+  const previous = new Array(OFFSETS.length+1).fill(0); // 1..COUNT used
+  let fileBytes = null; // Uint8Array of the opened file
+  let currentName = null;
+
+  const grid = document.getElementById('grid');
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('file');
+  const openBtn = document.getElementById('openBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const infoBtn = document.getElementById('infoBtn');
+
+  // Build UI (offset + textbox per row)
+  function buildGrid(){
+    grid.innerHTML = '';
+    inputs.length = 0;
+    const cols = 4;
+    const rowsPerCol = Math.ceil(OFFSETS.length / cols);
+    for(let i=0;i<OFFSETS.length;i++){
+      const off = OFFSETS[i];
+      const col = Math.floor(i / rowsPerCol);   // 0..cols-1
+      const row = (i % rowsPerCol) + 1;         // 1-based row
+
+      // One grid cell per entry (pair)
+      const cell = document.createElement('div');
+      cell.style.gridColumn = (col+1) + ' / ' + (col+2);
+      cell.style.gridRow = String(row);
+
+      const pair = document.createElement('div');
+      pair.className = 'pair';
+
+      const lab = document.createElement('div');
+      lab.className='offset';
+      lab.textContent = '0x'+off.toString(16).toUpperCase()+':';
+
+      // Add (i) tooltips to labels (not inputs)
+      if(off===0x58){
+        const tip=document.createElement('span');
+        tip.className='info';
+        tip.setAttribute('data-tip','Minimum head rotation speed (looking at object, passing a driver, etc.)');
+        tip.setAttribute('tabindex','0');
+        tip.setAttribute('aria-hidden','true');
+        lab.appendChild(tip);
+      }
+      if(off===0x5C){
+        const tip=document.createElement('span');
+        tip.className='info';
+        tip.setAttribute('data-tip','Maximum head rotation speed (looking at object, passing a driver, etc.)');
+        tip.setAttribute('tabindex','0');
+        tip.setAttribute('aria-hidden','true');
+        lab.appendChild(tip);
+      }
+
+      const inp = document.createElement('input');
+      inp.type='text'; inp.disabled = true; inp.placeholder='0'; inp.dataset.index = (i+1);
+      inp.setAttribute('inputmode','decimal');
+      // Accessibility: label each input with its offset (and description where available)
+      let aria = 'Value at offset 0x'+off.toString(16).toUpperCase();
+      if(off===0x58) aria += ' — Minimum head rotation speed';
+      if(off===0x5C) aria += ' — Maximum head rotation speed';
+      inp.setAttribute('aria-label', aria);
+
+      inp.addEventListener('blur', (e)=>{
+        let raw = inp.value.trim();
+        if(raw===''){ raw='0'; inp.value='0'; }
+        const idx = +inp.dataset.index;
+        const norm = normalizeNumericInput(raw);
+        let f = Number(norm);
+        if(!Number.isFinite(f)){
+          alert('The value you entered is incorrect.');
+          const pv = previous[idx] ?? 0;
+          inp.value = formatFloat(pv);
+          return;
+        }
+        previous[idx] = f;
+        inp.value = formatFloat(f);
+      });
+
+      pair.appendChild(lab);
+      pair.appendChild(inp);
+      cell.appendChild(pair);
+      grid.appendChild(cell);
+      inputs.push(inp);
+    }
+  }
+
+  function formatFloat(f){
+    // Normalize -0 to +0 and format up to 6 decimals without trailing zeros
+    if(!Number.isFinite(f)) return '0';
+    if (f === 0 && 1/f === -Infinity) f = 0; // avoid displaying "-0"
+    const s = f.toFixed(6);
+    return s.replace(/\.0+$/,'').replace(/(\.[0-9]*?)0+$/,'$1');
+  }
+
+  async function openBuffer(buf, name){
+    if(buf.byteLength !== 0x110){
+      alert('This is not a correct IKP file.');
+      disableAll();
+      return;
+    }
+    fileBytes = new Uint8Array(buf);
+    currentName = name || 'IKParam.ikp';
+    document.title = 'IKP Web v1.0 - ' + currentName;
+
+    const dv = new DataView(buf);
+    for(let i=0;i<OFFSETS.length;i++){
+      const f = dv.getFloat32(OFFSETS[i], false); // big-endian
+      inputs[i].disabled = false;
+      inputs[i].value = formatFloat(f);
+      previous[i+1] = f;
+    }
+    // Keep quirk from desktop (store last field in index 0)
+    saveBtn.disabled = false;
+  }
+
+  function disableAll(){
+    inputs.forEach(inp=>{ inp.disabled = true; inp.value=''; });
+    saveBtn.disabled = true;
+  }
+
+  async function readFile(f){
+    const ab = await f.arrayBuffer();
+    await openBuffer(ab, f.name);
+  }
+
+  function writeFile(){
+    if(!fileBytes) return;
+    const buf = fileBytes.slice(); // copy so we keep other bytes intact
+    const dv = new DataView(buf.buffer);
+    for(let i=0;i<OFFSETS.length;i++){
+      const raw = inputs[i].value.trim();
+      const norm = normalizeNumericInput(raw === '' ? '0' : raw);
+      const v = Number(norm);
+      if(!Number.isFinite(v)){
+        alert('The value you entered is incorrect.');
+        return;
+      }
+      dv.setFloat32(OFFSETS[i], v, false); // big-endian
+    }
+    const out = new Blob([buf], {type:'application/octet-stream'});
+    const url = URL.createObjectURL(out);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentName || 'IKParam.ikp';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    alert('Successfully saved IKP file.');
+  }
+
+  // Events
+  openBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', ()=>{ const f = fileInput.files[0]; if(f) readFile(f); });
+  saveBtn.addEventListener('click', writeFile);
+  infoBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    alert(
+`This original tool was made by Atlas. It allows you to edit Mario Kart Wii IKP files.
+
+This tool wouldn't have been possible without Atlas.`);
+  });
+
+  // Drag & drop
+  ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, (e)=>{e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; drop.style.borderColor = 'var(--accent)';}));
+  ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, (e)=>{e.preventDefault(); drop.style.borderColor = 'var(--border)';}));
+  drop.addEventListener('drop', (e)=>{
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) readFile(f);
+  });
+
+  buildGrid();
+})();
+</script>
+</body>
+</html>
