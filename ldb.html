@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blank ldb.pul Generator</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a32;
+    --ink: #e8ecff;
+    --muted: #9aa4c5;
+    --accent: #7aa2ff;
+    --accent-2: #a0f0ff;
+    --bad: #ff6b6b;
+    --ok: #67ffa8;
+  }
+  html, body {
+    margin: 0;
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    /* Layered backgrounds: two dot grids + the base gradient (no pseudo-elements) */
+    background-color: #0b1020;
+    background-image:
+      radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1.5px),
+      radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1.5px),
+      linear-gradient(180deg, #0b1020 0%, #0f1731 100%);
+    background-size: 24px 24px, 24px 24px, auto;
+    background-position: 0 0, 12px 12px, 0 0;
+    background-repeat: repeat, repeat, no-repeat;
+    background-attachment: fixed, fixed, scroll; /* dots fixed to viewport; gradient scrolls */
+  }
+  body {
+    margin: 0; background: linear-gradient(180deg, #0b1020 0%, #0f1731 100%);
+    color: var(--ink); font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+  .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .hero { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+  .badge { color: var(--accent-2); background: #10203a; border: 1px solid #1a2b52; border-radius: 999px; padding: 6px 10px; font-weight: 600; }
+  .card { background: rgba(18,26,50,.7); border: 1px solid #1b2b53; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(6px); }
+  .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+  input[type="text"], textarea, select { width: 100%; box-sizing: border-box; background: #0f1731; color: var(--ink); border: 1px solid #1b2b53; border-radius: 12px; padding: 10px 12px; font: inherit; }
+  textarea { min-height: 120px; resize: vertical; }
+  .btn { appearance: none; border: 1px solid #1b2b53; background: #132043; color: var(--ink); border-radius: 12px; padding: 10px 14px; font: 600 14px system-ui; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .btn:hover { border-color: #2a4488; box-shadow: inset 0 0 0 1px #2a4488; }
+  .btn-primary { background: linear-gradient(180deg, #2a4488 0%, #1b2b53 100%); border-color: #2a4488; }
+  .btn-danger { background: #3a1420; border-color: #5a1e2f; }
+  .btn-good { background: #133a2a; border-color: #1f6a4e; }
+  .pill { background: #0e1530; border: 1px solid #203160; border-radius: 999px; padding: 6px 10px; }
+  .muted { color: var(--muted); }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th, .tbl td { border-bottom: 1px solid #1b2b53; padding: 8px 10px; text-align: left; }
+  .tbl th { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+  .tbl tr:hover td { background: rgba(255,255,255,.02); }
+  .right { text-align: right; }
+  .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+  .danger { color: var(--bad); }
+  .good { color: var(--ok); }
+  .grid-fit { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .hint { font-size: 12px; color: var(--muted); }
+  footer { margin: 24px 0; color: var(--muted); }
+  .sticky-actions { position: static; padding-top: 8px; background: transparent; }
+  .btn-sm{padding:6px 10px;font-size:12px;border-radius:10px}
+  .tracks-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width: 900px){.tracks-grid{grid-template-columns:1fr}}
+  /* subtle star/dot background pattern overlay (fixed, non-janky) */
+  
+  /* ensure main content sits above the pattern overlay */
+  
+  /* Make all three ZIP controls equal-sized */
+  #zipControls > .btn,
+  #zipControls > #zipDownloadSlot > .btn { flex: 1 1 0; }
+  /* Ensure the download slot's child participates as a flex item */
+  #zipDownloadSlot { display: contents; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Blank <span class="mono">ldb.pul</span> Generator</h1>
+      <div class="badge">Single‑file web tool</div>
+    </div>
+
+    <p class="muted">Generates <strong>valid, blank</strong> leaderboard files (<span class="mono">ldb.pul</span>) for Pulsar‑based packs (e.g., Retro Rewind). Load a <span class="mono">FolderToTrackName.txt</span>, pick tracks, and export a ready‑to‑drop <span class="mono">Ghosts/…/ldb.pul</span> ZIP.</p>
+
+    <div class="card" style="margin-top:12px">
+      <div class="grid-fit">
+        <div>
+          <label>Load mapping from server</label>
+          <div class="controls">
+            <input id="serverUrl" type="text" value="FolderToTrackName.txt" placeholder="FolderToTrackName.txt" />
+            <button class="btn" id="btnLoadServer">Fetch</button>
+          </div>
+          <div class="hint">Fetches via <span class="mono">fetch()</span> relative to where this HTML is hosted. Put the TXT next to this file for the default path to work.</div>
+        </div>
+        <div>
+          <label>…or load a local mapping</label>
+          <div class="controls">
+            <input id="fileMap" type="file" accept=".txt" />
+            <button class="btn" id="btnUseLocal">Load</button>
+          </div>
+          <div class="hint">Supports <span class="mono">\c{color}</span> tags; they are stripped automatically.</div>
+        </div>
+        <div>
+          <label>(Untested, not recommended)<br>Provide a template <span class="mono">ldb.pul</span></label>
+          <div class="controls">
+            <input id="fileTemplate" type="file" accept=".pul" />
+            <button class="btn" id="btnUseTemplate">Use template</button>
+          </div>
+          <div class="hint">If provided, new files will clone this binary and zero the trophy flags. If not, we emit a Pulsar‑style full‑size blank with proper header (see Notes below).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <div class="card">
+        <div class="controls" style="justify-content: space-between; align-items:center; margin-bottom:8px">
+          <div class="controls">
+            <button class="btn" id="btnSelectAll">Select all</button>
+            <button class="btn" id="btnSelectNone">Select none</button>
+            <button class="btn" id="btnInvert">Invert</button>
+            <label class="controls" style="gap:6px; align-items:center">
+              <input type="checkbox" id="chkPlainSingle" />
+              <span class="muted">Single download name: <span class="mono">ldb.pul</span></span>
+            </label>
+          </div>
+          <div class="controls">
+            <label class="pill">Filter</label>
+            <input id="filter" type="text" placeholder="Type to filter by name or ID…" />
+          </div>
+        </div>
+        <div id="tracksArea" class="tracks-grid">
+          <table class="tbl" id="tracksTblL">
+            <thead>
+              <tr>
+                <th style="width:30px"></th>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tracksBodyL">
+              <tr><td colspan="4" class="muted">Load a mapping to populate…</td></tr>
+            </tbody>
+          </table>
+          <table class="tbl" id="tracksTblR">
+            <thead>
+              <tr>
+                <th style="width:30px"></th>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tracksBodyR">
+              <tr><td colspan="4" class="muted">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sticky-actions">
+          <div class="controls" style="justify-content: space-between; margin-top:10px">
+            <div>
+              <label>ZIP root folder</label>
+              <input id="zipRoot" type="text" value="Ghosts" />
+              <span class="hint">Files export under <span class="mono">/&lt;root&gt;/&lt;ID&gt;/ldb.pul</span></span>
+            </div>
+            <div class="controls" id="zipControls">
+              <button class="btn" id="btnValidate">Quick validate</button>
+              <button class="btn btn-primary" id="btnGenerate">Generate ZIP</button>
+              <span id="zipDownloadSlot"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px">
+          <label>Raw mapping preview</label>
+          <div class="pill" id="stats">0 tracks</div>
+        </div>
+        <textarea id="raw" placeholder="Your FolderToTrackName.txt will show here…"></textarea>
+        <div style="margin-top:8px">
+          <label>Parsing log</label>
+          <pre id="log" class="mono" style="white-space:pre-wrap; background:#0f1731; padding:10px; border-radius:12px; border:1px solid #1b2b53; max-height:180px; overflow:auto"></pre>
+        </div>
+        <div id="downloadSlot" style="margin-top:12px"></div>
+        <hr style="border:0;border-top:1px solid #1b2b53; margin:16px 0">
+        <details>
+          <summary><strong>Notes (important for validity)</strong></summary>
+          <ul>
+            <li>This tool zeros the <strong>four trophy flags at offset 0x3C</strong> in <span class="mono">ldb.pul</span>. Community tooling (Trophy Monarch) reads/writes those flags there; see the author’s implementation that seeks <span class="mono">0x3C</span> and reads 4 bytes. We follow the same convention.</li>
+            <li>If you supply a template <span class="mono">ldb.pul</span> exported from your pack, its exact binary layout is preserved and only the 4 bytes at <span class="mono">0x3C…0x3F</span> are cleared.</li>
+            <li>If you do <em>not</em> supply a template, the generator now emits a <strong>full-size 0x11C0‑byte</strong> file with <span class="mono">'PULL'</span> magic, <span class="mono">version=1</span> (BE), the track ID (BE), and a 4‑byte header derived from the mapping name (e.g., <span class="mono">'SNES'</span>, <span class="mono">'N64 '</span>, <span class="mono">'Wii '</span>, <span class="mono">'3DS '</span>, <span class="mono">'DS '</span>, <span class="mono">'GP '</span>). Trophies at <span class="mono">0x3C..0x3F</span> are cleared.</li>
+            <li>For convenience, your mapping file is also included in the ZIP at <span class="mono">/&lt;root&gt;/FolderToTrackName.txt</span>.</li>
+          </ul>
+          <p class="hint">References: Pulsar overview and pack structure (Custom Mario Kart Wiiki), Retro‑Rewind Pulsar repo, and Trophy Monarch (Python) showing the <span class="mono">0x3C</span> trophy flags and TROP handling.</p>
+        </details>
+      </div>
+    </div>
+
+    <footer>
+      Built for Pulsar distributions (e.g., Retro Rewind). No external libraries. All processing is local in your browser. Made by ChatGPT 5 Thinking.
+    </footer>
+  </div>
+
+<script>
+  // ---------- Tiny utils ----------
+  const $ = (sel) => document.querySelector(sel);
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  function stripColorTags(name) {
+    // Remove \c{...} sequences and collapse double spaces
+    return name.replace(/\\c\{[^}]*\}/g, '').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  function parseMapping(text) {
+    const out = [];
+    const log = [];
+    const lines = text.replace(/\r\n?/g,'\n').split('\n');
+    for (let i=0;i<lines.length;i++) {
+      const raw = lines[i];
+      if (!raw || !raw.trim()) continue;
+      const line = raw.split('#')[0].trim(); // strip comments
+      if (!line) continue;
+      const eq = line.indexOf('=');
+      if (eq === -1) { log.push(`Skipping line ${i+1}: no '=' -> ${raw}`); continue; }
+      let name = stripColorTags(line.slice(0, eq).trim());
+      let id = line.slice(eq+1).trim().toUpperCase();
+      id = id.replace(/^0X/, '').replace(/[^0-9A-F]/g, '');
+      if (id.length !== 8) { log.push(`Skipping line ${i+1}: ID '${id}' is not 8 hex chars.`); continue; }
+      if (!/^[0-9A-F]{8}$/.test(id)) { log.push(`Skipping line ${i+1}: invalid hex ID '${id}'.`); continue; }
+      out.push({ name, id });
+    }
+    // Deduplicate by ID, keep first occurrence
+    const seen = new Set();
+    const dedup = [];
+    for (const r of out) { if (!seen.has(r.id)) { seen.add(r.id); dedup.push(r); } }
+    if (dedup.length !== out.length) log.push(`Deduplicated ${out.length - dedup.length} duplicate ID(s).`);
+    return { rows: dedup, log };
+  }
+
+  // ---------- Minimal ZIP (store) builder ----------
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let i=0;i<256;i++) {
+      let c = i;
+      for (let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(buf) {
+    let c = 0 ^ (-1);
+    for (let i=0;i<buf.length;i++) c = (c >>> 8) ^ CRC_TABLE[(c ^ buf[i]) & 0xFF];
+    return (c ^ (-1)) >>> 0;
+  }
+  function dosDateTime(d = new Date()) {
+    // DOS time/date packed fields
+    const time = ((d.getHours() & 0x1F) << 11) | ((d.getMinutes() & 0x3F) << 5) | ((Math.floor(d.getSeconds()/2)) & 0x1F);
+    const date = (((d.getFullYear()-1980) & 0x7F) << 9) | (((d.getMonth()+1) & 0x0F) << 5) | (d.getDate() & 0x1F);
+    return { time, date };
+  }
+  function packZip(files /* [{name, bytes}] */) {
+    const localParts = [];
+    const central = [];
+    let offset = 0;
+    const now = dosDateTime();
+
+    for (const f of files) {
+      const nameBytes = enc.encode(f.name);
+      const data = f.bytes instanceof Uint8Array ? f.bytes : new Uint8Array(f.bytes);
+      const crc = crc32(data);
+      const compSize = data.length; // store
+      const uncompSize = data.length;
+
+      const lh = new ArrayBuffer(30 + nameBytes.length);
+      const dv = new DataView(lh);
+      let p = 0;
+      dv.setUint32(p, 0x04034b50, true); p+=4; // local file header
+      dv.setUint16(p, 20, true); p+=2;        // version needed
+      dv.setUint16(p, 0, true); p+=2;         // flags
+      dv.setUint16(p, 0, true); p+=2;         // method = store
+      dv.setUint16(p, now.time, true); p+=2;
+      dv.setUint16(p, now.date, true); p+=2;
+      dv.setUint32(p, crc, true); p+=4;
+      dv.setUint32(p, compSize, true); p+=4;
+      dv.setUint32(p, uncompSize, true); p+=4;
+      dv.setUint16(p, nameBytes.length, true); p+=2;
+      dv.setUint16(p, 0, true); p+=2;         // extra len
+      new Uint8Array(lh, 30).set(nameBytes);
+
+      const localChunk = new Uint8Array(lh.byteLength + data.length);
+      localChunk.set(new Uint8Array(lh), 0);
+      localChunk.set(data, lh.byteLength);
+      localParts.push(localChunk);
+
+      // central directory header
+      const ch = new ArrayBuffer(46 + nameBytes.length);
+      const cdv = new DataView(ch);
+      p = 0;
+      cdv.setUint32(p, 0x02014b50, true); p+=4; // central file header
+      cdv.setUint16(p, 20, true); p+=2;        // version made by
+      cdv.setUint16(p, 20, true); p+=2;        // version needed
+      cdv.setUint16(p, 0, true); p+=2;         // flags
+      cdv.setUint16(p, 0, true); p+=2;         // method
+      cdv.setUint16(p, now.time, true); p+=2;
+      cdv.setUint16(p, now.date, true); p+=2;
+      cdv.setUint32(p, crc, true); p+=4;
+      cdv.setUint32(p, compSize, true); p+=4;
+      cdv.setUint32(p, uncompSize, true); p+=4;
+      cdv.setUint16(p, nameBytes.length, true); p+=2;
+      cdv.setUint16(p, 0, true); p+=2;         // extra len
+      cdv.setUint16(p, 0, true); p+=2;         // file comment len
+      cdv.setUint16(p, 0, true); p+=2;         // disk number start
+      cdv.setUint16(p, 0, true); p+=2;         // internal attrs
+      cdv.setUint32(p, 0, true); p+=4;         // external attrs
+      cdv.setUint32(p, offset, true); p+=4;    // relative offset of local header
+      new Uint8Array(ch, 46).set(nameBytes);
+
+      central.push(new Uint8Array(ch));
+      offset += localChunk.length;
+    }
+
+    // combine everything
+    const localSize = localParts.reduce((s,b)=>s+b.length,0);
+    const centralSize = central.reduce((s,b)=>s+b.length,0);
+
+    const eocd = new ArrayBuffer(22);
+    const edv = new DataView(eocd);
+    let ep=0;
+    edv.setUint32(ep, 0x06054b50, true); ep+=4; // end of central dir
+    edv.setUint16(ep, 0, true); ep+=2;          // disk number
+    edv.setUint16(ep, 0, true); ep+=2;          // disk with central dir
+    edv.setUint16(ep, files.length, true); ep+=2; // entries on this disk
+    edv.setUint16(ep, files.length, true); ep+=2; // total entries
+    edv.setUint32(ep, centralSize, true); ep+=4; // size of central dir
+    edv.setUint32(ep, localSize, true); ep+=4;   // offset of central dir
+    edv.setUint16(ep, 0, true); ep+=2;           // comment length
+
+    const total = localSize + centralSize + eocd.byteLength;
+    const out = new Uint8Array(total);
+    let pos=0;
+    for (const part of localParts) { out.set(part, pos); pos += part.length; }
+    for (const part of central) { out.set(part, pos); pos += part.length; }
+    out.set(new Uint8Array(eocd), pos);
+
+    return new Blob([out], { type: 'application/zip' });
+  }
+
+  // ---------- ldb.pul generation ----------
+  // Intelligent header+size generator derived from your Ghosts samples
+  function computeHeader4(name){
+    var s = (name||'');
+    // Detect leading token of A-Z0-9 before the first space
+    var i=0; while(i<s.length && i<4 && /[A-Z0-9]/.test(s[i])) i++;
+    var tok = (i>0 && s[i]===' ') ? s.slice(0,i) : null;
+    if (tok){
+      if (tok.length===2){
+        // two-letter tokens: space + initial of next word (uppercase); DS stays space+NUL
+        var fourth = 0x00;
+        if (tok !== 'DS' && tok !== 'GP'){
+          var rest = s.slice(i+1);
+          var m2 = rest.match(/[A-Za-z0-9]/);
+          if (m2) fourth = m2[0].toUpperCase().charCodeAt(0);
+        }
+        return new Uint8Array([tok.charCodeAt(0), tok.charCodeAt(1), 0x20, fourth]);
+      }
+      if (tok.length===3){ return new Uint8Array([tok.charCodeAt(0), tok.charCodeAt(1), tok.charCodeAt(2), 0x20]); }
+      if (tok.length>=4){ return new Uint8Array([s.charCodeAt(0)||0, s.charCodeAt(1)||0, s.charCodeAt(2)||0, s.charCodeAt(3)||0]); }
+    }
+    var out = new Uint8Array(4);
+    out[0]=s.charCodeAt(0)||0; out[1]=s.charCodeAt(1)||0; out[2]=s.charCodeAt(2)||0; out[3]=s.charCodeAt(3)||0;
+    return out;
+  }
+  function generateSmartLDB(idHex, name){
+    var u8 = new Uint8Array(0x11C0); // 4544 bytes
+    // 'PULL'
+    u8.set([0x50,0x55,0x4C,0x4C], 0);
+    // version 1 (BE)
+    u8[4]=0; u8[5]=0; u8[6]=0; u8[7]=1;
+    // Track ID (BE)
+    var id = (idHex||'').toUpperCase().replace(/[^0-9A-F]/g,'');
+    if (id.length!==8) throw new Error('Bad track ID: '+idHex);
+    for (var j=0;j<4;j++){ u8[8+j] = parseInt(id.slice(j*2,(j+1)*2),16); }
+    // Header 4 bytes from mapping/name
+    var h4 = computeHeader4(name||'');
+    u8.set(h4, 0x0C);
+    // trophies @ 0x3C..0x3F are already zero
+    return u8;
+  }
+  let currentMapText = '';
+  let parsed = { rows: [], log: [] };
+  let templateBytes = null; // Uint8Array or null
+
+  function generateBlankLDB() {
+    // Minimal stub: 64 bytes, all zeros; trophies live at 0x3C..0x3F (present & zero)
+    const u8 = new Uint8Array(0x40);
+    // (intentionally all zeros)
+    return u8;
+  }
+  function cloneTemplateAndZeroTrophies(src) {
+    const u8 = new Uint8Array(src.length);
+    u8.set(src);
+    if (u8.length < 0x40) throw new Error(`Template is only ${u8.length} bytes; need at least 64.`);
+    // Zero 4 trophy bytes at 0x3C..0x3F
+    for (let i=0;i<4;i++) u8[0x3C+i] = 0x00;
+    return u8;
+  }
+
+  function renderTable() {
+    const q = $('#filter').value.trim().toLowerCase();
+    const bodyL = $('#tracksBodyL');
+    const bodyR = $('#tracksBodyR');
+    bodyL.innerHTML = '';
+    bodyR.innerHTML = '';
+    const rows = parsed.rows.filter(r => !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q));
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td'); td.colSpan = 4; td.className = 'muted'; td.textContent = 'No tracks (try loading a mapping or clearing the filter).';
+      tr.appendChild(td); bodyL.appendChild(tr); return;
+    }
+    const mid = Math.ceil(rows.length / 2);
+    const left = rows.slice(0, mid);
+    const right = rows.slice(mid);
+
+    const makeRow = (r) => {
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td');
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.className='rowSel'; cb.dataset.id = r.id; cb.checked = true; td0.appendChild(cb);
+      const td1 = document.createElement('td'); td1.textContent = r.name;
+      const td2 = document.createElement('td'); td2.className='mono'; td2.textContent = r.id;
+      const td3 = document.createElement('td');
+      const btn = document.createElement('button'); btn.className='btn btn-good btn-sm'; btn.textContent='Download'; btn.dataset.action='dlOne'; btn.dataset.id = r.id; btn.dataset.name = r.name; td3.appendChild(btn);
+      tr.append(td0, td1, td2, td3);
+      return tr;
+    };
+
+    for (const r of left) bodyL.appendChild(makeRow(r));
+    for (const r of right) bodyR.appendChild(makeRow(r));
+  }
+
+  function selectedIDs() {
+    return Array.from(document.querySelectorAll('.rowSel'))
+      .filter(x => x.checked)
+      .map(x => x.dataset.id);
+  }
+
+  // ---------- Event wiring ----------
+  $('#btnLoadServer').addEventListener('click', async () => {
+    const url = $('#serverUrl').value.trim();
+    const elLog = $('#log');
+    try {
+      elLog.textContent = `Fetching ${url}…`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const text = await res.text();
+      currentMapText = text;
+      $('#raw').value = text;
+      parsed = parseMapping(text);
+      $('#stats').textContent = `${parsed.rows.length} tracks`;
+      elLog.textContent = parsed.log.join('\n');
+      renderTable();
+    } catch (err) {
+      elLog.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  $('#btnUseLocal').addEventListener('click', async () => {
+    const f = $('#fileMap').files[0];
+    if (!f) { alert('Choose a mapping file first.'); return; }
+    const text = await f.text();
+    currentMapText = text;
+    $('#raw').value = text;
+    parsed = parseMapping(text);
+    $('#stats').textContent = `${parsed.rows.length} tracks`;
+    $('#log').textContent = parsed.log.join('\n');
+    renderTable();
+  });
+
+  $('#btnUseTemplate').addEventListener('click', async () => {
+    const f = $('#fileTemplate').files[0];
+    if (!f) { alert('Choose a template ldb.pul first.'); return; }
+    const ab = await f.arrayBuffer();
+    const u8 = new Uint8Array(ab);
+    if (u8.length < 0x40) { alert(`Template is only ${u8.length} bytes; need at least 64.`); return; }
+    templateBytes = u8;
+    alert(`Template set (${u8.length} bytes). We'll clone this and clear trophies @ 0x3C..0x3F.`);
+  });
+
+  $('#filter').addEventListener('input', renderTable);
+
+  $('#btnSelectAll').addEventListener('click', () => { document.querySelectorAll('.rowSel').forEach(cb => cb.checked = true); });
+  $('#btnSelectNone').addEventListener('click', () => { document.querySelectorAll('.rowSel').forEach(cb => cb.checked = false); });
+  $('#btnInvert').addEventListener('click', () => { document.querySelectorAll('.rowSel').forEach(cb => cb.checked = !cb.checked); });
+
+  // per-row single download via event delegation
+  $('#tracksArea').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || btn.dataset.action !== 'dlOne') return;
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    try {
+      const bytes = templateBytes ? cloneTemplateAndZeroTrophies(templateBytes) : generateSmartLDB(id, name);
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      const plain = document.querySelector('#chkPlainSingle')?.checked;
+      a.download = plain ? 'ldb.pul' : `ldb_${id}.pul`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    } catch (err) { alert('Failed to generate: ' + err.message); }
+  });
+
+  $('#btnValidate').addEventListener('click', () => {
+    const ids = selectedIDs();
+    if (!ids.length) { alert('No tracks selected.'); return; }
+    const errs = [];
+    for (const id of ids) if (!/^[0-9A-F]{8}$/.test(id)) errs.push(`Bad ID: ${id}`);
+    if (errs.length) alert('Validation issues:\n' + errs.join('\n'));
+    else alert(`Looks good: ${ids.length} tracks selected.`);
+  });
+
+  $('#btnGenerate').addEventListener('click', async () => {
+    const root = $('#zipRoot').value.trim() || 'Ghosts';
+    const ids = selectedIDs();
+    if (!ids.length) { alert('Select at least one track.'); return; }
+
+    const files = [];
+    // include mapping for convenience
+    if (currentMapText) files.push({ name: `${root}/FolderToTrackName.txt`, bytes: enc.encode(currentMapText) });
+
+    for (const id of ids) {
+      const rec = parsed.rows.find(r => r.id === id);
+      const name = rec ? rec.name : '';
+      let bytes = null;
+      if (templateBytes) bytes = cloneTemplateAndZeroTrophies(templateBytes);
+      else bytes = generateSmartLDB(id, name);
+      files.push({ name: `${root}/${id}/ldb.pul`, bytes });
+    }
+
+    const blob = packZip(files);
+    const url = URL.createObjectURL(blob);
+    const dt = new Date();
+    const filename = `ldb_pul_blank_${dt.toISOString().replaceAll(':','-').slice(0,19)}.zip`;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-good';
+    btn.textContent = 'Download ZIP';
+    btn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    };
+    $('#zipDownloadSlot').innerHTML = '';
+    $('#zipDownloadSlot').appendChild(btn);
+  });
+
+  // Keep raw editor in sync (manual edits)
+  $('#raw').addEventListener('input', () => {
+    currentMapText = $('#raw').value;
+    parsed = parseMapping(currentMapText);
+    $('#stats').textContent = `${parsed.rows.length} tracks`;
+    $('#log').textContent = parsed.log.join('\n');
+    renderTable();
+  });
+</script>
+</body>
+</html>
