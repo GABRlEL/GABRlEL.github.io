@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <title>rksys.dat Web Extract</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <style>
+    :root { --bg:#0b0d12; --card:#131722; --fg:#e6ebff; --muted:#9aa4bf; --accent:#7aa2ff; --ok:#70e000; --warn:#ffd166; --err:#ff6b6b; }
+    html, body { height:100%; background:var(--bg); color:var(--fg); font:14px/1.35 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
+    .wrap { max-width: 920px; margin: 32px auto; padding: 0 16px; }
+    .card { background: var(--card); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.35); padding: 18px; }
+    h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: .2px; }
+    .sub { color: var(--muted); margin-bottom: 14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button { background:#1b2230; color:var(--fg); border:1px solid #283044; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:600; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .about { margin-left:auto; }
+    .drop { border:2px dashed #2c3753; border-radius:14px; padding:16px; margin:14px 0; color:var(--muted); text-align:center; }
+    .drop.drag { border-color:var(--accent); color:var(--fg); }
+    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
+    .grid { display:grid; grid-template-columns:160px 1fr; gap:6px 14px; margin-top:8px; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .footer { color:var(--muted); font-size:12px; margin-top:16px; display:flex; gap:12px; align-items:center; }
+    .tag { padding:2px 8px; border-radius:999px; background:#1e2638; border:1px solid #2a3550; color:var(--muted); }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    .warn { color: var(--warn); }
+    .hr { height:1px; background:#20283a; margin:12px 0; }
+  </style>
+</head>
+<body>
+  <div class='wrap'>
+    <div class='card'>
+      <h1>rksys.dat Web Extract <span class='tag'>v1.0</span></h1>
+      <div class='sub'>Port of Atlas' Windows rksys.dat Extractor to a single-file HTML tool. Credit: <a href='https://wiki.tockdom.com/wiki/User:Atlas' target='_blank' rel='noopener'>Atlas</a>.</div>
+
+      <div class='row'>
+        <input id='file' type='file' accept='.dat' style='display:none'>
+        <button id='openBtn'>Open rksys.dat...</button>
+        <button id='extractBtn' disabled>Extract to folder...</button>
+        <button id='exportOneBtn' disabled>Export single...</button>
+        <button id='aboutBtn' class='about'>About</button>
+      </div>
+
+      <div id='drop' class='drop'>Drop a <span class='mono'>rksys.dat</span> here</div>
+
+      <div id='meta' style='display:none'>
+        <div class='grid'>
+          <div>File:</div><div class='mono' id='fname'></div>
+          <div>Size:</div><div class='mono' id='fsize'></div>
+          <div>Magic:</div><div class='mono' id='fmagic'></div>
+        </div>
+        <div class='hr'></div>
+        <div class='grid'>
+          <div>Licenses (.rkp):</div><div class='mono' id='pcnt'>0</div>
+          <div>Global block (.rkgd):</div><div class='mono' id='gcnt'>0</div>
+          <div>Ghost files (.rkg):</div><div class='mono' id='gocnt'>0</div>
+        </div>
+      </div>
+
+      <dialog id='singleDialog'>
+        <form method='dialog' style='min-width:520px;max-width:640px'>
+          <h3 style='margin:0 0 8px'>Export a single subfile</h3>
+          <div class='sub'>Choose one detected subfile to download via the browser.</div>
+          <select id='singleSelect' size='12' style='width:100%;background:#0f1420;color:#e6ebff;border:1px solid #2a3550;border-radius:8px;padding:8px'></select>
+          <div class='row' style='justify-content:flex-end;margin-top:10px'>
+            <button value='cancel' type='submit'>Cancel</button>
+            <button id='singleExportGo' value='ok' type='submit'>Download</button>
+          </div>
+        </form>
+      </dialog>
+
+      <div class='footer'>
+        <span>Original offsets and names per Atlas' tool. This web port matches functionality without additions.</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Strict ASCII JS only
+  (function(){
+    var VERSION = 'v1.0.0.4';
+    var OFFSETS = { HEADER_MAGIC:0x00, START:0x08, RKPD_SIZE:0x8CC0, RKGD_SIZE:0x4CF8, RKG_SIZE:0x2800, FILE_SIZE:0x2BC000 };
+    var RKP_NAMES = ['License1.rkp','License2.rkp','License3.rkp','License4.rkp'];
+    var RKGD_NAME = 'Unknown-0x23308.rkgd';
+
+    // Names array (264). Kept identical to the prior version. Split over lines to avoid super-long literals.
+    var RKG_NAMES = [];
+    function pushAll(arr){ for (var i=0;i<arr.length;i++) RKG_NAMES.push(arr[i]); }
+    pushAll(['License1_LuigiCircuit.rkg','License1_MooMooMeadows.rkg','License1_MushroomGorge.rkg','License1_ToadsFactory.rkg','License1_MarioCircuit.rkg','License1_CoconutMall.rkg','License1_DKSummit.rkg','License1_WariosGoldMine.rkg','License1_DaisyCircuit.rkg','License1_KoopaCape.rkg','License1_GrumbleVolcano.rkg','License1_MapleTreeway.rkg','License1_MoonviewHighway.rkg','License1_DryDryRuins.rkg','License1_BowsersCastle.rkg','License1_RainbowRoad.rkg','License1_GBAShyGuyBeach.rkg','License1_SNESGhostValley2.rkg','License1_SNESMarioCircuit3.rkg','License1_GBABowserCastle3.rkg','License1_N64SherbetLand.rkg','License1_N64MarioRaceway.rkg','License1_N64DKsJungleParkway.rkg','License1_N64BowsersCastle.rkg','License1_GCNPeachBeach.rkg','License1_GCNMarioCircuit.rkg','License1_GCNWaluigiStadium.rkg','License1_GCNDKMountain.rkg','License1_DSYoshiFalls.rkg','License1_DSDesertHills.rkg','License1_DSPeachGardens.rkg','License1_DSDelfinoSquare.rkg']);
+    pushAll(['License1_Unknown-0x78000.rkg','License1_Unknown-0x7A800.rkg','License1_Unknown-0x7D000.rkg','License1_Unknown-0x7F800.rkg','License1_Unknown-0x82000.rkg','License1_Unknown-0x84800.rkg','License1_Unknown-0x87000.rkg','License1_Unknown-0x89800.rkg','License1_Unknown-0x8C000.rkg','License1_Unknown-0x8E800.rkg','License1_Unknown-0x91000.rkg','License1_Unknown-0x93800.rkg','License1_Unknown-0x96000.rkg','License1_Unknown-0x98800.rkg','License1_Unknown-0x9B000.rkg','License1_Unknown-0x9D800.rkg','License1_Unknown-0xA0000.rkg','License1_Unknown-0xA2800.rkg','License1_Unknown-0xA5000.rkg','License1_Unknown-0xA7800.rkg','License1_Unknown-0xAA000.rkg','License1_Unknown-0xAC800.rkg','License1_Unknown-0xAF000.rkg','License1_Unknown-0xB1800.rkg','License1_Unknown-0xB4000.rkg','License1_Unknown-0xB6800.rkg','License1_Unknown-0xB9000.rkg','License1_Unknown-0xBB800.rkg','License1_Unknown-0xBE000.rkg','License1_Unknown-0xC0800.rkg','License1_Unknown-0xC3000.rkg','License1_Unknown-0xC5800.rkg']);
+    pushAll(['License2_LuigiCircuit.rkg','License2_MooMooMeadows.rkg','License2_MushroomGorge.rkg','License2_ToadsFactory.rkg','License2_MarioCircuit.rkg','License2_CoconutMall.rkg','License2_DKSummit.rkg','License2_WariosGoldMine.rkg','License2_DaisyCircuit.rkg','License2_KoopaCape.rkg','License2_GrumbleVolcano.rkg','License2_MapleTreeway.rkg','License2_MoonviewHighway.rkg','License2_DryDryRuins.rkg','License2_BowsersCastle.rkg','License2_RainbowRoad.rkg','License2_GBAShyGuyBeach.rkg','License2_SNESGhostValley2.rkg','License2_SNESMarioCircuit3.rkg','License2_GBABowserCastle3.rkg','License2_N64SherbetLand.rkg','License2_N64MarioRaceway.rkg','License2_N64DKsJungleParkway.rkg','License2_N64BowsersCastle.rkg','License2_GCNPeachBeach.rkg','License2_GCNMarioCircuit.rkg','License2_GCNWaluigiStadium.rkg','License2_GCNDKMountain.rkg','License2_DSYoshiFalls.rkg','License2_DSDesertHills.rkg','License2_DSPeachGardens.rkg','License2_DSDelfinoSquare.rkg']);
+    pushAll(['License2_Unknown-0xF0000.rkg','License2_Unknown-0xF2800.rkg','License2_Unknown-0xF5000.rkg','License2_Unknown-0xF7800.rkg','License2_Unknown-0xFA000.rkg','License2_Unknown-0xFC800.rkg','License2_Unknown-0xFF000.rkg','License2_Unknown-0x101800.rkg','License2_Unknown-0x104000.rkg','License2_Unknown-0x106800.rkg','License2_Unknown-0x109000.rkg','License2_Unknown-0x10B800.rkg','License2_Unknown-0x10E000.rkg','License2_Unknown-0x110800.rkg','License2_Unknown-0x113000.rkg','License2_Unknown-0x115800.rkg','License2_Unknown-0x118000.rkg','License2_Unknown-0x11A800.rkg','License2_Unknown-0x11D000.rkg','License2_Unknown-0x11F800.rkg','License2_Unknown-0x122000.rkg','License2_Unknown-0x124800.rkg','License2_Unknown-0x127000.rkg','License2_Unknown-0x129800.rkg','License2_Unknown-0x12C000.rkg','License2_Unknown-0x12E800.rkg','License2_Unknown-0x131000.rkg','License2_Unknown-0x133800.rkg','License2_Unknown-0x136000.rkg','License2_Unknown-0x138800.rkg','License2_Unknown-0x13B000.rkg','License2_Unknown-0x13D800.rkg','License2_Unknown-0x140000.rkg','License2_Unknown-0x142800.rkg','License2_Unknown-0x145000.rkg','License2_Unknown-0x147800.rkg','License2_Unknown-0x14A000.rkg','License2_Unknown-0x14C800.rkg','License2_Unknown-0x14F000.rkg']);
+    pushAll(['License3_LuigiCircuit.rkg','License3_MooMooMeadows.rkg','License3_MushroomGorge.rkg','License3_ToadsFactory.rkg','License3_MarioCircuit.rkg','License3_CoconutMall.rkg','License3_DKSummit.rkg','License3_WariosGoldMine.rkg','License3_DaisyCircuit.rkg','License3_KoopaCape.rkg','License3_GrumbleVolcano.rkg','License3_MapleTreeway.rkg','License3_MoonviewHighway.rkg','License3_DryDryRuins.rkg','License3_BowsersCastle.rkg','License3_RainbowRoad.rkg','License3_GBAShyGuyBeach.rkg','License3_SNESGhostValley2.rkg','License3_SNESMarioCircuit3.rkg','License3_GBABowserCastle3.rkg','License3_N64SherbetLand.rkg','License3_N64MarioRaceway.rkg','License3_N64DKsJungleParkway.rkg','License3_N64BowsersCastle.rkg','License3_GCNPeachBeach.rkg','License3_GCNMarioCircuit.rkg','License3_GCNWaluigiStadium.rkg','License3_GCNDKMountain.rkg','License3_DSYoshiFalls.rkg','License3_DSDesertHills.rkg','License3_DSPeachGardens.rkg','License3_DSDelfinoSquare.rkg']);
+    pushAll(['License3_Unknown-0x168000.rkg','License3_Unknown-0x16A800.rkg','License3_Unknown-0x16D000.rkg','License3_Unknown-0x16F800.rkg','License3_Unknown-0x172000.rkg','License3_Unknown-0x174800.rkg','License3_Unknown-0x177000.rkg','License3_Unknown-0x179800.rkg','License3_Unknown-0x17C000.rkg','License3_Unknown-0x17E800.rkg','License3_Unknown-0x181000.rkg','License3_Unknown-0x183800.rkg','License3_Unknown-0x186000.rkg','License3_Unknown-0x188800.rkg','License3_Unknown-0x18B000.rkg','License3_Unknown-0x18D800.rkg','License3_Unknown-0x190000.rkg','License3_Unknown-0x192800.rkg','License3_Unknown-0x195000.rkg','License3_Unknown-0x197800.rkg','License3_Unknown-0x19A000.rkg','License3_Unknown-0x19C800.rkg','License3_Unknown-0x19F000.rkg','License3_Unknown-0x1A1800.rkg','License3_Unknown-0x1A4000.rkg','License3_Unknown-0x1A6800.rkg','License3_Unknown-0x1A9000.rkg','License3_Unknown-0x1AB800.rkg','License3_Unknown-0x1AE000.rkg','License3_Unknown-0x1B0800.rkg','License3_Unknown-0x1B3000.rkg','License3_Unknown-0x1B5800.rkg','License3_Unknown-0x1B8000.rkg','License3_Unknown-0x1BA800.rkg','License3_Unknown-0x1BD000.rkg','License3_Unknown-0x1BF800.rkg']);
+    pushAll(['License4_LuigiCircuit.rkg','License4_MooMooMeadows.rkg','License4_MushroomGorge.rkg','License4_ToadsFactory.rkg','License4_MarioCircuit.rkg','License4_CoconutMall.rkg','License4_DKSummit.rkg','License4_WariosGoldMine.rkg','License4_DaisyCircuit.rkg','License4_KoopaCape.rkg','License4_GrumbleVolcano.rkg','License4_MapleTreeway.rkg','License4_MoonviewHighway.rkg','License4_DryDryRuins.rkg','License4_BowsersCastle.rkg','License4_RainbowRoad.rkg','License4_GBAShyGuyBeach.rkg','License4_SNESGhostValley2.rkg','License4_SNESMarioCircuit3.rkg','License4_GBABowserCastle3.rkg','License4_N64SherbetLand.rkg','License4_N64MarioRaceway.rkg','License4_N64DKsJungleParkway.rkg','License4_N64BowsersCastle.rkg','License4_GCNPeachBeach.rkg','License4_GCNMarioCircuit.rkg','License4_GCNWaluigiStadium.rkg','License4_GCNDKMountain.rkg','License4_DSYoshiFalls.rkg','License4_DSDesertHills.rkg','License4_DSPeachGardens.rkg','License4_DSDelfinoSquare.rkg']);
+    pushAll(['License4_Unknown-0x1F0000.rkg','License4_Unknown-0x1F2800.rkg','License4_Unknown-0x1F5000.rkg','License4_Unknown-0x1F7800.rkg','License4_Unknown-0x1FA000.rkg','License4_Unknown-0x1FC800.rkg','License4_Unknown-0x1FF000.rkg','License4_Unknown-0x201800.rkg','License4_Unknown-0x204000.rkg','License4_Unknown-0x206800.rkg','License4_Unknown-0x209000.rkg','License4_Unknown-0x20B800.rkg','License4_Unknown-0x20E000.rkg','License4_Unknown-0x210800.rkg','License4_Unknown-0x213000.rkg','License4_Unknown-0x215800.rkg','License4_Unknown-0x218000.rkg','License4_Unknown-0x21A800.rkg','License4_Unknown-0x21D000.rkg','License4_Unknown-0x21F800.rkg','License4_Unknown-0x222000.rkg','License4_Unknown-0x224800.rkg','License4_Unknown-0x227000.rkg','License4_Unknown-0x229800.rkg','License4_Unknown-0x22C000.rkg','License4_Unknown-0x22E800.rkg','License4_Unknown-0x231000.rkg','License4_Unknown-0x233800.rkg','License4_Unknown-0x236000.rkg','License4_Unknown-0x238800.rkg','License4_Unknown-0x23B000.rkg','License4_Unknown-0x23D800.rkg','License4_Unknown-0x240000.rkg','License4_Unknown-0x242800.rkg','License4_Unknown-0x245000.rkg','License4_Unknown-0x247800.rkg','License4_Unknown-0x24A000.rkg','License4_Unknown-0x24C800.rkg','License4_Unknown-0x24F000.rkg','License4_Unknown-0x251800.rkg','License4_Unknown-0x254000.rkg','License4_Unknown-0x256800.rkg','License4_Unknown-0x259000.rkg','License4_Unknown-0x25B800.rkg','License4_Unknown-0x25E000.rkg','License4_Unknown-0x260800.rkg','License4_Unknown-0x263000.rkg','License4_Unknown-0x265800.rkg','License4_Unknown-0x268000.rkg','License4_Unknown-0x26A800.rkg','License4_Unknown-0x26D000.rkg','License4_Unknown-0x26F800.rkg','License4_Unknown-0x272000.rkg','License4_Unknown-0x274800.rkg','License4_Unknown-0x277000.rkg','License4_Unknown-0x279800.rkg','License4_Unknown-0x27C000.rkg','License4_Unknown-0x27E800.rkg','License4_Unknown-0x281000.rkg','License4_Unknown-0x283800.rkg','License4_Unknown-0x286000.rkg','License4_Unknown-0x288800.rkg','License4_Unknown-0x28B000.rkg','License4_Unknown-0x28D800.rkg','License4_Unknown-0x290000.rkg','License4_Unknown-0x292800.rkg','License4_Unknown-0x295000.rkg','License4_Unknown-0x297800.rkg','License4_Unknown-0x29A000.rkg','License4_Unknown-0x29C800.rkg','License4_Unknown-0x29F000.rkg','License4_Unknown-0x2A1800.rkg','License4_Unknown-0x2A4000.rkg','License4_Unknown-0x2A6800.rkg','License4_Unknown-0x2A9000.rkg','License4_Unknown-0x2AB800.rkg','License4_Unknown-0x2AE000.rkg','License4_Unknown-0x2B0800.rkg','License4_Unknown-0x2B3000.rkg','License4_Unknown-0x2B5800.rkg','License4_Unknown-0x2B8000.rkg','License4_Unknown-0x2BA800.rkg','License4_Unknown-0x2BD000.rkg','License4_Unknown-0x2BF800.rkg']);
+
+    var fileInput = document.getElementById('file');
+    var openBtn = document.getElementById('openBtn');
+    var extractBtn = document.getElementById('extractBtn');
+    var exportOneBtn = document.getElementById('exportOneBtn');
+    var aboutBtn = document.getElementById('aboutBtn');
+    var dropZone = document.getElementById('drop');
+
+    var meta = {
+      box: document.getElementById('meta'),
+      name: document.getElementById('fname'),
+      size: document.getElementById('fsize'),
+      magic: document.getElementById('fmagic'),
+      pcnt: document.getElementById('pcnt'),
+      gcnt: document.getElementById('gcnt'),
+      gocnt: document.getElementById('gocnt')
+    };
+
+    var fileBuf = null; // ArrayBuffer
+    var view = null;    // DataView
+    var indexed = null; // cached entries
+
+    openBtn.addEventListener('click', function(){ fileInput.click(); });
+    fileInput.addEventListener('change', function(e){ if (e.target.files && e.target.files[0]) loadFile(e.target.files[0]); });
+
+    ['dragenter','dragover'].forEach(function(ev){ dropZone.addEventListener(ev, function(e){ e.preventDefault(); dropZone.classList.add('drag'); }); });
+    ['dragleave','drop'].forEach(function(ev){ dropZone.addEventListener(ev, function(e){ e.preventDefault(); dropZone.classList.remove('drag'); }); });
+    dropZone.addEventListener('drop', function(e){ var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+    aboutBtn.addEventListener('click', function(){
+      alert(
+        'This program allows you to extract subfiles from Mario Kart Wii\'s rksys.dat.\n'
+        + 'Original Windows version by Atlas (AVS).\n'
+        + 'Web port mirrors functionality (and added single file export).\n\n'
+        + 'Ported from rksys.dat Extractor Version: ' + VERSION + ''
+      );
+    });
+
+    var singleDialog = document.getElementById('singleDialog');
+    var singleSelect = document.getElementById('singleSelect');
+
+    exportOneBtn.addEventListener('click', function(){
+      if (!fileBuf) return;
+      indexEntries().then(function(list){
+        if (!list.length) { alert('No subfiles found to export.'); return; }
+        singleSelect.innerHTML = '';
+        for (var i=0;i<list.length;i++){
+          var ent = list[i];
+          var opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = ent.name + ' - ' + toHex(ent.start) + ' (' + ent.size.toLocaleString() + ' bytes)';
+          singleSelect.appendChild(opt);
+        }
+        singleSelect.selectedIndex = 0;
+        try { singleDialog.showModal(); } catch (e) { /* dialog not supported */ }
+      });
+    });
+
+    singleDialog.addEventListener('close', function(){
+      if (singleDialog.returnValue !== 'ok') return;
+      var idx = parseInt(singleSelect.value, 10);
+      var list = indexed || [];
+      var ent = list[idx];
+      if (!ent) return;
+      downloadEntry(ent);
+    });
+
+    function loadFile(file){
+      file.arrayBuffer().then(function(buf){
+        fileBuf = buf; view = new DataView(buf);
+        meta.box.style.display = '';
+        meta.name.textContent = file.name;
+        meta.size.textContent = toHexSize(buf.byteLength) + ' (' + buf.byteLength.toLocaleString() + ' bytes)';
+        var magic = getASCII(0,4); meta.magic.textContent = magic;
+        if (magic !== 'RKSD') { alert('The file you tried to open is not a correct rksys.dat file.'); extractBtn.disabled = true; exportOneBtn.disabled = true; return; }
+        extractBtn.disabled = false; exportOneBtn.disabled = false; indexed = null;
+        meta.pcnt.textContent = '0'; meta.gcnt.textContent = '0'; meta.gocnt.textContent = '0';
+        // Parse-on-load: compute counts immediately
+        indexEntries().then(function(list){ updateCounts(list); });
+      });
+    }
+
+    function eqASCII(offset, s){ for (var i=0;i<s.length;i++){ if (view.getUint8(offset+i) !== s.charCodeAt(i)) return false; } return true; }
+    function getASCII(offset, n){ var out=''; for (var i=0;i<n;i++){ out += String.fromCharCode(view.getUint8(offset+i)); } return out; }
+    function toHex(n){ return '0x' + n.toString(16).toUpperCase(); }
+    function toHexSize(n){ return toHex(n); }
+
+    extractBtn.addEventListener('click', function(){
+      if (!fileBuf) return;
+      if (!window.showDirectoryPicker) { alert('Your browser does not support folder selection (File System Access API). Use Chromium-based browsers.'); return; }
+      window.showDirectoryPicker().then(function(dir){
+        doExtractToDir(dir).catch(function(err){ console.error(err); alert('Extraction failed: ' + err.message); });
+      });
+    });
+
+    async function doExtractToDir(dir){
+      var pos = OFFSETS.START;
+      var profileCount = 0;
+      for (var i=0;i<4;i++){
+        var blockStart = pos; var name = RKP_NAMES[i];
+        var slice = new Uint8Array(fileBuf, blockStart, OFFSETS.RKPD_SIZE);
+        if (eqASCII(blockStart,'RKPD')){ await writeFile(dir, name, slice); profileCount++; }
+        pos += OFFSETS.RKPD_SIZE;
+      }
+      var rkgdCount = 0; var rkgdStart = pos; var rkgdSlice = new Uint8Array(fileBuf, rkgdStart, OFFSETS.RKGD_SIZE);
+      if (eqASCII(rkgdStart,'RKGD')){ await writeFile(dir, RKGD_NAME, rkgdSlice); rkgdCount++; }
+      pos += OFFSETS.RKGD_SIZE;
+      var rkgCount = 0;
+      for (var j=0;j<264;j++){
+        var start = pos + j*OFFSETS.RKG_SIZE; var nm = RKG_NAMES[j]; var sl = new Uint8Array(fileBuf, start, OFFSETS.RKG_SIZE);
+        if (eqASCII(start,'RKGD')){ await writeFile(dir, nm, sl); rkgCount++; }
+      }
+      meta.pcnt.textContent = String(profileCount);
+      meta.gcnt.textContent = String(rkgdCount);
+      meta.gocnt.textContent = String(rkgCount);
+      alert('Extracted subfiles successfully.\n\nProfiles extracted: ' + profileCount + '\nRKGD blocks: ' + rkgdCount + '\nRKG files: ' + rkgCount + '\n\nExtraction completed.');
+    }
+
+    async function writeFile(dirHandle, name, bytes){ var fh = await dirHandle.getFileHandle(name, {create:true}); var writable = await fh.createWritable(); await writable.write(bytes); await writable.close(); }
+
+    function indexEntries(){
+      if (indexed) return Promise.resolve(indexed);
+      var out = []; var pos = OFFSETS.START;
+      for (var i=0;i<4;i++){ if (eqASCII(pos,'RKPD')) out.push({name:RKP_NAMES[i], start:pos, size:OFFSETS.RKPD_SIZE}); pos += OFFSETS.RKPD_SIZE; }
+      if (eqASCII(pos,'RKGD')) out.push({name:RKGD_NAME, start:pos, size:OFFSETS.RKGD_SIZE});
+      pos += OFFSETS.RKGD_SIZE;
+      for (var j=0;j<264;j++){ var st = pos + j*OFFSETS.RKG_SIZE; if (eqASCII(st,'RKGD')) out.push({name:RKG_NAMES[j], start:st, size:OFFSETS.RKG_SIZE}); }
+      indexed = out; return Promise.resolve(out);
+    }
+
+    function updateCounts(list){
+      var pc=0,gc=0,goc=0; for (var i=0;i<list.length;i++){ var n=list[i].name; if (/.rkp$/i.test(n)) pc++; else if (/\.rkgd$/i.test(n)) gc++; else if (/\.rkg$/i.test(n)) goc++; }
+      meta.pcnt.textContent = String(pc);
+      meta.gcnt.textContent = String(gc);
+      meta.gocnt.textContent = String(goc);
+    }
+
+    function downloadEntry(ent){ var bytes = new Uint8Array(fileBuf, ent.start, ent.size); var blob = new Blob([bytes], {type:'application/octet-stream'}); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ent.name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 0); }
+  })();
+  </script>
+</body>
+</html>
