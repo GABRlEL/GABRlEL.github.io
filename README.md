@@ -35,3 +35,5 @@
 [rksys.dat Web Extract](https://gabrlel.github.io/rksysextract.html)
 
 [IKP Web](https://gabrlel.github.io/ikp.html)
+
+[Blank ldb.pul Generator](https://gabrlel.github.io/ldb.html)
