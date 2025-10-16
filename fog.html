@@ -1,0 +1,3035 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fog Web Converter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0b0f14; --fg:#e6eef7; --muted:#9db1c9; --card:#141a22; --accent:#7cc0ff; --ok:#7cffbf; --warn:#ffd37c; }
+  * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+  body { margin:0; background:var(--bg); color:var(--fg); }
+  header { padding:24px 16px; border-bottom:1px solid #202a36; }
+  h1 { margin:0 0 8px; font-size:20px; letter-spacing:.5px; }
+  .sub { color:var(--muted); font-size:13px; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-top:16px; }
+  .card { background:var(--card); border:1px solid #202a36; border-radius:14px; padding:16px; }
+  .card h2 { margin:0 0 10px; font-size:16px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 6px; }
+  input[type=file] { width:100%; padding:8px; background:#0f141b; color:var(--fg); border:1px solid #273041; border-radius:8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { background:var(--accent); color:#00131f; border:none; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; }
+  button.secondary { background:#223142; color:var(--fg); }
+  .credits { margin-top:24px; font-size:12px; color:var(--muted); }
+  .log { white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0e131a; border:1px solid #243042; padding:10px; border-radius:10px; font-size:12px; height:120px; overflow:auto; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>Fog Web Converter</h1>
+  <div class="sub">Single-file, client-side converter for BFG ⇄ SCN0 (Mario Kart Wii) and BFG ⇄ TXT.<br>
+  Credit: <a href="https://wiki.tockdom.com/wiki/User:Atlas" target="_blank" rel="noopener">Atlas</a> (original tool &amp; docs).</div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <section class="card">
+      <h2>BFG → SCN0</h2>
+      <label>Select .bfg</label>
+      <input type="file" id="bfgIn" accept=".bfg">
+      <div class="row">
+        <button id="btnBfg2Scn0">Convert to .scn0</button>
+        <button id="btnBfg2Txt" class="secondary">Export .txt</button>
+      </div>
+      <div class="credits">If any fog has attributes, a matching <code>.vbfga</code> sidecar is generated (same as original).</div>
+    </section>
+
+    <section class="card">
+      <h2>SCN0 → BFG</h2>
+      <label>Select .scn0</label>
+      <input type="file" id="scn0In" accept=".scn0">
+      <label>Optional .vbfga (attributes)</label>
+      <input type="file" id="vbfgaIn" accept=".vbfga">
+      <div class="row">
+        <button id="btnScn02Bfg">Convert to .bfg</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>TXT → BFG</h2>
+      <label>Select .txt (FogConv BFG2TXT format)</label>
+      <input type="file" id="txtIn" accept=".txt">
+      <div class="row">
+        <button id="btnTxt2Bfg">Convert to .bfg</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px;">
+    <h2>Logs</h2>
+    <div id="log" class="log"></div>
+  </section>
+
+  <div class="credits">No files leave your browser. All parsing/building is done locally.</div>
+</main>
+
+<script>
+// ==== helpers: big-endian DataView read/write ====
+function dvBE(buf) { return new DataView(buf); }
+function rU32(dv, off) { return dv.getUint32(off, false); }
+function rI32(dv, off) { return dv.getInt32(off, false); }
+function rU16(dv, off) { return dv.getUint16(off, false); }
+function rI16(dv, off) { return dv.getInt16(off, false); }
+function rF32(dv, off) { return dv.getFloat32(off, false); }
+function rU8 (dv, off) { return dv.getUint8(off); }
+
+function wU32(dv, off, v) { dv.setUint32(off, v>>>0, false); }
+function wI32(dv, off, v) { dv.setInt32(off, v|0, false); }
+function wU16(dv, off, v) { dv.setUint16(off, (v>>>0)&0xFFFF, false); }
+function wI16(dv, off, v) { dv.setInt16(off, v|0, false); }
+function wF32(dv, off, v) { dv.setFloat32(off, Number(v)||0, false); }
+function wU8 (dv, off, v) { dv.setUint8(off, (v>>>0)&0xFF); }
+
+function writeU64be(dv, off, bighex) {
+  // bighex is "0x................"
+  let v = BigInt(bighex);
+  const hi = Number((v >> 32n) & 0xFFFFFFFFn);
+  const lo = Number(v & 0xFFFFFFFFn);
+  wU32(dv, off+0, hi);
+  wU32(dv, off+4, lo);
+  return 8;
+}
+
+// ==== logging ====
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent += msg + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+// ==== model ====
+function emptyFog() {
+  return { type:0, startZ:0, endZ:0, r:0, g:0, b:0, a:0, hasAttribs:false, a1:0, a2:0, a3:0, a4:0, a5:0 };
+}
+
+// ==== BFG parsing ====
+function parseBFG(buf) {
+  if (buf.byteLength !== 0x70) throw new Error("BFG must be exactly 0x70 bytes");
+  const dv = dvBE(buf);
+  const fogs = [emptyFog(), emptyFog(), emptyFog(), emptyFog()];
+  const bases = [0x00, 0x1C, 0x38, 0x54];
+  for (let i=0;i<4;i++) {
+    const base = bases[i];
+    const type = rU32(dv, base+0x00);
+    if (type !== 0) {
+      fogs[i].type = type;
+      fogs[i].startZ = rF32(dv, base+0x04);
+      fogs[i].endZ   = rF32(dv, base+0x08);
+      fogs[i].r = rU8(dv, base+0x0C);
+      fogs[i].g = rU8(dv, base+0x0D);
+      fogs[i].b = rU8(dv, base+0x0E);
+      fogs[i].a = rU8(dv, base+0x0F);
+    }
+    // attributes (always present in BFG, zero means "none")
+    const a1 = rU16(dv, base+0x10);
+    const a2 = rU16(dv, base+0x12);
+    const a3 = rF32(dv, base+0x14);
+    const a4 = rU16(dv, base+0x18);
+    const a5 = rU16(dv, base+0x1A);
+    const hasA = (a1|a2|a4|a5) !== 0 || (Math.abs(a3) > 0);
+    fogs[i].hasAttribs = hasA;
+    fogs[i].a1=a1; fogs[i].a2=a2; fogs[i].a3=a3; fogs[i].a4=a4; fogs[i].a5=a5;
+  }
+  return fogs;
+}
+
+// ==== BFG writer (FIXED SIZE, PATCHED) ====
+function buildBFG(fogs) {
+  const buf = new ArrayBuffer(0x70);
+  const dv  = new DataView(buf);
+  const bases = [0x00, 0x1C, 0x38, 0x54];
+
+  function writeFog(base, fog) {
+    if (!fog) return;
+    const type = (fog.type>>>0);
+    if (!type) return; // leave zeros
+    wU32(dv, base+0x00, type);
+    wF32(dv, base+0x04, fog.startZ);
+    wF32(dv, base+0x08, fog.endZ);
+    wU8 (dv, base+0x0C, fog.r);
+    wU8 (dv, base+0x0D, fog.g);
+    wU8 (dv, base+0x0E, fog.b);
+    wU8 (dv, base+0x0F, fog.a);
+    const _hasA = (fog && (fog.hasAttribs === true || ((fog.a1|fog.a2|fog.a4|fog.a5)>>>0)!==0 || Math.abs(Number(fog.a3)||0)>0));
+    if (_hasA) {
+      wU16(dv, base+0x10, fog.a1>>>0);
+      wU16(dv, base+0x12, fog.a2>>>0);
+      wF32(dv, base+0x14, fog.a3);
+      wU16(dv, base+0x18, fog.a4>>>0);
+      wU16(dv, base+0x1A, fog.a5>>>0);
+    } else {
+      wU16(dv, base+0x10, 0); wU16(dv, base+0x12, 0);
+      wF32(dv, base+0x14, 0);
+      wU16(dv, base+0x18, 0); wU16(dv, base+0x1A, 0);
+    }
+  }
+
+  for (let i=0;i<4;i++) writeFog(bases[i], fogs?.[i]);
+
+  return new Blob([buf], { type:"application/octet-stream" });
+}
+
+// ==== VFGA (.vbfga) read/write ====
+function writeVBFGA(fogs) {
+  // VFGA + 4 flags + the per-flag attribute blocks
+  const flags = fogs.map(f => !!(f?.hasAttribs));
+  const countAttribBytes = flags.reduce((n,has)=> n + (has?12:0), 0);
+  const buf = new ArrayBuffer(4+4 + countAttribBytes);
+  const dv = dvBE(buf);
+  // 'VFGA'
+  wU32(dv, 0, 0x56464741);
+  let off=4;
+  for (let i=0;i<4;i++) wU8(dv, off+i, flags[i]?1:0);
+  off+=4;
+  for (let i=0;i<4;i++) if (flags[i]) {
+    const f = fogs[i];
+    wU16(dv, off+0, f.a1);
+    wU16(dv, off+2, f.a2);
+    wF32(dv, off+4, f.a3);
+    wU16(dv, off+8, f.a4);
+    wU16(dv, off+10, f.a5);
+    off += 12;
+  }
+  return new Blob([buf], { type:"application/octet-stream" });
+}
+
+function readVBFGA(buf) {
+  const dv = dvBE(buf);
+  if (rU32(dv,0) !== 0x56464741) throw new Error("VBFGA magic missing");
+  const flags = [rU8(dv,4), rU8(dv,5), rU8(dv,6), rU8(dv,7)].map(x=>x?true:false);
+  let off=8;
+  const attrs = [null,null,null,null];
+  for (let i=0;i<4;i++) if (flags[i]) {
+    attrs[i] = {
+      a1: rU16(dv, off+0),
+      a2: rU16(dv, off+2),
+      a3: rF32(dv, off+4),
+      a4: rU16(dv, off+8),
+      a5: rU16(dv, off+10),
+    };
+    off += 12;
+  }
+  return attrs;
+}
+
+// ==== BFG <-> TXT ====
+function bfgToTxt(fogs) {
+  // Replicate FogConv's textual format
+  const lines = [];
+  const CRLF = "\r\n";
+  lines.push("BFG2TXT");
+  lines.push("");
+  lines.push("Created with FogConv v1.0 by Atlas");
+  lines.push("");
+  const flags = fogs.map(f => !!(f && f.type));
+  const aflags= fogs.map(f => !!(f && f.hasAttribs));
+  lines.push(`hasfog1 = {flags[0]?1:0}`);
+  lines.push(`hasfog1attribs = {aflags[0]?1:0}`);
+  lines.push(`hasfog2 = {flags[1]?1:0}`);
+  lines.push(`hasfog2attribs = {aflags[1]?1:0}`);
+  lines.push(`hasfog3 = {flags[2]?1:0}`);
+  lines.push(`hasfog3attribs = {aflags[2]?1:0}`);
+  lines.push(`hasfog4 = {flags[3]?1:0}`);
+  lines.push(`hasfog4attribs = {aflags[3]?1:0}`);
+
+  for (let i=0;i<4;i++) if (flags[i]) {
+    const f=fogs[i];
+    lines.push("");
+    lines.push("");
+    lines.push(`== FOG {i+1} ==`);
+    lines.push(`Type = {f.type}`);
+    lines.push(`StartZ = {f.startZ}`);
+    lines.push(`EndZ = {f.endZ}`);
+    lines.push(`ColorRed = {f.r}`);
+    lines.push(`ColorGreen = {f.g}`);
+    lines.push(`ColorBlue = {f.b}`);
+    lines.push(`ColorAlpha = {f.a}`);
+    if (f.hasAttribs) {
+      lines.push("");
+      lines.push("= Attributes =");
+      lines.push(`Unknown1 = {f.a1}`);
+      lines.push(`Unknown2 = {f.a2}`);
+      lines.push(`Unknown3 = {f.a3}`);
+      lines.push(`Unknown4 = {f.a4}`);
+      lines.push(`Unknown5 = {f.a5}`);
+    }
+  }
+  return lines.join(CRLF) + CRLF;
+}
+
+function txtToBfg(buf) {
+  const s = new TextDecoder().decode(buf);
+  const lines = s.replace(/\r\n/g,"\n").split("\n");
+  if (!/^BFG2TXT$/.test(lines[0]?.trim())) throw new Error("TXT header missing (BFG2TXT)");
+  function val(key, def=null) {
+    const re=new RegExp("^"+key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")+"\\s*=\\s*(.+)$");
+    const m = lines.map(l=>l.trim()).find(l=>re.test(l));
+    if (!m) return def;
+    return Number(m.match(re)[1]);
+  }
+  const fogs=[emptyFog(),emptyFog(),emptyFog(),emptyFog()];
+  for (let i=0;i<4;i++) {
+    const has = !!val(`hasfog{i+1}`, 0);
+    const hasA = !!val(`hasfog{i+1}attribs`, 0);
+    if (has) {
+      // Find section "== FOG N =="
+      const idx = lines.findIndex(l=>l.trim()===`== FOG {i+1} ==`);
+      if (idx<0) throw new Error("FOG section missing in TXT");
+      function readNum(label) {
+        const re=new RegExp("^"+label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")+"\\s*=\\s*(.+)$");
+        for (let j=idx+1;j<Math.min(idx+40, lines.length);j++) {
+          const t=lines[j].trim();
+          const m=t.match(re);
+          if (m) return Number(m[1]);
+        }
+        throw new Error("Missing "+label+" in FOG "+(i+1));
+      }
+      fogs[i].type = readNum("Type");
+      fogs[i].startZ = readNum("StartZ");
+      fogs[i].endZ   = readNum("EndZ");
+      fogs[i].r = readNum("ColorRed");
+      fogs[i].g = readNum("ColorGreen");
+      fogs[i].b = readNum("ColorBlue");
+      fogs[i].a = readNum("ColorAlpha");
+      if (hasA) {
+        fogs[i].hasAttribs = true;
+        fogs[i].a1 = readNum("Unknown1");
+        fogs[i].a2 = readNum("Unknown2");
+        fogs[i].a3 = readNum("Unknown3");
+        fogs[i].a4 = readNum("Unknown4");
+        fogs[i].a5 = readNum("Unknown5");
+      }
+    }
+  }
+  return fogs;
+}
+
+// ==== SCN0 writer from BFG: ops map (extracted from original C#) ====
+const SCN0_OPS = {
+  "1000": [
+    [
+      "u64",
+      "0x53434E30000000BC"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x0000009400000000"
+    ],
+    [
+      "u64",
+      "0x000000C000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000001"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000090"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x000000010000005C"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF6C00000034"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u64",
+      "0x0000000342464700"
+    ],
+    [
+      "u64",
+      "0x00000004466F6731"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0100": [
+    [
+      "u64",
+      "0x53434E30000000BC"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x0000009400000000"
+    ],
+    [
+      "u64",
+      "0x000000C000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000001"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000090"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x000000010000005C"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF6C00000034"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u64",
+      "0x0000000342464700"
+    ],
+    [
+      "u64",
+      "0x00000004466F6732"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0010": [
+    [
+      "u64",
+      "0x53434E30000000BC"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x0000009400000000"
+    ],
+    [
+      "u64",
+      "0x000000C000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000001"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000090"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x000000010000005C"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF6C00000034"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u64",
+      "0x0000000342464700"
+    ],
+    [
+      "u64",
+      "0x00000004466F6733"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0001": [
+    [
+      "u64",
+      "0x53434E30000000BC"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x0000009400000000"
+    ],
+    [
+      "u64",
+      "0x000000C000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000001"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000090"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x000000010000005C"
+    ],
+    [
+      "u64",
+      "0x0000002800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF6C00000034"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u64",
+      "0x0000000342464700"
+    ],
+    [
+      "u64",
+      "0x00000004466F6734"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "1100": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6732"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "1010": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6733"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "1001": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6734"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0110": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673200000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6733"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0101": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673200000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6734"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "0011": [
+    [
+      "u64",
+      "0x53434E30000000F4"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000A400000000"
+    ],
+    [
+      "u64",
+      "0x000000F800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000002"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x00000001000000D4"
+    ],
+    [
+      "u64",
+      "0x0000002800000038"
+    ],
+    [
+      "u64",
+      "0x00000002FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000200000094"
+    ],
+    [
+      "u64",
+      "0x0000003800190000"
+    ],
+    [
+      "u64",
+      "0x00010002000000A0"
+    ],
+    [
+      "u64",
+      "0x0000006000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF5C0000005C"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3400000040"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673300000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6734"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ],
+  "1110": [
+    [
+      "u64",
+      "0x53434E300000012C"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000B400000000"
+    ],
+    [
+      "u64",
+      "0x0000013000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000003"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000118"
+    ],
+    [
+      "u64",
+      "0x0000002800000048"
+    ],
+    [
+      "u64",
+      "0x00000003FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x00000002000000CC"
+    ],
+    [
+      "u64",
+      "0x0000004800190000"
+    ],
+    [
+      "u64",
+      "0x00010003000000D8"
+    ],
+    [
+      "u64",
+      "0x0000007000180000"
+    ],
+    [
+      "u64",
+      "0x00020003000000E4"
+    ],
+    [
+      "u64",
+      "0x0000009800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF4C00000084"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF2400000068"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEFC0000004C"
+    ],
+    [
+      "u64",
+      "0x0000000200000002"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6732"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x466F673300000000"
+    ],
+    [
+      "u64",
+      "0x0000000A466F6773"
+    ],
+    [
+      "u64",
+      "0x284E573452290000"
+    ]
+  ],
+  "1101": [
+    [
+      "u64",
+      "0x53434E300000012C"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000B400000000"
+    ],
+    [
+      "u64",
+      "0x0000013000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000003"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000118"
+    ],
+    [
+      "u64",
+      "0x0000002800000048"
+    ],
+    [
+      "u64",
+      "0x00000003FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x00000002000000CC"
+    ],
+    [
+      "u64",
+      "0x0000004800190000"
+    ],
+    [
+      "u64",
+      "0x00010003000000D8"
+    ],
+    [
+      "u64",
+      "0x0000007000180000"
+    ],
+    [
+      "u64",
+      "0x00020003000000E4"
+    ],
+    [
+      "u64",
+      "0x0000009800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF4C00000084"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF2400000068"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEFC0000004C"
+    ],
+    [
+      "u64",
+      "0x0000000200000002"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6732"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x466F673400000000"
+    ],
+    [
+      "u64",
+      "0x0000000A466F6773"
+    ],
+    [
+      "u64",
+      "0x284E573452290000"
+    ]
+  ],
+  "1011": [
+    [
+      "u64",
+      "0x53434E300000012C"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000B400000000"
+    ],
+    [
+      "u64",
+      "0x0000013000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000003"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000118"
+    ],
+    [
+      "u64",
+      "0x0000002800000048"
+    ],
+    [
+      "u64",
+      "0x00000003FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x00000002000000CC"
+    ],
+    [
+      "u64",
+      "0x0000004800190000"
+    ],
+    [
+      "u64",
+      "0x00010003000000D8"
+    ],
+    [
+      "u64",
+      "0x0000007000180000"
+    ],
+    [
+      "u64",
+      "0x00020003000000E4"
+    ],
+    [
+      "u64",
+      "0x0000009800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF4C00000084"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF2400000068"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEFC0000004C"
+    ],
+    [
+      "u64",
+      "0x0000000200000002"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6733"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x466F673400000000"
+    ],
+    [
+      "u64",
+      "0x0000000A466F6773"
+    ],
+    [
+      "u64",
+      "0x284E573452290000"
+    ]
+  ],
+  "0111": [
+    [
+      "u64",
+      "0x53434E300000012C"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000B400000000"
+    ],
+    [
+      "u64",
+      "0x0000013000000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000003"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x0000000100000118"
+    ],
+    [
+      "u64",
+      "0x0000002800000048"
+    ],
+    [
+      "u64",
+      "0x00000003FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x00000002000000CC"
+    ],
+    [
+      "u64",
+      "0x0000004800190000"
+    ],
+    [
+      "u64",
+      "0x00010003000000D8"
+    ],
+    [
+      "u64",
+      "0x0000007000180000"
+    ],
+    [
+      "u64",
+      "0x00020003000000E4"
+    ],
+    [
+      "u64",
+      "0x0000009800000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF4C00000084"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF2400000068"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEFC0000004C"
+    ],
+    [
+      "u64",
+      "0x0000000200000002"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673200000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6733"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x466F673400000000"
+    ],
+    [
+      "u64",
+      "0x0000000A466F6773"
+    ],
+    [
+      "u64",
+      "0x284E573452290000"
+    ]
+  ],
+  "1111": [
+    [
+      "u64",
+      "0x53434E3000000164"
+    ],
+    [
+      "u64",
+      "0x0000000400000000"
+    ],
+    [
+      "u64",
+      "0x0000004400000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u64",
+      "0x000000C400000000"
+    ],
+    [
+      "u64",
+      "0x0000016800000000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x0000000000000028"
+    ],
+    [
+      "u64",
+      "0x00000001FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000004D0000"
+    ],
+    [
+      "u64",
+      "0x000000010000015C"
+    ],
+    [
+      "u64",
+      "0x0000002800000058"
+    ],
+    [
+      "u64",
+      "0x00000004FFFF0000"
+    ],
+    [
+      "u64",
+      "0x0001000000000000"
+    ],
+    [
+      "u64",
+      "0x00000000001D0000"
+    ],
+    [
+      "u64",
+      "0x0000000400000104"
+    ],
+    [
+      "u64",
+      "0x0000005800190000"
+    ],
+    [
+      "u64",
+      "0x0001000300000110"
+    ],
+    [
+      "u64",
+      "0x0000008000180000"
+    ],
+    [
+      "u64",
+      "0x000200030000011C"
+    ],
+    [
+      "u64",
+      "0x000000A8001A0000"
+    ],
+    [
+      "u64",
+      "0x0002000400000128"
+    ],
+    [
+      "u64",
+      "0x000000D000000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF3C000000AC"
+    ],
+    [
+      "u64",
+      "0x0000000000000000"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      1
+    ],
+    [
+      "fogfloats",
+      1
+    ],
+    [
+      "fogrgba",
+      1
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFF1400000090"
+    ],
+    [
+      "u64",
+      "0x0000000100000001"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      2
+    ],
+    [
+      "fogfloats",
+      2
+    ],
+    [
+      "fogrgba",
+      2
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEEC00000074"
+    ],
+    [
+      "u64",
+      "0x0000000200000002"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      3
+    ],
+    [
+      "fogfloats",
+      3
+    ],
+    [
+      "fogrgba",
+      3
+    ],
+    [
+      "u32",
+      "0x00000028"
+    ],
+    [
+      "u64",
+      "0xFFFFFEC400000058"
+    ],
+    [
+      "u64",
+      "0x0000000300000003"
+    ],
+    [
+      "u32",
+      "0xE0000000"
+    ],
+    [
+      "fogtype",
+      4
+    ],
+    [
+      "fogfloats",
+      4
+    ],
+    [
+      "fogrgba",
+      4
+    ],
+    [
+      "u32",
+      "0x00000003"
+    ],
+    [
+      "u64",
+      "0x4246470000000004"
+    ],
+    [
+      "u64",
+      "0x466F673100000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6732"
+    ],
+    [
+      "u64",
+      "0x0000000000000004"
+    ],
+    [
+      "u64",
+      "0x466F673300000000"
+    ],
+    [
+      "u64",
+      "0x00000004466F6734"
+    ],
+    [
+      "u64",
+      "0x000000000000000A"
+    ],
+    [
+      "u64",
+      "0x466F6773284E5734"
+    ],
+    [
+      "u32",
+      "0x52290000"
+    ]
+  ]
+};
+
+function maskFromFogs(fogs) {
+  const b = fogs.map(f => (f && (f.type>>>0)!==0) ? '1':'0').join('');
+  return b;
+}
+
+function buildSCN0(fogs) {
+  const mask = maskFromFogs(fogs);
+  const ops = SCN0_OPS[mask];
+  if (!ops) throw new Error("Fog combination unsupported: "+mask);
+  // First pass: compute total size by summing 8 for u64 and 4 for u32 and 4+4+... for fog data
+  let size = 0;
+  for (const [k,v] of ops) {
+    if (k==='u64') size+=8;
+    else if (k==='u32') size+=4;
+    else if (k==='fogtype') size+=4;
+    else if (k==='fogfloats') size+=8;
+    else if (k==='fogrgba') size+=4;
+  }
+  const buf = new ArrayBuffer(size);
+  const dv = dvBE(buf);
+  let off=0;
+  for (const [k,v] of ops) {
+    if (k==='u64') { off += writeU64be(dv, off, v); }
+    else if (k==='u32') { wU32(dv, off, parseInt(v)); off+=4; }
+    else if (k==='fogtype') { const f=fogs[v-1]; wU32(dv, off, f.type>>>0); off+=4; }
+    else if (k==='fogfloats') { const f=fogs[v-1]; wF32(dv, off, f.startZ); wF32(dv, off+4, f.endZ); off+=8; }
+    else if (k==='fogrgba') { const f=fogs[v-1]; wU8(dv, off+0, f.r); wU8(dv, off+1, f.g); wU8(dv, off+2, f.b); wU8(dv, off+3, f.a); off+=4; }
+  }
+  return new Blob([buf], { type:"application/octet-stream" });
+}
+
+// ==== SCN0 reader to BFG (uses the same offsets as original) ====
+function parseSCN0(buf) {
+  const dv=dvBE(buf);
+  // 'SCN0' magic
+  const m = String.fromCharCode(rU8(dv,0), rU8(dv,1), rU8(dv,2), rU8(dv,3));
+  if (m!=="SCN0") throw new Error("SCN0 magic missing");
+  const frameCount = rU16(dv, 0x30);
+  if (frameCount !== 1) throw new Error("SCN0 must have framecount=1");
+  const fogCount = rU16(dv, 0x3E);
+  const fogs=[emptyFog(),emptyFog(),emptyFog(),emptyFog()];
+
+  function readFogAt(pos, which) {
+    // SCN0 stores fog as: u32 type, f32 startZ, f32 endZ, u8 r,g,b,a (big-endian)
+    const type   = rU32(dv, pos+0x00);
+    const startZ = rF32(dv, pos+0x04);
+    const endZ   = rF32(dv, pos+0x08);
+    const r      = rU8 (dv, pos+0x0C);
+    const g      = rU8 (dv, pos+0x0D);
+    const b      = rU8 (dv, pos+0x0E);
+    const a      = rU8 (dv, pos+0x0F);
+    const i = (which-1);
+    fogs[i] = { type, startZ, endZ, r, g, b, a, hasAttribs:false, a1:0,a2:0,a3:0,a4:0,a5:0 };
+  }
+  function readLabelAt(pos) {
+    return String.fromCharCode(rU8(dv,pos), rU8(dv,pos+1), rU8(dv,pos+2), rU8(dv,pos+3));
+  }
+
+  if (fogCount===1) {
+    if (buf.byteLength !== 0xE0) throw new Error("Unexpected SCN0 length for 1 fog");
+    const nameLen = rU32(dv, 0xBC); if (nameLen!==3) throw new Error("Unexpected name length");
+    const lab = readLabelAt(0xC8);
+    const which = parseInt(lab.replace("Fog",""),10);
+    readFogAt(0xAC, which);
+  } else if (fogCount===2) {
+    if (buf.byteLength !== 0x124) throw new Error("Unexpected SCN0 length for 2 fogs");
+    const nameLen = rU32(dv, 0xF4); if (nameLen!==3) throw new Error("Unexpected name length");
+    const lab1=readLabelAt(0x100); readFogAt(0xBC, parseInt(lab1.replace("Fog",""),10));
+    const lab2=readLabelAt(0x10C); readFogAt(0xE4, parseInt(lab2.replace("Fog",""),10));
+  } else if (fogCount===3) {
+    if (buf.byteLength !== 0x168) throw new Error("Unexpected SCN0 length for 3 fogs");
+    const nameLen = rU32(dv, 0x12C); if (nameLen!==3) throw new Error("Unexpected name length");
+    const lab1=readLabelAt(0x138); readFogAt(0xCC, parseInt(lab1.replace("Fog",""),10));
+    const lab2=readLabelAt(0x144); readFogAt(0xF4, parseInt(lab2.replace("Fog",""),10));
+    const lab3=readLabelAt(0x150); readFogAt(0x11C, parseInt(lab3.replace("Fog",""),10));
+  } else if (fogCount===4) {
+    if (buf.byteLength !== 0x1AC) throw new Error("Unexpected SCN0 length for 4 fogs");
+    const nameLen = rU32(dv, 0x164); if (nameLen!==3) throw new Error("Unexpected name length");
+    const lab1=readLabelAt(0x170); readFogAt(0xDC, parseInt(lab1.replace("Fog",""),10));
+    const lab2=readLabelAt(0x17C); readFogAt(0x104, parseInt(lab2.replace("Fog",""),10));
+    const lab3=readLabelAt(0x188); readFogAt(0x12C, parseInt(lab3.replace("Fog",""),10));
+    const lab4=readLabelAt(0x194); readFogAt(0x154, parseInt(lab4.replace("Fog",""),10));
+  } else {
+    throw new Error("Unsupported fog count: "+fogCount);
+  }
+  return fogs;
+}
+
+// ==== UI wiring ====
+function downloadBlob(blob, name) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+document.getElementById('btnBfg2Scn0').addEventListener('click', async () => {
+  const f = document.getElementById('bfgIn').files[0];
+  if (!f) return log("Select a .bfg first.");
+  const buf = await f.arrayBuffer();
+  try {
+    const fogs = parseBFG(buf);
+    const scn0 = buildSCN0(fogs);
+    downloadBlob(scn0, f.name.replace(/\.bfg$/i,'') + '.scn0');
+    if (fogs.some(x=>x && x.hasAttribs)) {
+      const side = writeVBFGA(fogs);
+      downloadBlob(side, f.name.replace(/\.bfg$/i,'') + '.vbfga');
+    }
+    log("BFG → SCN0 complete.");
+  } catch (e) { log("Error: "+e.message); }
+});
+
+document.getElementById('btnBfg2Txt').addEventListener('click', async () => {
+  const f = document.getElementById('bfgIn').files[0];
+  if (!f) return log("Select a .bfg first.");
+  try {
+    const fogs = parseBFG(await f.arrayBuffer());
+    const txt = bfgToTxt(fogs);
+    downloadBlob(new Blob([txt],{type:'text/plain'}), f.name.replace(/\.bfg$/i,'') + '.txt');
+    log("BFG → TXT complete.");
+  } catch (e) { log("Error: "+e.message); }
+});
+
+document.getElementById('btnScn02Bfg').addEventListener('click', async () => {
+  const scn = document.getElementById('scn0In').files[0];
+  if (!scn) return log("Select a .scn0 first.");
+  const vbf = document.getElementById('vbfgaIn').files[0];
+  try {
+    const fogs = parseSCN0(await scn.arrayBuffer());
+    if (vbf) {
+      const attrs = readVBFGA(await vbf.arrayBuffer());
+      for (let i=0;i<4;i++) if (attrs[i]) {
+        fogs[i].hasAttribs=true;
+        Object.assign(fogs[i], attrs[i]);
+      }
+    }
+    const bfg = buildBFG(fogs); // <-- patched writer ensures 0x70 exact
+    downloadBlob(bfg, scn.name.replace(/\.scn0$/i,'') + '.bfg');
+    log("SCN0 → BFG complete.");
+  } catch (e) { log("Error: "+e.message); }
+});
+
+document.getElementById('btnTxt2Bfg').addEventListener('click', async () => {
+  const t = document.getElementById('txtIn').files[0];
+  if (!t) return log("Select a .txt first.");
+  try {
+    const fogs = txtToBfg(await t.arrayBuffer());
+    const bfg = buildBFG(fogs);
+    downloadBlob(bfg, t.name.replace(/\.txt$/i,'') + '.bfg');
+    log("TXT → BFG complete.");
+  } catch (e) { log("Error: "+e.message); }
+});
+</script>
+</body>
+</html>
