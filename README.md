@@ -39,3 +39,5 @@
 [Blank ldb.pul Generator](https://gabrlel.github.io/ldb.html)
 
 [Fog Web Converter](https://gabrlel.github.io/fog.html)
+
+[Le Tabler — MKWii Competitive Tabling Helper](https://gabrlel.github.io/table.html)
