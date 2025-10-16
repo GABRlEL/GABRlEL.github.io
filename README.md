@@ -40,4 +40,4 @@
 
 [Fog Web Converter](https://gabrlel.github.io/fog.html)
 
-[Le Tabler — MKWii Competitive Tabling Helper](https://gabrlel.github.io/table.html)
+[Le Tableur — MKWii Competitive Tabling Helper](https://gabrlel.github.io/table.html)
