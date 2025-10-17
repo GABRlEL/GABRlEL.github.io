@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KRT Web — Mario Kart Wii RKGT Editor</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923;
+      --muted: #7f8ca3;
+      --text: #e6e9ef;
+      --accent: #6ea8fe;
+      --accent-2: #9aedfe;
+      --ok: #2ecc71;
+      --warn: #f39c12;
+      --err: #e74c3c;
+      --border: #232a36;
+      --shadow: 0 6px 20px rgba(0,0,0,.25);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, #1a2030, var(--bg));
+      color: var(--text);
+    }
+    header {
+      display: grid; gap: 12px; padding: 18px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+      position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px);
+    }
+    .title { display:flex; align-items: center; gap: 12px; }
+    .title h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
+    .tag { font-size: 12px; color: var(--muted); border:1px solid var(--border); padding:2px 8px; border-radius:999px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap: 10px; align-items: center; }
+    .toolbar .group { background: var(--panel); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; display:flex; gap:8px; align-items: center; box-shadow: var(--shadow); }
+    .toolbar label { font-size: 12px; color: var(--muted); }
+    input[type="number"], input[type="text"], select, button {
+      background: #0f1320; color: var(--text); border:1px solid var(--border); border-radius: 10px; padding:8px 10px; font-size: 13px;
+    }
+    input[type="number"]:focus, input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    button { cursor: pointer; transition: transform .05s ease; }
+    button:hover { transform: translateY(-1px); }
+    button.primary { background: linear-gradient(180deg, #1f60ff, #174bd6); border: none; }
+    button.ghost { background: transparent; }
+    button.ok { background: #1e7a45; border: none; }
+    button.warn { background: #9b6b11; border:none; }
+    button.error { background: #8b2b20; border:none; }
+    .hint { color: var(--muted); font-size: 12px; }
+
+    main { padding: 18px; display: grid; gap: 16px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1100px) { .grid { grid-template-columns: 2fr 1fr; } }
+
+    .card { background: var(--panel); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card h2 { font-size: 15px; letter-spacing: .4px; margin: 0; padding: 12px 14px; border-bottom:1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)); }
+    .card .body { padding: 12px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px; text-align: left; font-size: 13px; }
+    thead th { position: sticky; top: 0; background: #121725; z-index: 1; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+
+    .muted { color: var(--muted); }
+    .pill { padding: 2px 8px; border-radius: 999px; background: #111624; border: 1px solid var(--border); font-size: 12px; }
+    .warn-text { color: var(--warn); }
+    .ok-text { color: var(--ok); }
+    .err-text { color: var(--err); }
+
+    .footer { color: var(--muted); font-size: 12px; padding: 10px 0 16px; }
+
+    .k { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .sr { position: absolute; left: -9999px; }
+    .row-actions { display:flex; gap: 6px; align-items: center; }
+    .sticky-actions { position: sticky; bottom: 0; background: #0e1320d0; backdrop-filter: blur(8px); border-top:1px solid var(--border); padding: 8px; display:flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <div class="tag">Single‑file web tool</div>
+      <h1>KRT Web — Mario Kart Wii RKGT Editor</h1>
+    </div>
+    <div class="toolbar">
+      <div class="group">
+        <label for="fileInput">Open .krt</label>
+        <input id="fileInput" type="file" accept=".krt,application/octet-stream" />
+        <button id="btnDemo" title="Start with an empty 32‑entry file">New 32‑entry</button>
+      </div>
+      <div class="group">
+        <label>Display</label>
+        <select id="displayMode">
+          <option value="frames">Frames</option>
+          <option value="ms">mm:ss.mmm</option>
+        </select>
+        <label>FPS</label>
+        <select id="fps">
+          <option value="60">60</option>
+          <option value="50">50</option>
+          <option value="59.94">59.94</option>
+        </select>
+      </div>
+      <div class="group">
+        <label>Download</label>
+        <button id="btnSave" class="primary">Export .krt</button>
+        <button id="btnSaveJson">Export JSON</button>
+        <button id="btnSaveCsv">Export CSV</button>
+      </div>
+      <div class="group">
+        <label>Import</label>
+        <input id="jsonInput" type="file" accept=".json" />
+        <input id="csvInput" type="file" accept=".csv,text/csv" />
+      </div>
+    </div>
+    <div class="hint">Magic must be <span class="k">RKGT</span>. Values are Big‑Endian. Each entry = 3×UInt16 (50cc, 100cc, 150/Mirror) + 2 bytes padding.</div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="card" id="fileCard">
+        <h2>Header</h2>
+        <div class="body" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+          <div>
+            <label>Magic</label>
+            <input id="magic" type="text" value="RKGT" maxlength="4" class="k" readonly aria-readonly="true" title="Locked by spec (RKGT)" />
+            <div class="hint">Locked by spec (RKGT).</div>
+          </div>
+          <div>
+            <label>Rank time delta factor (UInt32)</label>
+            <input id="factor" type="number" min="0" max="4294967295" step="1" />
+            <div class="hint">Unused by the game (hardcoded to 1000), but preserved.</div>
+          </div>
+          <div>
+            <label>Header size (UInt16)</label>
+            <input id="headerSize" type="number" min="12" max="65535" step="1" readonly aria-readonly="true" title="Locked by spec (12 / 0x0C)" />
+            <div class="hint">Locked by spec (12 / 0x0C).</div>
+          </div>
+          <div>
+            <label>Entries</label>
+            <input id="numEntries" type="number" min="0" max="4096" step="1" readonly aria-readonly="true" title="Read-only; auto-updated to table size" />
+            <div class="hint">Read‑only; auto‑updated to match the table.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Inspector</h2>
+        <div class="body" id="inspector">
+          <div class="hint">Select a cell to see friendly time formatting, keyboard shortcuts, and validation.
+          <ul>
+            <li>Arrows / Enter / Tab to navigate.</li>
+            <li><span class="k">Ctrl/⌘ + D</span> duplicate row, <span class="k">Ctrl/⌘ + ⌫</span> delete row.</li>
+            <li>Switch “Display” to edit in <em>mm:ss.mmm</em> — we’ll convert to frames using FPS.</li>
+          </ul></div>
+          <div id="inspectorInfo" class="pill">No selection</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Entries (ordered by Special Slot ID)</h2>
+      <div class="body">
+        <div style="overflow:auto; max-height: 56vh; border:1px solid var(--border); border-radius: var(--radius);">
+          <table id="tbl">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Track (hint)</th>
+                <th>50cc</th>
+                <th>100cc</th>
+                <th>150/Mirror</th>
+                <th class="muted">≈ mm:ss.mmm (150)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="sticky-actions">
+          <div class="hint" id="status">Ready.</div>
+          <div class="row-actions">
+            <button id="btnAddRow">Add row</button>
+            <button id="btnReset" class="ghost">Reset changes</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="footer">
+      <div><strong>Notes.</strong> This tool reads & writes Big‑Endian KRT (RKGT) files used by Mario Kart Wii for GP rank timing. It preserves header fields and re‑writes padding as 0. Made by ChatGPT 5 Thinking.</div>
+    </section>
+  </main>
+
+  <template id="rowTemplate">
+    <tr>
+      <td class="k idx"></td>
+      <td class="muted track"></td>
+      <td><input class="t50" type="number" min="0" max="65535" inputmode="numeric"></td>
+      <td><input class="t100" type="number" min="0" max="65535" inputmode="numeric"></td>
+      <td><input class="t150" type="number" min="0" max="65535" inputmode="numeric"></td>
+      <td class="muted approx"></td>
+      <td class="row-actions">
+        <button class="dup" title="Duplicate row">⧉</button>
+        <button class="del" title="Delete row">✕</button>
+      </td>
+    </tr>
+  </template>
+
+  <script>
+  'use strict';
+  // ——— Utilities ————————————————————————————————————————————————————————
+  const $ = (sel, el=document) => el.querySelector(sel);
+  const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const beU16 = (dv, off) => dv.getUint16(off, false);
+  const beU32 = (dv, off) => dv.getUint32(off, false);
+  const setBeU16 = (dv, off, v) => dv.setUint16(off, v >>> 0, false);
+  const setBeU32 = (dv, off, v) => dv.setUint32(off, v >>> 0, false);
+  const download = (blob, name) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+  };
+
+  // Track names (Special Slot ID order). Purely cosmetic.
+  const TRACK_NAMES = [
+    'Luigi Circuit','Moo Moo Meadows','Mushroom Gorge','Toad\'s Factory',
+    'Mario Circuit','Coconut Mall','DK Summit','Wario\'s Gold Mine',
+    'Daisy Circuit','Koopa Cape','Maple Treeway','Grumble Volcano',
+    'Dry Dry Ruins','Moonview Highway','Bowser\'s Castle','Rainbow Road',
+    'GCN Peach Beach','DS Yoshi Falls','SNES Ghost Valley 2','N64 Mario Raceway',
+    'N64 Sherbet Land','GBA Shy Guy Beach','DS Delfino Square','GCN Waluigi Stadium',
+    'DS Desert Hills','GBA Bowser Castle 3','N64 DK\'s Jungle Parkway','GCN Mario Circuit',
+    'SNES Mario Circuit 3','DS Peach Gardens','GCN DK Mountain','N64 Bowser\'s Castle'
+  ];
+
+  // ——— App State ————————————————————————————————————————————————————————
+  const state = {
+    original: null,           // to support reset
+    header: { magic: 'RKGT', factor: 1000, headerSize: 12, numEntries: 0 },
+    entries: [],              // [{t50,t100,t150}]
+  };
+
+  // ——— Parsing / Building ———————————————————————————————————————————————
+  function parseKRT(buf){
+    const dv = new DataView(buf);
+    if (dv.byteLength < 12) throw new Error('File too small');
+    const magic = new TextDecoder().decode(new Uint8Array(buf,0,4));
+    const factor = beU32(dv,4);
+    const numEntries = beU16(dv,8);
+    const headerSize = beU16(dv,10);
+
+    let expected = headerSize + numEntries * 8;
+    let actual = dv.byteLength;
+    let n = numEntries;
+    if (actual !== expected) {
+      const inferred = Math.floor((actual - headerSize) / 8);
+      console.warn('Size mismatch: expected', expected, 'actual', actual, '— using inferred entries =', inferred);
+      n = Math.max(0, inferred);
+    }
+
+    const entries = [];
+    for (let i=0;i<n;i++){
+      const off = headerSize + i*8;
+      if (off + 8 > dv.byteLength) break;
+      const t50 = beU16(dv, off);
+      const t100 = beU16(dv, off+2);
+      const t150 = beU16(dv, off+4);
+      entries.push({ t50, t100, t150 });
+    }
+
+    return { header:{ magic, factor, headerSize, numEntries:n }, entries };
+  }
+
+  function buildKRT(data){
+    const headerSize = data.header.headerSize|0 || 12;
+    const n = data.entries.length|0;
+    const buf = new ArrayBuffer(headerSize + n*8);
+    const dv = new DataView(buf);
+    // header
+    const magicBytes = new TextEncoder().encode((data.header.magic || 'RKGT').slice(0,4).padEnd(4,'\0'));
+    new Uint8Array(buf,0,4).set(magicBytes);
+    setBeU32(dv,4, data.header.factor>>>0);
+    setBeU16(dv,8, n);
+    setBeU16(dv,10, headerSize);
+    // entries
+    let off = headerSize;
+    for (const e of data.entries){
+      setBeU16(dv, off+0, clamp(e.t50|0, 0, 0xFFFF));
+      setBeU16(dv, off+2, clamp(e.t100|0,0,0xFFFF));
+      setBeU16(dv, off+4, clamp(e.t150|0,0,0xFFFF));
+      dv.setUint8(off+6, 0); dv.setUint8(off+7, 0);
+      off += 8;
+    }
+    return buf;
+  }
+
+  // ——— Formatting ————————————————————————————————————————————————————
+  function framesToMmssmmm(frames, fps){
+    const totalMs = Math.round((frames / fps) * 1000);
+    const m = Math.floor(totalMs / 60000);
+    const s = Math.floor((totalMs % 60000) / 1000);
+    const ms = totalMs % 1000; // 0..999
+    return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+  }
+
+  function mmssmmmToFrames(text, fps){
+    const t = (text || '').trim();
+
+    // Precompiled regex via constructors to avoid literal-escape issues in HTML
+    const intRe = new RegExp('^[0-9]+$');
+    const decRe = new RegExp('^[0-9]+(?:\\.[0-9]+)?$');
+    const mmssRe = new RegExp('^([0-9]+):([0-9]{1,2})(?:\\.([0-9]{1,3}))?$');
+
+    if (intRe.test(t)) return parseInt(t, 10); // raw frames
+    if (decRe.test(t)) return Math.round(parseFloat(t) * fps); // seconds.mmm
+
+    const mRes = t.match(mmssRe);
+    if (!mRes) throw new Error('Invalid time; expected m:ss.mmm');
+
+    const minutes = parseInt(mRes[1], 10);
+    const seconds = parseInt(mRes[2], 10);
+    const msStr = mRes[3] || '0';
+
+    if (seconds < 0 || seconds >= 60) throw new Error('Seconds must be 0..59');
+    if (msStr.length > 3) throw new Error('Milliseconds must be 0..999');
+
+    const millis = parseInt(msStr.padEnd(3, '0'), 10); // 0..999
+    const totalMs = minutes * 60000 + seconds * 1000 + millis;
+    return Math.round((totalMs / 1000) * fps);
+  }
+
+  // ——— Render Table ——————————————————————————————————————————————————
+  function render(){
+    // Header fields
+    $('#magic').value = state.header.magic;
+    $('#factor').value = state.header.factor;
+    $('#headerSize').value = state.header.headerSize;
+    $('#numEntries').value = state.entries.length;
+
+    const tbody = $('#tbl tbody');
+    tbody.innerHTML = '';
+    const t = document.getElementById('rowTemplate');
+    const fps = parseFloat($('#fps').value);
+    const showMs = $('#displayMode').value === 'ms';
+
+    state.entries.forEach((e, i) => {
+      const row = t.content.firstElementChild.cloneNode(true);
+      $('.idx', row).textContent = i.toString().padStart(2,'0');
+      $('.track', row).textContent = TRACK_NAMES[i] || '';
+
+      const in50 = $('.t50', row), in100 = $('.t100', row), in150 = $('.t150', row);
+
+      if (showMs){
+        in50.type = in100.type = in150.type = 'text';
+        in50.value = framesToMmssmmm(e.t50, fps);
+        in100.value = framesToMmssmmm(e.t100, fps);
+        in150.value = framesToMmssmmm(e.t150, fps);
+      } else {
+        in50.type = in100.type = in150.type = 'number';
+        in50.value = e.t50; in100.value = e.t100; in150.value = e.t150;
+      }
+      $('.approx', row).textContent = framesToMmssmmm(e.t150, fps);
+
+      const updateFromInputs = () => {
+        try{
+          if (showMs){
+            e.t50 = clamp(mmssmmmToFrames(in50.value, fps), 0, 0xFFFF);
+            e.t100 = clamp(mmssmmmToFrames(in100.value, fps), 0, 0xFFFF);
+            e.t150 = clamp(mmssmmmToFrames(in150.value, fps), 0, 0xFFFF);
+          } else {
+            e.t50 = clamp(parseInt(in50.value||'0',10), 0, 0xFFFF);
+            e.t100 = clamp(parseInt(in100.value||'0',10), 0, 0xFFFF);
+            e.t150 = clamp(parseInt(in150.value||'0',10), 0, 0xFFFF);
+          }
+          $('.approx', row).textContent = framesToMmssmmm(e.t150, fps);
+          setStatus('Edited row '+i, 'ok');
+        } catch(err){
+          setStatus('Row '+i+': '+err.message, 'err');
+        }
+      };
+
+      in50.addEventListener('change', updateFromInputs);
+      in100.addEventListener('change', updateFromInputs);
+      in150.addEventListener('change', updateFromInputs);
+
+      // Row actions
+      $('.dup', row).addEventListener('click', () => { state.entries.splice(i+1,0, {...e}); syncHeader(); render(); });
+      $('.del', row).addEventListener('click', () => { state.entries.splice(i,1); syncHeader(); render(); });
+
+      // Inspector hover/selection
+      $$('input', row).forEach(inp => {
+        inp.addEventListener('focus', ()=> inspectorShow(i, inp.className));
+        inp.addEventListener('blur', ()=> inspectorClear());
+      });
+
+      tbody.appendChild(row);
+    });
+  }
+
+  function inspectorShow(idx, field){
+    const e = state.entries[idx];
+    const fps = parseFloat($('#fps').value);
+    const lines = [
+      `<div class="pill">Row ${idx} — ${TRACK_NAMES[idx]||'Track'}</div>`,
+      `<div>50cc: <span class="k">${e.t50}</span> frames ≈ ${framesToMmssmmm(e.t50,fps)}</div>`,
+      `<div>100cc: <span class="k">${e.t100}</span> frames ≈ ${framesToMmssmmm(e.t100,fps)}</div>`,
+      `<div>150/Mirror: <span class="k">${e.t150}</span> frames ≈ ${framesToMmssmmm(e.t150,fps)}</div>`,
+      `<div class="muted">Editing: <span class="k">${field}</span></div>`
+    ];
+    $('#inspectorInfo').innerHTML = lines.join('\n');
+  }
+  function inspectorClear(){ $('#inspectorInfo').textContent = 'No selection'; }
+
+  // ——— Status ————————————————————————————————————————————————————————
+  function setStatus(text, kind='info'){
+    const el = $('#status');
+    el.textContent = text;
+    el.classList.remove('warn-text','ok-text','err-text');
+    if (kind==='warn') el.classList.add('warn-text');
+    else if (kind==='ok') el.classList.add('ok-text');
+    else if (kind==='err') el.classList.add('err-text');
+  }
+
+  // ——— Synchronize header ↔ data ————————————————————————————————————
+  function syncHeader(){
+    // Lock spec-defined fields and reflect them in the UI
+    state.header.magic = 'RKGT';
+    const magicEl = $('#magic'); if (magicEl) magicEl.value = 'RKGT';
+
+    state.header.factor = clamp(parseInt($('#factor').value||'1000',10), 0, 0xFFFFFFFF);
+
+    state.header.headerSize = 12;
+    const hsEl = $('#headerSize'); if (hsEl) hsEl.value = 12;
+
+    // numEntries is read-only UI — always mirror the table length
+    $('#numEntries').value = state.entries.length;
+  }
+
+  // ——— File I/O Handlers ————————————————————————————————————————————
+  $('#fileInput').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    const buf = await file.arrayBuffer();
+    try{
+      const parsed = parseKRT(buf);
+      state.header = parsed.header; state.entries = parsed.entries;
+      state.original = { header: {...parsed.header}, entries: parsed.entries.map(x=>({...x})) };
+      render();
+      validateBasic(parsed, file.name);
+      setStatus(`Loaded ${file.name} — ${state.entries.length} entries`,'ok');
+    } catch(err){ setStatus('Failed to load: '+err.message, 'err'); }
+  });
+
+  $('#btnDemo').addEventListener('click', () => {
+    // Create a fresh 32-entry file with zeros.
+    state.header = { magic:'RKGT', factor:1000, headerSize:12, numEntries:32 };
+    state.entries = Array.from({length:32}, ()=>({t50:0,t100:0,t150:0}));
+    state.original = { header: {...state.header}, entries: state.entries.map(x=>({...x})) };
+    render();
+    setStatus('Created new 32‑entry file');
+  });
+
+  $('#btnReset').addEventListener('click', () => {
+    if (!state.original) return setStatus('Nothing to reset', 'warn');
+    state.header = { ...state.original.header };
+    state.entries = state.original.entries.map(x=>({...x}));
+    render(); setStatus('Reset to last loaded file');
+  });
+
+  $('#btnAddRow').addEventListener('click', () => {
+    state.entries.push({ t50:0, t100:0, t150:0 });
+    $('#numEntries').value = state.entries.length;
+    render();
+  });
+
+  $('#displayMode').addEventListener('change', render);
+  $('#fps').addEventListener('change', render);
+  ['factor'].forEach(id => {
+    $('#'+id).addEventListener('change', () => { syncHeader(); setStatus('Header updated','ok'); });
+  });
+
+  $('#btnSave').addEventListener('click', () => {
+    syncHeader();
+    const buf = buildKRT(state);
+    const blob = new Blob([buf], { type: 'application/octet-stream' });
+    download(blob, 'ranktimeGP.krt');
+    setStatus('Exported .krt','ok');
+  });
+
+  $('#btnSaveJson').addEventListener('click', () => {
+    const out = JSON.stringify(state, null, 2);
+    const blob = new Blob([out], { type: 'application/json' });
+    download(blob, 'ranktimeGP.json');
+  });
+
+  $('#btnSaveCsv').addEventListener('click', () => {
+    const rows = [ ['index','track','t50','t100','t150'] ];
+    state.entries.forEach((e,i)=> rows.push([i, TRACK_NAMES[i]||'', e.t50, e.t100, e.t150]));
+    const csv = rows.map(r=>r.map(x=>String(x).includes(',')?`"${String(x).replace(/"/g,'""')}"`:x).join(',')).join('\n');
+    download(new Blob([csv], {type:'text/csv'}), 'ranktimeGP.csv');
+  });
+
+  $('#jsonInput').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    try {
+      const text = await file.text();
+      const obj = JSON.parse(text);
+      if (!obj || !obj.header || !Array.isArray(obj.entries)) throw new Error('Invalid JSON');
+      state.header = { ...obj.header };
+      state.entries = obj.entries.map(x=>({ t50:x.t50|0, t100:x.t100|0, t150:x.t150|0 }));
+      state.original = { header: {...state.header}, entries: state.entries.map(x=>({...x})) };
+      render(); setStatus('Imported JSON','ok');
+    } catch(err){ setStatus('JSON import failed: '+err.message, 'err'); }
+  });
+
+  $('#csvInput').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const out = [];
+      for (let i=1;i<lines.length;i++){
+        const cols = parseCsvLine(lines[i]);
+        const t50 = parseInt(cols[2]||'0',10), t100 = parseInt(cols[3]||'0',10), t150 = parseInt(cols[4]||'0',10);
+        out.push({ t50: clamp(t50,0,0xFFFF), t100: clamp(t100,0,0xFFFF), t150: clamp(t150,0,0xFFFF) });
+      }
+      state.entries = out; syncHeader(); render(); setStatus('Imported CSV ('+out.length+' rows)','ok');
+    } catch(err){ setStatus('CSV import failed: '+err.message, 'err'); }
+  });
+
+  function parseCsvLine(line){
+    const res = []; let cur = ''; let inQ = false;
+    for (let i=0;i<line.length;i++){
+      const ch = line[i];
+      if (inQ){
+        if (ch==='"' && line[i+1]==='"'){ cur+='"'; i++; }
+        else if (ch==='"'){ inQ=false; }
+        else cur+=ch;
+      } else {
+        if (ch===','){ res.push(cur); cur=''; }
+        else if (ch==='"'){ inQ=true; }
+        else cur+=ch;
+      }
+    }
+    res.push(cur); return res;
+  }
+
+  function validateBasic(parsed, fileName){
+    if (parsed.header.magic !== 'RKGT') setStatus('Warning: Magic is not RKGT','warn');
+    if (parsed.header.headerSize !== 12) setStatus('Note: Header size is '+parsed.header.headerSize+' (usually 12)','warn');
+    if ((12 + parsed.entries.length*8) !== (parsed.header.headerSize + parsed.header.numEntries*8)){
+      setStatus('Size/entry count mismatch. File might be truncated/extended.','warn');
+    }
+  }
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='d'){
+      ev.preventDefault();
+      const row = document.activeElement && document.activeElement.closest('tr');
+      if (!row) return; const i = row.rowIndex - 1; // account for thead
+      const e = state.entries[i]; if (!e) return;
+      state.entries.splice(i+1,0,{...e}); render();
+    }
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key==='Backspace' || ev.key==='Delete')){
+      ev.preventDefault();
+      const row = document.activeElement && document.activeElement.closest('tr');
+      if (!row) return; const i = row.rowIndex - 1;
+      state.entries.splice(i,1); render();
+    }
+  });
+
+  // Initialize empty UI
+  (function init(){
+    state.header = { magic:'RKGT', factor:1000, headerSize:12, numEntries:0 };
+    state.entries = [];
+    render();
+  })();
+  </script>
+</body>
+</html>
