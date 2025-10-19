@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RFL_Res Web</title>
+<style>
+  :root{
+    --bg: #0b0d10; --panel:#12161b; --muted:#7a8599; --line:#232a33; --accent:#8ab4ff;
+  }
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:#e6ebf5;font:14px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Helvetica Neue", "Apple Color Emoji","Segoe UI Emoji"}
+  .topbar{display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e1116,#0c1014)}
+  .topbar h1{font-size:14px;margin:0;font-weight:600;color:#dbe7ff;letter-spacing:.2px}
+  .topbar .meta{margin-left:auto;display:flex;gap:1rem;align-items:center;font-size:12px;color:var(--muted)}
+  .topbar a{color:#cbe1ff;text-decoration:none}
+  .btn{background:#1a2230;border:1px solid #2a3240;color:#dbe7ff;border-radius:8px;padding:.45rem .75rem;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:grid;grid-template-columns:280px 1fr;gap:0;height:calc(100% - 46px)}
+  .col{display:flex;flex-direction:column;min-height:0}
+  .panel{background:var(--panel);border-right:1px solid var(--line)}
+  #tree{flex:1;overflow:auto}
+  #tree ul{list-style:none;margin:0;padding:.25rem .25rem .75rem .25rem}
+  #tree li{user-select:none}
+  .n{display:flex;gap:.4rem;align-items:center;padding:.3rem .45rem;border-radius:8px;margin:1px 4px;color:#dfe8ff}
+  .n:hover{background:#1a2130}
+  .n.sel{background:#1f2b3e;border:1px solid #2c3c55}
+  .kids{margin-left:12px;padding-left:8px;border-left:1px dashed #2a3445}
+  .tag{font:11px ui-monospace,Menlo,Consolas,monospace;color:#a9b5c9;background:#0f141b;border:1px solid #252e3b;border-radius:6px;padding:.05rem .35rem}
+  .right{display:grid;grid-template-rows:240px 1fr;min-height:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--line)}
+  .box{padding:.7rem;border-right:1px solid var(--line);min-height:0;overflow:auto;}
+  .box:last-child{border-right:none}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:.35rem .6rem}
+  .kv label{color:#9fb0c9}
+  .kv input, .kv select{background:#0f141b;color:#e6ebf5;border:1px solid #2a3240;border-radius:6px;padding:.35rem .45rem}
+  .kv .ro{opacity:.8;background:#0c1116}
+  .kv .s{grid-column:span 2}
+  .grid h3{margin:.2rem 0 .6rem 0;font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:#98aac6}
+  .canvasWrap{position:relative;display:flex;align-items:center;justify-content:center;height:100%;background:#0c1014}
+  .canvasWrap.checker{background-image:linear-gradient(45deg,#0a0f14 25%,#0d1217 25%,#0d1217 50%,#0a0f14 50%,#0a0f14 75%,#0d1217 75%,#0d1217 100%);background-size:24px 24px}
+  #preview{image-rendering:pixelated;max-width:100%;max-height:100%}
+  .toolbar{display:flex;gap:.5rem;align-items:center}
+  .menu{display:flex;gap:.4rem}
+  .menu .btn{padding:.35rem .55rem}
+  .footer{padding:.45rem .75rem;border-top:1px solid var(--line);display:flex;gap:.6rem;align-items:center}
+  details{color:#9fb0c9}
+  summary{cursor:pointer}
+  .ctx{position:fixed;background:#121722;border:1px solid #2a3140;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.45);overflow:hidden;z-index:9999;display:none}
+  .ctx button{display:block;width:100%;text-align:left;background:transparent;border:0;color:#e6ebf5;padding:.5rem .75rem}
+  .ctx button:hover{background:#1a2230}
+  .warn{color:#ffbf70}
+  .ok{color:#9be1a3}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>RFL_Res Web</h1>
+    <div class="menu">
+      <button class="btn" id="openBtn">Open .dat</button>
+      <button class="btn" id="saveBtn" disabled>Save</button>
+      <button class="btn" id="bgToggle">Background: Checkered</button>
+    </div>
+    <div class="meta">
+      <span>Original tool by <a href="https://wiki.tockdom.com/wiki/User:Atlas" target="_blank" rel="noreferrer">Atlas</a></span>
+      <span>Web port — this file keeps all logic client‑side</span>
+    </div>
+    <input type="file" id="fileInput" accept=".dat" hidden />
+  </div>
+  <div class="row">
+    <div class="col panel">
+      <div id="tree" oncontextmenu="event.preventDefault()"></div>
+    </div>
+    <div class="col right">
+      <div class="grid">
+        <div class="box">
+          <h3>Selection</h3>
+          <div class="kv" id="selInfo"></div>
+        </div>
+        <div class="box">
+          <h3>BTI Properties</h3>
+          <div class="kv" id="propGrid"></div>
+        </div>
+      </div>
+      <div class="canvasWrap checker" id="canvasWrap">
+        <canvas id="preview"></canvas>
+      </div>
+      <div class="footer">
+        <div class="toolbar">
+          <button class="btn" id="importBtn" disabled>Import…</button>
+          <button class="btn" id="exportBtn" disabled>Export</button>
+          <button class="btn" id="exportAllBtn" disabled>Export all images</button>
+          <input type="file" id="importImage" accept="image/*,.bti" hidden />
+        </div>
+        <details>
+          <summary>Notes</summary>
+          <div style="max-width:900px;color:#aab7cd">
+            This is a faithful browser port of the original WinForms tool. It loads only the texture sections ("Group XX")
+            and preserves all model sections byte‑for‑byte when saving. Import expects standard images; paletted (<code>CI4/CI8/CI14X2</code>) and <code>DXT1</code> import are intentionally disabled (matching the original readme). Preview supports all non‑paletted formats; paletted are previewed too. Made by ChatGPT 5 Thinking.
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- simple context menus -->
+  <div class="ctx" id="ctxGroup">
+    <button data-act="group-export">Export (.vflgp)</button>
+    <button data-act="group-export-all">Export all images</button>
+  </div>
+  <div class="ctx" id="ctxImage">
+    <button data-act="img-import">Import…</button>
+    <button data-act="img-export">Export</button>
+  </div>
+
+<script>
+(function(){
+'use strict';
+
+/*==============================
+* Utilities
+*==============================*/
+const $ = sel => document.querySelector(sel);
+function h(tag, attrs={}, children=[]) {
+  const el = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) {
+    if (k === 'class') el.className = v; else if (k === 'style') el.style.cssText = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else el.setAttribute(k,v);
+  }
+  for (const c of (Array.isArray(children)? children : [children])) {
+    if (c==null) continue; el.append(c.nodeType? c : document.createTextNode(c));
+  }
+  return el;
+}
+function hex(n, pad=2){ return '0x'+(n>>>0).toString(16).toUpperCase().padStart(pad,'0'); }
+function readStr(dataview, pos, len){ let s = ""; for(let i=0;i<len;i++) s += String.fromCharCode(dataview.getUint8(pos+i)); return s; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/*==============================
+* Global state
+*==============================*/
+let fileBytes = null;       // ArrayBuffer of the opened RFL_Res.dat
+let fileName = null;
+let staticData = [];        // Array of Uint8Array chunks for model/static sections [0..8]
+let groups = [];            // [{title, images:[{name, offTag, btiBytes, header}]}]
+let imageOffsetsTable = []; // flat list to rebuild
+let selected = { groupIdx:null, imgIdx:null };
+
+// constants (mirrors the desktop tool)
+const MAXSIZE_BY_GROUP = [0xA20, 0x2A0, 0x4020, 0x1020, 0x0A0, 0x0B20, 0x420, 0x420, 0x420];
+const MODEL_MAGIC = new Set(["face","frhd","glas","hair","mask","nose","nsln","cap_"]);
+
+/*==============================
+* Binary helpers (Big Endian)
+*==============================*/
+class BE {
+  constructor(buf){ this.dv = new DataView(buf); }
+  u8(p){ return this.dv.getUint8(p); }
+  u16(p){ return this.dv.getUint16(p,false); }
+  u32(p){ return this.dv.getUint32(p,false); }
+}
+function slice(buf, start, end){ return new Uint8Array(buf.slice(start,end)); }
+function concatBytes(arrays){ const len = arrays.reduce((a,b)=>a+b.length,0); const out = new Uint8Array(len); let o=0; for(const a of arrays){ out.set(a,o); o+=a.length; } return out; }
+
+/*==============================
+* BTI codec (read/preview + write subset)
+*==============================*/
+const IMG_FMT = { I4:0x00,I8:0x01,IA4:0x02,IA8:0x03,RGB565:0x04,RGB5A3:0x05,RGBA8:0x06,CI4:0x08,CI8:0x09,CI14X2:0x0A,DXT1:0x0E };
+const PAL_FMT = { IA8:0x00, RGB565:0x01, RGB5A3:0x02 };
+const TILE_W = {0:8,1:8,2:8,3:4,4:4,5:4,6:4,8:8,9:8,10:4,14:8};
+const TILE_H = {0:8,1:4,2:4,3:4,4:4,5:4,6:4,8:8,9:4,10:4,14:8};
+const BPP    = {0:4,1:8,2:8,3:16,4:16,5:16,6:32,8:4,9:8,10:16,14:4};
+function alignDim(v, tile){ while(v % tile !== 0) v++; return v; }
+function getImageDataSize(fmt, w, h){ const W=alignDim(w, TILE_W[fmt]); const H=alignDim(h, TILE_H[fmt]); return (W*H*BPP[fmt])>>>3; }
+
+function readBTIHeader(dv, pos){
+  const fmt = dv.getUint8(pos);            // 0
+  const alphaEnable = dv.getUint8(pos+1);  // 1
+  const w = dv.getUint16(pos+2,false);     // 2
+  const h = dv.getUint16(pos+4,false);     // 4
+  const wrapS = dv.getUint8(pos+6);
+  const wrapT = dv.getUint8(pos+7);
+  const palFmt = dv.getUint16(pos+8,false);
+  const palEntries = dv.getUint16(pos+10,false);
+  const palOff = dv.getUint32(pos+12,false);
+  const unk1 = dv.getUint32(pos+16,false);
+  const mag = dv.getUint8(pos+20);
+  const min = dv.getUint8(pos+21);
+  const unk2 = dv.getUint16(pos+22,false);
+  const mips = dv.getUint8(pos+24);
+  const unk3 = dv.getUint8(pos+25);
+  const unk4 = dv.getUint16(pos+26,false);
+  const imgOff = dv.getUint32(pos+28,false);
+  return {fmt, alphaEnable, w, h, wrapS, wrapT, palFmt, palEntries, palOff, unk1, mag, min, unk2, mips, unk3, unk4, imgOff};
+}
+
+function rgb5a3_to_rgba(c){
+  // If high bit set => RGB555, else A3RGB4
+  if ((c & 0x8000) !== 0){
+    const r = ((c>>10)&0x1F)*255/31|0;
+    const g = ((c>>5)&0x1F)*255/31|0;
+    const b = (c&0x1F)*255/31|0;
+    return [r,g,b,255];
+  } else {
+    const a = ((c>>12)&0x7)*255/7|0;
+    const r = ((c>>8)&0xF)*255/15|0;
+    const g = ((c>>4)&0xF)*255/15|0;
+    const b = (c&0xF)*255/15|0;
+    return [r,g,b,a];
+  }
+}
+function rgb565_to_rgba(c){
+  const r=((c>>11)&0x1F)*255/31|0; const g=((c>>5)&0x3F)*255/63|0; const b=(c&0x1F)*255/31|0; return [r,g,b,255];
+}
+
+function decodeBTItoImageData(bytes){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const H = readBTIHeader(dv,0);
+  const fmt = H.fmt; const W=H.w, HH=H.h;
+  const out = new Uint8ClampedArray(W*HH*4);
+  const put = (x,y,rgba)=>{ if(x<0||y<0||x>=W||y>=HH) return; const i=(y*W+x)*4; out[i]=rgba[0]; out[i+1]=rgba[1]; out[i+2]=rgba[2]; out[i+3]=rgba[3]; };
+  const tileW=TILE_W[fmt], tileH=TILE_H[fmt];
+  const AW=alignDim(W,tileW), AH=alignDim(HH,tileH);
+  let p = H.imgOff; // start of image data (past header)
+  // Palette (for CI formats)
+  let palette=null; if (fmt===IMG_FMT.CI4 || fmt===IMG_FMT.CI8 || fmt===IMG_FMT.CI14X2){
+    const entries = H.palEntries || (fmt===IMG_FMT.CI4?16:(fmt===IMG_FMT.CI8?256:16384));
+    palette = new Array(entries);
+    const pd = H.palOff; // absolute within this BTI block
+    for(let i=0;i<entries;i++){
+      const c = dv.getUint16(pd + i*2, false);
+      if (H.palFmt===PAL_FMT.RGB565) palette[i]=rgb565_to_rgba(c);
+      else if (H.palFmt===PAL_FMT.RGB5A3) palette[i]=rgb5a3_to_rgba(c);
+      else { // IA8
+        const a=(c>>8)&0xFF, y=c&0xFF; palette[i]=[y,y,y,a];
+      }
+    }
+  }
+  // Helpers to read bytes
+  const get8 = ()=> dv.getUint8(p++);
+  const get16= ()=> { const v=dv.getUint16(p,false); p+=2; return v; };
+  const get32= ()=> { const v=dv.getUint32(p,false); p+=4; return v; };
+  // Iterate tiles
+  const nbx = Math.ceil(AW/tileW), nby=Math.ceil(AH/tileH);
+  function putPixelBlock(x0,y0,fn){ for(let y=0;y<tileH;y++){ for(let x=0;x<tileW;x++){ const rgba = fn(x,y); put(x0+x,y0+y,rgba); } } }
+
+  if (fmt===IMG_FMT.I4){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x+=2){ const b=get8(); const n1=(b>>4)&0xF, n2=b&0xF; const y1=(n1*255/15)|0; const y2=(n2*255/15)|0; put(bx*tileW+x,   by*tileH+y,[y1,y1,y1,255]); put(bx*tileW+x+1, by*tileH+y,[y2,y2,y2,255]); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.I8){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){ const Y=get8(); put(bx*tileW+x,by*tileH+y,[Y,Y,Y,255]); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.IA4){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){ const b=get8(); const y4=(b>>4)&0xF, a4=b&0xF; const Y=(y4*255/15)|0; const A=(a4*255/15)|0; put(bx*tileW+x,by*tileH+y,[Y,Y,Y,A]); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.IA8){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){ const a=get8(), Y=get8(); put(bx*tileW+x,by*tileH+y,[Y,Y,Y,a]); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.RGB565){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){ const c=get16(); put(bx*tileW+x,by*tileH+y, rgb565_to_rgba(c)); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.RGB5A3){
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){ const c=get16(); put(bx*tileW+x,by*tileH+y, rgb5a3_to_rgba(c)); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.RGBA8){
+    // Stored as two 8-bit planes per tile: AR and GB
+    for(let by=0;by<nby;by++){
+      for(let bx=0;bx<nbx;bx++){
+        // First A,R plane
+        const AR = new Uint8Array(tileW*tileH*2);
+        for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ AR[(y*tileW+x)*2+0] = get8(); }
+        for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ AR[(y*tileW+x)*2+1] = get8(); }
+        // Then G,B plane
+        const GB = new Uint8Array(tileW*tileH*2);
+        for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ GB[(y*tileW+x)*2+0] = get8(); }
+        for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ GB[(y*tileW+x)*2+1] = get8(); }
+        // Compose
+        for(let y=0;y<tileH;y++){
+          for(let x=0;x<tileW;x++){
+            const i=(y*tileW+x)*2; put(bx*tileW+x,by*tileH+y,[AR[i+1],GB[i+0],GB[i+1],AR[i+0]]);
+          }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.CI4 || fmt===IMG_FMT.CI8 || fmt===IMG_FMT.CI14X2){
+    // Indexed color; preview using palette
+    const bpp = fmt===IMG_FMT.CI4?4:(fmt===IMG_FMT.CI8?8:14);
+    for(let by=0; by<nby; by++){
+      for(let bx=0; bx<nbx; bx++){
+        if (fmt===IMG_FMT.CI8){
+          for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const idx=get8(); put(bx*tileW+x,by*tileH+y, palette[idx]||[0,0,0,0]); }
+        } else if (fmt===IMG_FMT.CI4){
+          for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x+=2){ const b=get8(); const i1=(b>>4)&0xF, i2=b&0xF; put(bx*tileW+x,by*tileH+y, palette[i1]||[0,0,0,0]); put(bx*tileW+x+1,by*tileH+y, palette[i2]||[0,0,0,0]); }
+        } else { // CI14X2 packed as 16b values with 2 unused bits (implementation approximation for preview)
+          for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const idx=get16() & 0x3FFF; put(bx*tileW+x,by*tileH+y, palette[idx]||[0,0,0,0]); }
+        }
+      }
+    }
+  } else if (fmt===IMG_FMT.DXT1){
+    // Not supported for import; decoding is non‑trivial. We skip preview.
+    // Show transparent image
+    return {header:H, imageData:null, warning:"DXT1 preview not supported"};
+  } else {
+    return {header:H, imageData:null, warning:"Unknown format"};
+  }
+
+  const imageData = new ImageData(out, W, HH);
+  return {header:H, imageData};
+}
+
+// Encode subset (RGBA8, RGB565, RGB5A3, IA8) — paletted + DXT1 not supported (matches original readme)
+async function encodeImageToBTI(blob, templateHeader){
+  const bmp = await createImageBitmap(await blob.arrayBuffer? blob : new Blob([blob])); // ensure ImageBitmap
+  const W = bmp.width, H=bmp.height;
+  if (W>512 || H>512) throw new Error('Image\'s width/height cannot be greater than 512 pixels.');
+  // Draw to canvas to get RGBA
+  const c=document.createElement('canvas'); c.width=W; c.height=H; const cx=c.getContext('2d'); cx.drawImage(bmp,0,0);
+  const img = cx.getImageData(0,0,W,H);
+
+  // Ask user for BTI options (format, wrap/filter/unknowns)
+  const opts = await showImportDialog(templateHeader);
+  if (!opts) return null;
+
+  const fmt = opts.format; // 0x06 RGBA8 etc
+  const tileW=TILE_W[fmt], tileH=TILE_H[fmt];
+  const AW=alignDim(W,tileW), AH=alignDim(H,tileH);
+  const imgOff = 0x20; // header size
+  let palOff = 0; let palEntries=0; let palFmt=0; // for non‑paletted
+  const out = new Uint8Array(imgOff + getImageDataSize(fmt, W,H));
+  out.fill(0);
+  const dv = new DataView(out.buffer);
+  // Write header
+  dv.setUint8(0, fmt);
+  dv.setUint8(1, (templateHeader && typeof templateHeader.alphaEnable === "number") ? templateHeader.alphaEnable : 0);
+
+  dv.setUint16(2, W, false);
+  dv.setUint16(4, H, false);
+  dv.setUint8(6, opts.wrapS); dv.setUint8(7, opts.wrapT);
+  dv.setUint16(8, palFmt, false);
+  dv.setUint16(10, palEntries, false);
+  dv.setUint32(12, palOff, false);
+  dv.setUint32(16, opts.unk1>>>0, false);
+  dv.setUint8(20, opts.mag);
+  dv.setUint8(21, opts.min);
+  dv.setUint16(22, opts.unk2>>>0, false);
+  dv.setUint8(24, 1); // Nr mipmaps (1)
+  dv.setUint8(25, opts.unk3>>>0);
+  dv.setUint16(26, opts.unk4>>>0, false);
+  dv.setUint32(28, imgOff, false);
+
+  // Write pixels in tiled order
+  let p = imgOff;
+  const put8 = v=>{ dv.setUint8(p++, v); };
+  const put16 = v=>{ dv.setUint16(p, v, false); p+=2; };
+  const putPlane = (arr)=>{ for(let i=0;i<arr.length;i++) put8(arr[i]); };
+
+  const nbx = Math.ceil(AW/tileW), nby=Math.ceil(AH/tileH);
+
+  const rgbaAt = (x,y)=>{ const i=(y*W+x)*4; return [img.data[i],img.data[i+1],img.data[i+2],img.data[i+3]]; };
+
+  if (fmt===IMG_FMT.RGBA8){
+    for(let by=0;by<nby;by++) for(let bx=0;bx<nbx;bx++){
+      const AR=[], GB=[];
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); AR.push(a); }
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); AR.push(r); }
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); GB.push(g); }
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); GB.push(b); }
+      putPlane(AR); putPlane(GB);
+    }
+  } else if (fmt===IMG_FMT.RGB565){
+    const pack=(r,g,b)=> ((r*31/255&31)<<11)|((g*63/255&63)<<5)|(b*31/255&31);
+    for(let by=0;by<nby;by++) for(let bx=0;bx<nbx;bx++){
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); put16(pack(r,g,b)); }
+    }
+  } else if (fmt===IMG_FMT.RGB5A3){
+  // EXE parity for RGB5A3
+  // - Submode: RGB555 iff A===255; else A3RGB4
+  // - OOB samples -> 0x0000
+  // - Quantization: A3 alpha = A>>5; A3 RGB = floor(C/17); 555 RGB = floor(C/8)
+  for (let by = 0; by < nby; by++) {
+    for (let bx = 0; bx < nbx; bx++) {
+      for (let y = 0; y < tileH; y++) {
+        for (let x = 0; x < tileW; x++) {
+          const sx = bx*tileW + x;
+          const sy = by*tileH + y;
+          if (sx >= W || sy >= H) { put16(0x0000); continue; }
+          const i = (sy*W + sx) * 4;
+          const R = img.data[i+0] | 0;
+          const G = img.data[i+1] | 0;
+          const B = img.data[i+2] | 0;
+          const A = img.data[i+3] | 0;
+          if (A === 255) {
+            // RGB555: 1 rrrrr ggggg bbbbb with floor(C/8)
+            const r5 = (R / 8) | 0;
+            const g5 = (G / 8) | 0;
+            const b5 = (B / 8) | 0;
+            put16(0x8000 | (r5<<10) | (g5<<5) | b5);
+          } else {
+            // A3RGB4: 0 aaa rrrr gggg bbbb with a3=A>>5 and floor(C/17)
+            const a3 = A >>> 5;
+            const r4 = (R / 17) | 0;
+            const g4 = (G / 17) | 0;
+            const b4 = (B / 17) | 0;
+            put16((a3<<12) | (r4<<8) | (g4<<4) | b4);
+          }
+        }
+      }
+    }
+  }
+} else if (fmt===IMG_FMT.IA8){
+    for(let by=0;by<nby;by++) for(let bx=0;bx<nbx;bx++){
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); const Y=(0.299*r+0.587*g+0.114*b)|0; put8(a); put8(Y); }
+    }
+  } else if (fmt===IMG_FMT.I8){
+    for(let by=0;by<nby;by++) for(let bx=0;bx<nbx;bx++){
+      for(let y=0;y<tileH;y++) for(let x=0;x<tileW;x++){ const [r,g,b,a]=rgbaAt(Math.min(bx*tileW+x,W-1), Math.min(by*tileH+y,H-1)); const Y=(0.299*r+0.587*g+0.114*b)|0; put8(Y); }
+    }
+  } else if (fmt===IMG_FMT.IA4 || fmt===IMG_FMT.CI4 || fmt===IMG_FMT.CI8 || fmt===IMG_FMT.CI14X2 || fmt===IMG_FMT.DXT1){
+    throw new Error('Import for this format is not supported in this web port (parity with original readme).');
+  } else {
+    throw new Error('Unknown format: '+fmt);
+  }
+  return out;
+}
+
+function canvasFromImageData(imageData){
+  const c = document.createElement('canvas'); c.width=imageData.width; c.height=imageData.height; const cx=c.getContext('2d'); cx.putImageData(imageData,0,0); return c;
+}
+
+/*==============================
+* File parser (mirrors the desktop algorithm)
+*==============================*/
+function parseRFL(bytes){
+  const dv = new DataView(bytes);
+  const be = new BE(bytes);
+  const id = be.u32(0);
+  if (id !== 0x0012039D) throw new Error('Incorrect file (magic '+hex(id,8)+')');
+
+  staticData = []; groups = []; imageOffsetsTable = []; selected={groupIdx:null,imgIdx:null};
+  // Capture initial static block (main + berd)
+  staticData.push(slice(bytes, 0, 0x74C));
+  // Move to section offsets table (start = 0x08)
+  const offsStart = 0x08; // after N and unknown
+  // Read 17 offsets (positions where each section starts AFTER the first tex group)
+  const imageGroupOffsets = [];
+  for(let i=0;i<0x11;i++){ imageGroupOffsets.push(be.u32(offsStart + i*4)); }
+
+  // Walk each section and split into model or texture group
+  let k=0; // texture group index
+  let l=0; // global image tag index
+  for(let i=0;i<imageGroupOffsets.length;i++){
+    const secStart = imageGroupOffsets[i];
+    const nextStart = imageGroupOffsets[i+1] || dv.byteLength; // last section reaches end
+    const dvSec = new DataView(bytes, secStart);
+    const nr = dvSec.getUint16(0,false);
+    const maxSz = dvSec.getUint16(2,false);
+    const relOffs = new Array(nr);
+    for(let j=0;j<nr;j++) relOffs[j]=dvSec.getUint32(4+j*4,false);
+    const secSize = dvSec.getUint32(4+nr*4,false);
+    const probe = readStr(dvSec, 8+nr*4, 4);
+    if (MODEL_MAGIC.has(probe)){
+      // Entire model section is preserved as static
+      staticData.push(slice(bytes, secStart, nextStart));
+      continue;
+    }
+    // Texture group
+    const groupNode = { title:`Group ${k.toString(16).toUpperCase().padStart(2,'0')}`, images:[] };
+    const base = secStart + 8 + nr*4; // after header+offset list, at the byte before size (we will add +4 below per entry)
+    for(let j=0;j<nr;j++){
+      const imgStart = base + relOffs[j];
+      const H = readBTIHeader(new DataView(bytes), imgStart);
+      const total = 0x20 + getImageDataSize(H.fmt, H.w, H.h) + ( (H.fmt===IMG_FMT.CI4||H.fmt===IMG_FMT.CI8||H.fmt===IMG_FMT.CI14X2) ? (H.palEntries*2) : 0 );
+      const imgBytes = slice(bytes, imgStart, imgStart+total);
+      const name = (relOffs[j]>>>0).toString(16).toUpperCase().padStart(8,'0')+".bti";
+      groupNode.images.push({ name, offTag:l, bytes:imgBytes, header:H });
+      imageOffsetsTable.push(l);
+      l++;
+    }
+    groups.push(groupNode);
+    k++;
+  }
+}
+
+/*==============================
+* UI rendering
+*==============================*/
+function renderTree(){
+  const tree = $('#tree'); tree.innerHTML = '';
+  const root = h('ul');
+  const rootLi = h('li',{}, h('div',{class:'n sel', id:'root'},[h('span',{class:'tag'},'RFL_Res'), ' ', fileName||'' ]));
+  root.append(rootLi);
+  const kids = h('div',{class:'kids'});
+  groups.forEach((g,gi)=>{
+    const gLi = h('li');
+    const gRow = h('div',{class:'n', tabIndex:0},[ h('span',{class:'tag'},g.title) ]);
+    gRow.addEventListener('click',()=>selectNode(gi,null));
+    gRow.addEventListener('contextmenu',(e)=>showCtx(e,'group',gi,null));
+    gLi.append(gRow);
+    const files = h('ul',{class:'kids'});
+    g.images.forEach((im,ii)=>{
+      const fLi = h('li');
+      const fRow = h('div',{class:'n'},[ im.name ]);
+      fRow.addEventListener('click',()=>selectNode(gi,ii));
+      fRow.addEventListener('contextmenu',(e)=>showCtx(e,'image',gi,ii));
+      fLi.append(fRow); files.append(fLi);
+    });
+    gLi.append(files); kids.append(gLi);
+  });
+  tree.append(root,kids);
+  $('#saveBtn').disabled = false;
+  $('#exportAllBtn').disabled = groups.length===0;
+}
+
+function selectNode(gi,ii){
+  selected.groupIdx = gi; selected.imgIdx = ii;
+  document.querySelectorAll('#tree .n').forEach(n=>n.classList.remove('sel'));
+  // Mark selected
+  const tree = $('#tree');
+  if (gi==null){ tree.querySelector('#root').classList.add('sel'); return; }
+  const gNode = tree.querySelectorAll('.kids>li>.n')[gi]; gNode.classList.add('sel');
+  if (ii!=null){ const fNode = tree.querySelectorAll('.kids>li>ul>li>.n')[ groups.slice(0,gi).reduce((a,g)=>a+g.images.length,0)+ii ]; fNode.classList.add('sel'); }
+  renderSelection();
+}
+
+function kvRow(k,v,ro=false, key){ const id = 'kv_'+k; const lab=h('label',{for:id},k); let input; if (typeof v === 'number' || typeof v === 'string'){ input=h('input',{id, value:v, class: ro?'ro':''}); if(ro) input.disabled=true; } else { input=v; }
+  if (key) input.dataset.key=key; const wrap = document.createDocumentFragment(); wrap.append(lab,input); return wrap; }
+
+function renderSelection(){
+  const selBox = $('#selInfo'); selBox.innerHTML='';
+  const propBox = $('#propGrid'); propBox.innerHTML='';
+  const cwrap = $('#canvasWrap'); const canv=$('#preview'); const cx=canv.getContext('2d'); cx.clearRect(0,0,canv.width,canv.height);
+  if (selected.groupIdx==null || selected.imgIdx==null){ return; }
+  const g = groups[selected.groupIdx]; const im = g.images[selected.imgIdx];
+
+  // Selection info (read‑only)
+  selBox.append(
+    kvRow('Group', g.title, true),
+    kvRow('File', im.name, true),
+    kvRow('Offset tag', im.offTag, true),
+  );
+
+  // Decode for preview
+  const dec = decodeBTItoImageData(im.bytes);
+  if (dec.imageData){ canv.width=dec.imageData.width; canv.height=dec.imageData.height; cx.putImageData(dec.imageData,0,0); }
+  else { canv.width=320; canv.height=200; cx.clearRect(0,0,canv.width,canv.height); cx.fillStyle="#8893aa"; cx.fillText(dec.warning||'Not previewable', 20,30); }
+
+  // Properties — editable subset
+  const H = dec.header;
+  // Build dropdowns for Wrap/Filter fields (show names instead of numbers)
+  const selWrap = (cur)=>{ const s=h('select'); [['Clamp',0],['Repeat',1],['Mirror',2]].forEach(([n,v])=>s.append(h('option',{value:v},n))); s.value=String(cur); return s; };
+  const selMag  = (cur)=>{ const s=h('select'); [['Nearest',0],['Linear',1]].forEach(([n,v])=>s.append(h('option',{value:v},n))); s.value=String(cur); return s; };
+  const selMin  = (cur)=>{ const s=h('select'); [['Nearest',0],['Linear',1],['Nearest_Mipmap_Nearest',2],['Nearest_Mipmap_Linear',3],['Linear_Mipmap_Nearest',4],['Linear_Mipmap_Linear',5]].forEach(([n,v])=>s.append(h('option',{value:v},n))); s.value=String(cur); return s; };
+
+  const wrapSSelect = selWrap(H.wrapS); wrapSSelect.dataset.key='wrapS';
+  const wrapTSelect = selWrap(H.wrapT); wrapTSelect.dataset.key='wrapT';
+  const magSelect   = selMag(H.mag);   magSelect.dataset.key='mag';
+  const minSelect   = selMin(H.min);   minSelect.dataset.key='min';
+
+  const fields = [
+    ['Offset', hex( im.bytes.byteOffset || 0 ) , true],
+    ['Width', H.w, true],
+    ['Height', H.h, true],
+    ['Format', H.fmt, true],
+    ['PaletteFormat', H.palFmt, true],
+    ['WrapS', wrapSSelect, false, 'wrapS'],
+    ['WrapT', wrapTSelect, false, 'wrapT'],
+    ['MagFilter', magSelect, false, 'mag'],
+    ['MinFilter', minSelect, false, 'min'],
+    ['Unknown1', H.unk1>>>0, false, 'unk1'],
+    ['Unknown2', H.unk2>>>0, false, 'unk2'],
+    ['Unknown3', H.unk3>>>0, false, 'unk3'],
+    ['Unknown4', H.unk4>>>0, false, 'unk4']
+  ];
+  for (const [k,v,ro,key] of fields){ propBox.append( kvRow(k, v, ro, key) ); }
+  // Handle edits -> update header in memory
+  propBox.querySelectorAll('input:not(.ro), select').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const key=inp.dataset.key; const val = parseInt(inp.value,10)>>>0; const dv=new DataView(im.bytes.buffer, im.bytes.byteOffset, im.bytes.byteLength);
+      if (key==='wrapS') dv.setUint8(6, val);
+      else if (key==='wrapT') dv.setUint8(7, val);
+      else if (key==='mag') dv.setUint8(20, val);
+      else if (key==='min') dv.setUint8(21, val);
+      else if (key==='unk1') dv.setUint32(16, val, false);
+      else if (key==='unk2') dv.setUint16(22, val, false);
+      else if (key==='unk3') dv.setUint8(25, val);
+      else if (key==='unk4') dv.setUint16(26, val, false);
+    });
+  });
+
+  // Enable actions
+  $('#importBtn').disabled=false; $('#exportBtn').disabled=false; $('#exportAllBtn').disabled=false;
+}
+
+/*==============================
+* Context menus & actions
+*==============================*/
+function showCtx(ev, type, gi, ii){
+  const mGroup=$('#ctxGroup'), mImage=$('#ctxImage');
+  mGroup.style.display=mImage.style.display='none';
+  const menu = type==='group'? mGroup : mImage;
+  menu.style.left = ev.clientX+'px'; menu.style.top = ev.clientY+'px'; menu.style.display='block';
+  const close=()=>{ menu.style.display='none'; document.removeEventListener('click', close); };
+  document.addEventListener('click', close);
+  menu.onclick = async (e)=>{
+    const act = e.target.closest('button')?.dataset.act; if (!act) return;
+    e.stopPropagation(); close();
+    if (act==='group-export') await exportGroupVFLGP(gi);
+    if (act==='group-export-all') await exportGroupAll(gi);
+    if (act==='img-import') $('#importImage').click();
+    if (act==='img-export') await exportImage(gi, ii);
+  };
+}
+
+async function exportImage(gi,ii){
+  const im = groups[gi].images[ii];
+  // Offer BTI or PNG
+  const choice = await quickPick('Export', ['BTI (.bti)','PNG (.png)']);
+  if (!choice) return;
+  if (choice.startsWith('BTI')){
+    download(im.bytes, im.name, 'application/octet-stream');
+  } else {
+    const dec = decodeBTItoImageData(im.bytes); if (!dec.imageData) return;
+    const c = canvasFromImageData(dec.imageData);
+    c.toBlob(b=>download(b, im.name.replace(/\.bti$/i,'.png'), 'image/png'));
+  }
+}
+
+async function exportGroupAll(gi){
+  // Create a tiny ZIP (store only)
+  const files = groups[gi].images.map(im=>({name:im.name, data:im.bytes}));
+  const zip = buildZip(files);
+  download(zip, groups[gi].title.replace(/\s/g,'_')+"_images.zip", 'application/zip');
+}
+
+async function exportGroupVFLGP(gi){
+  const g = groups[gi];
+  const out = new Uint8Array(4+1+1+1 + g.images.reduce((a,im)=>a+im.bytes.length,0));
+  const dv = new DataView(out.buffer);
+  dv.setUint8(0,'V'.charCodeAt(0)); dv.setUint8(1,'F'.charCodeAt(0)); dv.setUint8(2,'L'.charCodeAt(0)); dv.setUint8(3,'G'.charCodeAt(0));
+  dv.setUint8(4,1); // version
+  dv.setUint8(5,gi&0xFF);
+  dv.setUint8(6,g.images.length&0xFF);
+  let p=7; for(const im of g.images){ out.set(im.bytes,p); p+=im.bytes.length; }
+  download(out, g.title+".vflgp", 'application/octet-stream');
+}
+
+// Import handler (single image)
+$('#importImage').addEventListener('change', async (ev)=>{
+  const file = ev.target.files[0]; ev.target.value=''; if (!file) return;
+  const gi = selected.groupIdx, ii=selected.imgIdx; const im=groups[gi].images[ii];
+  try{
+    let newBytes;
+    if (/\.bti$/i.test(file.name)){
+      newBytes = new Uint8Array(await file.arrayBuffer());
+    } else {
+      newBytes = await encodeImageToBTI(file, im.header);
+      if (!newBytes) return; // cancelled
+    }
+    im.bytes = newBytes; // replace
+    renderSelection();
+  }catch(err){ alert('Import failed: '+err.message); }
+});
+
+/*==============================
+* Save RFL_Res.dat (rebuild like desktop tool)
+*==============================*/
+function fillOffsetList(dv, groupPos, groupIdx, nextSectionPos){
+  // Section header layout:
+  // +0..1: u16 count
+  // +2..3: u16 max file length (kept as-is)
+  // +4..(4+4N-1): N x u32 relative offsets (from start of files area)
+  // +4+4N..(8+4N-1): u32 section size (sum of file sizes)
+  // Files start at: groupPos + 8 + 4*N
+  const g = groups[groupIdx];
+  const n = g.images.length;
+  // Write offsets (prefix sums) starting at groupPos + 4
+  let p = groupPos + 4;
+  let acc = 0 >>> 0;
+  for (let i = 0; i < n; i++){
+    dv.setUint32(p + i*4, acc >>> 0, false);
+    acc = (acc + g.images[i].bytes.length) >>> 0;
+  }
+  // Write section size at groupPos + 4 + 4N
+  const sizePos = groupPos + 4 + n*4;
+  dv.setUint32(sizePos, acc >>> 0, false);
+}
+function rebuildDat(){
+  // Precompute sizes
+  const parts = [];
+  // Static 0 (main+berd)
+  parts.push(staticData[0]);
+  const pos = []; // capture positions for section offset table
+  // TexData0 header + reserve offsets
+  const W = [];// group write helpers
+  function writeGroupHeader(count, max){ const a=new Uint8Array(8 + count*4); const dv=new DataView(a.buffer); dv.setUint16(0,count,false); dv.setUint16(2,max,false); /* offsets start at +4; section size later */ return a; }
+
+  // Group 0
+  let g0h = writeGroupHeader(groups[0].images.length, MAXSIZE_BY_GROUP[0]); let g0imgs = concatBytes(groups[0].images.map(im=>im.bytes)); parts.push(g0h, g0imgs);
+  pos[0] = staticData[0].length; // TexData0 starts at 0x754 in originals; here we derive position
+
+  // Group 1 then face (Static 1)
+  pos[1] = parts.reduce((s,a)=>s+a.length,0);
+  let g1h = writeGroupHeader(groups[1].images.length, MAXSIZE_BY_GROUP[1]); let g1imgs = concatBytes(groups[1].images.map(im=>im.bytes)); parts.push(g1h,g1imgs); const facePos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[1]);
+  // Group 2 then frhd
+  const tex2Pos = parts.reduce((s,a)=>s+a.length,0); let g2h = writeGroupHeader(groups[2].images.length, MAXSIZE_BY_GROUP[2]); let g2imgs = concatBytes(groups[2].images.map(im=>im.bytes)); parts.push(g2h,g2imgs); const frhdPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[2]);
+  // glas (static3)
+  const glasPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[3]);
+  // Group 3 then hair then mask then Groups 4,5,6, then nose, nsln, Group 7, cap_, Group 8
+  const tex3Pos = parts.reduce((s,a)=>s+a.length,0); let g3h=writeGroupHeader(groups[3].images.length, MAXSIZE_BY_GROUP[3]); let g3imgs=concatBytes(groups[3].images.map(im=>im.bytes)); parts.push(g3h,g3imgs);
+  const hairPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[4]);
+  const maskPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[5]);
+  const tex4Pos = parts.reduce((s,a)=>s+a.length,0); let g4h=writeGroupHeader(groups[4].images.length, MAXSIZE_BY_GROUP[4]); let g4imgs=concatBytes(groups[4].images.map(im=>im.bytes)); parts.push(g4h,g4imgs);
+  const tex5Pos = parts.reduce((s,a)=>s+a.length,0); let g5h=writeGroupHeader(groups[5].images.length, MAXSIZE_BY_GROUP[5]); let g5imgs=concatBytes(groups[5].images.map(im=>im.bytes)); parts.push(g5h,g5imgs);
+  const tex6Pos = parts.reduce((s,a)=>s+a.length,0); let g6h=writeGroupHeader(groups[6].images.length, MAXSIZE_BY_GROUP[6]); let g6imgs=concatBytes(groups[6].images.map(im=>im.bytes)); parts.push(g6h,g6imgs);
+  const nosePos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[6]);
+  const nslnPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[7]);
+  const tex7Pos = parts.reduce((s,a)=>s+a.length,0); let g7h=writeGroupHeader(groups[7].images.length, MAXSIZE_BY_GROUP[7]); let g7imgs=concatBytes(groups[7].images.map(im=>im.bytes)); parts.push(g7h,g7imgs);
+  const capPos = parts.reduce((s,a)=>s+a.length,0); parts.push(staticData[8]);
+  const tex8Pos = parts.reduce((s,a)=>s+a.length,0); let g8h=writeGroupHeader(groups[8].images.length, MAXSIZE_BY_GROUP[8]); let g8imgs=concatBytes(groups[8].images.map(im=>im.bytes)); parts.push(g8h,g8imgs);
+
+  const finalLen = parts.reduce((s,a)=>s+a.length,0);
+  // Assemble into one Uint8Array
+  const out = new Uint8Array(finalLen);
+  let off=0; for(const a of parts){ out.set(a,off); off+=a.length; }
+
+  // Now patch the section offsets table and per-group relative offsets + section sizes
+  const dv = new DataView(out.buffer);
+  // Write section starts at 0x0C (as per desktop tool). Order: Tex1, face, Tex2, frhd, glas, Tex3, hair, mask, Tex4, Tex5, Tex6, nose, nsln, Tex7, cap_, Tex8
+  dv.setUint32(0x0C, pos[1], false); // We follow the detected positions above
+  dv.setUint32(0x10, facePos, false);
+  dv.setUint32(0x14, tex2Pos, false);
+  dv.setUint32(0x18, frhdPos, false);
+  dv.setUint32(0x1C, glasPos, false);
+  dv.setUint32(0x20, tex3Pos, false);
+  dv.setUint32(0x24, hairPos, false);
+  dv.setUint32(0x28, maskPos, false);
+  dv.setUint32(0x2C, tex4Pos, false);
+  dv.setUint32(0x30, tex5Pos, false);
+  dv.setUint32(0x34, tex6Pos, false);
+  dv.setUint32(0x38, nosePos, false);
+  dv.setUint32(0x3C, nslnPos, false);
+  dv.setUint32(0x40, tex7Pos, false);
+  dv.setUint32(0x44, capPos, false);
+  dv.setUint32(0x48, tex8Pos, false);
+
+  // TexData0 offset list starts at 0x754 in original — here we compute base from static0 length
+  let base0 = staticData[0].length; // where TexData0 header begins
+  // Compute starts of each group header within out (from earlier positions)
+  const tex0Pos = staticData[0].length; // g0h
+  const tex1Pos = pos[1];
+  fillOffsetList(dv, tex0Pos, 0, tex1Pos);
+  fillOffsetList(dv, tex1Pos, 1, facePos);
+  fillOffsetList(dv, tex2Pos, 2, frhdPos);
+  fillOffsetList(dv, tex3Pos, 3, hairPos);
+  fillOffsetList(dv, tex4Pos, 4, tex5Pos);
+  fillOffsetList(dv, tex5Pos, 5, tex6Pos);
+  fillOffsetList(dv, tex6Pos, 6, nosePos);
+  fillOffsetList(dv, tex7Pos, 7, capPos);
+  fillOffsetList(dv, tex8Pos, 8, finalLen);
+
+  return out;
+}
+
+/*==============================
+* Small dialogs & ZIP builder
+*==============================*/
+function quickPick(title, options){
+  return new Promise(resolve=>{
+    const d = h('div',{style:'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999'});
+    const panel = h('div',{style:'background:#0f141b;border:1px solid #2a3240;border-radius:12px;min-width:260px;padding:.7rem'});
+    panel.append(h('div',{style:'color:#cfe0ff;margin-bottom:.4rem;font-weight:600'}, title));
+    options.forEach(opt=>{
+      const b=h('button',{class:'btn',style:'width:100%;margin:.2rem 0'},opt); b.onclick=()=>{document.body.removeChild(d); resolve(opt);}; panel.append(b);
+    });
+    const cancel=h('button',{class:'btn',style:'width:100%;margin-top:.4rem;background:#1a2029;color:#b9c4d6'},'Cancel'); cancel.onclick=()=>{document.body.removeChild(d); resolve(null);}; panel.append(cancel);
+    d.append(panel); document.body.append(d);
+  });
+}
+
+function showImportDialog(template){
+  return new Promise(resolve=>{
+    const d = h('div',{style:'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999'});
+    const P = h('div',{style:'background:#0f141b;border:1px solid #2a3240;border-radius:12px;min-width:420px;max-width:520px;padding:12px;'});
+    P.append(h('div',{style:'color:#cfe0ff;margin-bottom:6px;font-weight:700'},'Create BTI from image'));
+    const row=(label,el)=>{ const r=h('div',{style:'display:flex;align-items:center;gap:10px;margin:6px 0'}); r.append(h('div',{style:'width:140px;color:#9fb0c9'},label), el); return r; };
+    const fmtSel=h('select'); [["RGBA8",IMG_FMT.RGBA8],["RGB565",IMG_FMT.RGB565],["RGB5A3",IMG_FMT.RGB5A3],["IA8",IMG_FMT.IA8],["I8",IMG_FMT.I8]].forEach(([n,v])=>{ const o=h('option',{value:v},n); fmtSel.append(o); });
+    fmtSel.value = String(template?.fmt ?? IMG_FMT.RGBA8);
+const wrapS=h('select'); [["Clamp",0],["Repeat",1],["Mirror",2]].forEach(([n,v])=>wrapS.append(h('option',{value:v},n))); wrapS.value=template?.wrapS??0;
+    const wrapT=h('select'); [["Clamp",0],["Repeat",1],["Mirror",2]].forEach(([n,v])=>wrapT.append(h('option',{value:v},n))); wrapT.value=template?.wrapT??0;
+    const mag=h('select'); [["Nearest",0],["Linear",1]].forEach(([n,v])=>mag.append(h('option',{value:v},n))); mag.value=template?.mag??1;
+    const min=h('select'); [["Nearest",0],["Linear",1],["Nearest_Mipmap_Nearest",2],["Nearest_Mipmap_Linear",3],["Linear_Mipmap_Nearest",4],["Linear_Mipmap_Linear",5]].forEach(([n,v])=>min.append(h('option',{value:v},n))); min.value=template?.min??1;
+    const unk1=h('input',{type:'number',value:template?.unk1??0}); const unk2=h('input',{type:'number',value:template?.unk2??0}); const unk3=h('input',{type:'number',value:template?.unk3??0}); const unk4=h('input',{type:'number',value:template?.unk4??0});
+    P.append(
+      row('Format',fmtSel), row('WrapS',wrapS), row('WrapT',wrapT), row('MagFilter',mag), row('MinFilter',min), row('Unknown1',unk1), row('Unknown2',unk2), row('Unknown3',unk3), row('Unknown4',unk4)
+    );
+    const bar=h('div',{style:'display:flex;gap:10px;justify-content:flex-end;margin-top:10px'});
+    const ok=h('button',{class:'btn'},'OK'); const cancel=h('button',{class:'btn'},'Cancel');
+    ok.onclick=()=>{ document.body.removeChild(d); resolve({format:+fmtSel.value, wrapS:+wrapS.value, wrapT:+wrapT.value, mag:+mag.value, min:+min.value, unk1:+unk1.value, unk2:+unk2.value, unk3:+unk3.value, unk4:+unk4.value}); };
+    cancel.onclick=()=>{ document.body.removeChild(d); resolve(null); };
+    bar.append(cancel, ok); P.append(bar); d.append(P); document.body.append(d);
+  });
+}
+
+function buildZip(files){
+  // Minimal ZIP (store) implementation
+  let offset=0; const local=[], central=[];
+  function crc32(buf){ // simple CRC32
+    let c=~0; for(let i=0;i<buf.length;i++){ c = (c>>>8) ^ table[(c^buf[i])&0xFF]; } return ~c>>>0;
+  }
+  const table = (function(){ let c, table=[]; for(let n=0;n<256;n++){ c=n; for(let k=0;k<8;k++) c = (c&1)? (0xEDB88320^(c>>>1)) : (c>>>1); table[n]=c>>>0; } return table; })();
+  for(const f of files){ const name=new TextEncoder().encode(f.name); const data=f.data; const crc=crc32(data); const lh=new Uint8Array(30+name.length); const lhd=new DataView(lh.buffer);
+    lhd.setUint32(0,0x04034b50,true); lhd.setUint16(4,20,true); lhd.setUint16(6,0,true); lhd.setUint16(8,0,true); lhd.setUint16(10,0,true); lhd.setUint16(12,0,true);
+    lhd.setUint32(14,crc,true); lhd.setUint32(18,data.length,true); lhd.setUint32(22,data.length,true); lhd.setUint16(26,name.length,true); lhd.setUint16(28,0,true);
+    local.push(lh,name,data); const cdoff = offset; offset += lh.length + name.length + data.length;
+    const ch=new Uint8Array(46+name.length); const chd=new DataView(ch.buffer);
+    chd.setUint32(0,0x02014b50,true); chd.setUint16(4,20,true); chd.setUint16(6,20,true); chd.setUint16(8,0,true); chd.setUint16(10,0,true); chd.setUint16(12,0,true); chd.setUint16(14,0,true);
+    chd.setUint32(16,crc,true); chd.setUint32(20,data.length,true); chd.setUint32(24,data.length,true); chd.setUint16(28,name.length,true); chd.setUint16(30,0,true); chd.setUint16(32,0,true); chd.setUint16(34,0,true); chd.setUint16(36,0,true);
+    chd.setUint32(42,cdoff,true); central.push(ch,name);
+  }
+  const centralSize = central.reduce((a,b)=>a+b.length,0);
+  const centralOff = offset;
+  const eoc = new Uint8Array(22); const e=new DataView(eoc.buffer);
+  e.setUint32(0,0x06054b50,true); e.setUint16(4,0,true); e.setUint16(6,0,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,centralSize,true); e.setUint32(16,centralOff,true); e.setUint16(20,0,true);
+  const out = concatBytes([...local, ...central, eoc]);
+  return out;
+}
+
+function download(data, name, type){ const blob = (data instanceof Blob)? data : new Blob([data], {type:type||'application/octet-stream'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+
+/*==============================
+* Wiring
+*==============================*/
+$('#openBtn').onclick=()=>$('#fileInput').click();
+$('#fileInput').addEventListener('change', async (ev)=>{
+  const f=ev.target.files[0]; ev.target.value=''; if(!f) return;
+  try{
+    const bytes = await f.arrayBuffer(); fileBytes = bytes; fileName=f.name;
+    parseRFL(bytes);
+    renderTree(); selectNode(0,0);
+  }catch(err){ alert('Failed to open: '+err.message); }
+});
+$('#saveBtn').onclick=()=>{
+  try{ const out=rebuildDat(); download(out, fileName||'RFL_Res.dat', 'application/octet-stream'); }
+  catch(err){ alert('Save failed: '+err.message); }
+};
+$('#bgToggle').onclick=()=>{
+  const w=$('#canvasWrap'); if (w.classList.contains('checker')){ w.classList.remove('checker'); $('#bgToggle').textContent='Background: Solid'; } else { w.classList.add('checker'); $('#bgToggle').textContent='Background: Checkered'; }
+};
+$('#importBtn').onclick=()=>$('#importImage').click();
+$('#exportBtn').onclick=()=>{ if (selected.groupIdx!=null && selected.imgIdx!=null) exportImage(selected.groupIdx, selected.imgIdx); };
+$('#exportAllBtn').onclick=()=>{ if (selected.groupIdx!=null) exportGroupAll(selected.groupIdx); };
+
+// Drag & drop support
+window.addEventListener('dragover',e=>{e.preventDefault();});
+window.addEventListener('drop',async e=>{ e.preventDefault(); const f=e.dataTransfer.files?.[0]; if(!f) return; const bytes=await f.arrayBuffer(); fileBytes=bytes; fileName=f.name; parseRFL(bytes); renderTree(); selectNode(0,0); });
+
+})();
+</script>
+</body>
+</html>
