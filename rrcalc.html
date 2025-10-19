@@ -97,9 +97,9 @@
             <p>This tool reads <code>rksys.dat</code> locally in your browser and shows, for each license, the stats used by Retro Rewind’s VS ranking alongside the <em>minimum</em> value each stat would have to reach (if changed in isolation) to hit the next rank threshold.</p>
             <ul>
               <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (60%), VS win% (20%), 1st-place count (10%), distance travelled (5%), distance while 1st (5%).</li>
-              <li>Normalizations: VR 0–30000 → 0–100; 1st-place 0–1500 → 0–100; distance 0–75000 → 0–100; 1st distance 0–20000 → 0–100; win% 0–100.</li>
+              <li>Normalizations: VR 0–30000 → 0–100; 1st-place: 0–1250 → 0–100 (saturates by 1500); distance: 0–50000 → 0–100 (saturates by 75000); 1st distance: 0–10000 → 0–100 (saturates by 20000); Win% 0–100 (if no VS races, baseline 45%).</li>
               <li>Affine mapping uses anchors so that a strong profile maps near 100 and a weak/brand new profile maps near ~10. Ranks are bucketed by the score (12,24,36,48,60,72,84,94,100).</li>
-              <li>Per-stat lowest possible value for max rank: 26501 VR, Win%: 65%, Times 1st: 450, Distance & 1st Distance: 9500m/9500m or 45000m/0m</li>
+              <li>Per-stat lowest possible value for max rank: VR ≥ 26,500; Win% ≥ 65%; Times 1st ≥ 375; Distance & 1st Distance combos to supply ≥3 M-points at 0.05·(distNorm+dist1stNorm) (e.g., 30,000m/0m or 15,000m/3,000m).</li>
               <li>Nothing is uploaded; everything is client's side. You can save this file and run it offline.</li>
             </ul>
           </div>
@@ -193,11 +193,11 @@
   function computeScore(stats){
     const {vrPoints, vsWins, vsLosses, firsts, dist, dist1st} = stats;
     const totalVs = vsWins + vsLosses;
-    const winPct = totalVs>0 ? (100.0 * vsWins / totalVs) : 50.0;
+    const winPct = totalVs>0 ? (100.0 * vsWins / totalVs) : 45.0;
     const vrNorm = clamp((clamp(vrPoints,0,30000) / 30000.0) * 100.0, 0, 100);
-    const firstsNorm = clamp(firsts >= 1500 ? 100.0 : (100.0*firsts/1500.0), 0, 100);
-    const distNorm = clamp(dist >= 75000 ? 100.0 : (100.0*dist/75000.0), 0, 100);
-    const dist1stNorm = clamp(dist1st >= 20000 ? 100.0 : (100.0*dist1st/20000.0), 0, 100);
+    const firstsNorm = (firsts >= 1500) ? 100.0 : (100.0*firsts/1250.0);
+    const distNorm = (dist >= 75000) ? 100.0 : (100.0*dist/50000.0);
+    const dist1stNorm = (dist1st >= 20000) ? 100.0 : (100.0*dist1st/10000.0);
     const M = W_VR*vrNorm + W_RWIN*winPct + W_FIRSTS*firstsNorm + W_DIST*distNorm + W_DIST1ST*dist1stNorm;
     const score = clamp(ALPHA*M + BETA, 0, 100);
     return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm};
@@ -233,9 +233,9 @@
 
     const vrRaw     = clamp(Math.ceil(vrNormReq * 300), 0, 30000); // 100→30000
     const winPctRaw = clamp(Math.ceil(winPctReq * 100) / 100, 0, 100); // show 2dp
-    const firstsRaw = clamp(Math.ceil(firstsNormReq * 15), 0, 1500);   // 100→1500
-    const distRaw   = clamp(Math.ceil(distNormReq   * 750), 0, 75000); // 100→75000
-    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 200), 0, 20000); // 100→20000
+    const firstsRaw = clamp(Math.ceil(firstsNormReq * 12.5), 0, 1500);   // 100→1500
+    const distRaw   = clamp(Math.ceil(distNormReq   * 500), 0, 75000); // 100→75000
+    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 100), 0, 20000); // 100→20000
 
     function feas(normReq){ return normReq<=100 ? 'ok' : (normReq<=110 ? 'warn' : 'bad'); }
 
