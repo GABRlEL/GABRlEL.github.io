@@ -43,3 +43,7 @@
 [Le Tableur — MKWii Competitive Tabling Helper](https://gabrlel.github.io/table.html)
 
 [KRT Web — Mario Kart Wii RKGT Editor](https://gabrlel.github.io/krt.html)
+
+[RFL_Res Web - RFL_Res.dat Editor](https://gabrlel.github.io/rfl_res.html)
+
+[CMG Web - MKWii Country Modifier Generator](https://gabrlel.github.io/cmg.html)
