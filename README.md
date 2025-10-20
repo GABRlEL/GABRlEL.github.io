@@ -47,3 +47,5 @@
 [RFL_Res Web - RFL_Res.dat Editor](https://gabrlel.github.io/rfl_res.html)
 
 [CMG Web - MKWii Country Modifier Generator](https://gabrlel.github.io/cmg.html)
+
+[Hidden GP Score Calculator](https://gabrlel.github.io/hidden.html)
