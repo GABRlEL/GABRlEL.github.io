@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MKW Hidden GP Score Calculator</title>
+  <style>
+    :root { --fg:#0b1321; --bg:#f7f8fb; --muted:#6b7280; --card:#ffffff; --accent:#2563eb; }
+    * { box-sizing: border-box; }
+    html, body { height:100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+      color:var(--fg); background: var(--bg);
+      line-height: 1.25;
+    }
+    header { padding: 24px; text-align: center; }
+    h1 { margin: 0 0 6px; font-size: clamp(22px, 3vw, 30px); }
+    p.subtitle { margin: 0; color: var(--muted); }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card {
+      background: var(--card); border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(10,12,21,.06);
+      padding: 16px;
+    }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    label { font-size: 13px; color: var(--muted); display:block; margin-bottom:6px; }
+    select { background:white; }
+    input[type="text"], input[type="number"], select {
+      width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius: 10px; outline:none; background:white;
+      font-size: 14px;
+    }
+    input[type="checkbox"] { transform: scale(1.1); margin-right: 8px; vertical-align: middle; }
+    .row { display:flex; gap:12px; align-items: center; flex-wrap: wrap; }
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      background: var(--accent); color:white; border:none; border-radius: 10px; padding: 10px 14px; font-weight: 600;
+      cursor:pointer;
+    }
+    .btn.secondary { background: #0f172a; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .result-line { display:flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e5e7eb; }
+    .result-line:last-child { border-bottom: none; }
+    .result-key { color: var(--muted); }
+    .result-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .total { font-size: 18px; }
+    footer { text-align:center; padding:20px; color: var(--muted); font-size: 13px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size: 12px; }
+    .warn { background:#fff7ed; color:#9a3412; }
+    .ok { background:#ecfdf5; color:#065f46; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; padding:2px 6px; border:1px solid #e5e7eb; border-radius:6px; background:white; }
+    @media (max-width: 860px) {
+      .col-4, .col-6, .col-8 { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MKW Hidden GP Score Calculator</h1>
+    <p class="subtitle">Reproduces Nintendo's per‑race hidden score used for GP star ranks.</p>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+      <div class="card col-8">
+        <div class="grid">
+          <div class="col-6">
+            <label>Course</label>
+            <select id="course">
+              <optgroup label="Mushroom Cup"><option value="1">Moo Moo Meadows (Wii) — 0x01</option><option value="2">Mushroom Gorge (Wii) — 0x02</option><option value="4">Toad's Factory (Wii) — 0x04</option><option value="8">Luigi Circuit (Wii) — 0x08</option></optgroup><optgroup label="Flower Cup"><option value="0">Mario Circuit (Wii) — 0x00</option><option value="5">Coconut Mall (Wii) — 0x05</option><option value="6">DK Summit (Wii) — 0x06</option><option value="7">Wario's Gold Mine (Wii) — 0x07</option></optgroup><optgroup label="Star Cup"><option value="3">Grumble Volcano (Wii) — 0x03</option><option value="9">Daisy Circuit (Wii) — 0x09</option><option value="11">Maple Treeway (Wii) — 0x0B</option><option value="15">Koopa Cape (Wii) — 0x0F</option></optgroup><optgroup label="Special Cup"><option value="10">Moonview Highway (Wii) — 0x0A</option><option value="12">Bowser's Castle (Wii) — 0x0C</option><option value="13">Rainbow Road (Wii) — 0x0D</option><option value="14">Dry Dry Ruins (Wii) — 0x0E</option></optgroup><optgroup label="Shell Cup"><option value="16">GCN Peach Beach — 0x10</option><option value="20">DS Yoshi Falls — 0x14</option><option value="25">SNES Ghost Valley 2 — 0x19</option><option value="26">N64 Mario Raceway — 0x1A</option></optgroup><optgroup label="Banana Cup"><option value="18">GCN Waluigi Stadium — 0x12</option><option value="23">DS Delfino Square — 0x17</option><option value="27">N64 Sherbet Land — 0x1B</option><option value="31">GBA Shy Guy Beach — 0x1F</option></optgroup><optgroup label="Leaf Cup"><option value="17">GCN Mario Circuit — 0x11</option><option value="21">DS Desert Hills — 0x15</option><option value="29">N64 DK's Jungle Parkway — 0x1D</option><option value="30">GBA Bowser Castle 3 — 0x1E</option></optgroup><optgroup label="Lightning Cup"><option value="19">GCN DK Mountain — 0x13</option><option value="22">DS Peach Gardens — 0x16</option><option value="24">SNES Mario Circuit 3 — 0x18</option><option value="28">N64 Bowser's Castle — 0x1C</option></optgroup>
+            </select>
+            <div class="muted" id="courseNote">Special Slot ID ↔ KRT index mapping from the attached docs.</div>
+          </div>
+          <div class="col-6">
+            <label>Engine class</label>
+            <select id="engine">
+              <option value="0">50cc</option>
+              <option value="1">100cc</option>
+              <option value="2" selected>150cc</option>
+              <option value="3">Mirror</option>
+            </select>
+          </div>
+
+          <div class="col-6">
+            <label>Race time <span class="muted">(mm:ss.mmm)</span></label>
+            <input id="raceTime" type="text" placeholder="e.g., 1:52.345" />
+          </div>
+          <div class="col-6">
+            <label>…or race time in frames <span class="muted">(60 fps)</span></label>
+            <input id="raceFrames" type="number" min="0" step="1" placeholder="e.g., 6741" />
+          </div>
+
+          <div class="col-6">
+            <label>Time in 1st place <span class="muted">(mm:ss.mmm)</span></label>
+            <input id="firstTime" type="text" placeholder="e.g., 0:45.000" />
+          </div>
+          <div class="col-6">
+            <label>…or 1st-place time in frames</label>
+            <input id="firstFrames" type="number" min="0" step="1" placeholder="e.g., 2700" />
+          </div>
+
+          <div class="col-6">
+            <label>Time spent offroad <span class="muted">(mm:ss.mmm)</span></label>
+            <input id="offroadTime" type="text" placeholder="e.g., 0:07.500" />
+          </div>
+          <div class="col-6">
+            <label>…or offroad time in frames</label>
+            <input id="offroadFrames" type="number" min="0" step="1" placeholder="e.g., 450" />
+          </div>
+
+          <div class="col-4">
+            <label>Miniturbos</label>
+            <input id="miniturbos" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="col-4">
+            <label>Hits on CPUs with items</label>
+            <input id="hits" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="col-4">
+            <label>AI rank bonus</label>
+            <input id="aiBonus" type="number" min="0" step="1" value="0" />
+          </div>
+
+          <div class="col-4">
+            <label>Wall collisions</label>
+            <input id="wallBonks" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="col-4">
+            <label>Object collisions (course damage)</label>
+            <input id="objHits" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="col-4">
+            <label>Out-of-bounds (Lakitu)</label>
+            <input id="oob" type="number" min="0" step="1" value="0" />
+          </div>
+
+          <div class="col-12 row">
+            <label><input id="rocket" type="checkbox" /> Successful rocket start</label>
+            <label><input id="wheel" type="checkbox" /> Wii Wheel</label>
+            <label><input id="autoDrift" type="checkbox" /> Automatic drift</label>
+          </div>
+
+          <div class="col-12 row" style="margin-top:6px;">
+            <button class="btn" id="calc">Calculate score</button>
+            <button class="btn secondary" id="reset">Reset</button>
+            <span id="krtInfo" class="pill">Using embedded ranktimeGP.krt</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col-4">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <div>
+            <strong>KRT file</strong><br/>
+            <span class="muted">Load a different <span class="kbd">ranktimeGP.krt</span> (optional)</span>
+          </div>
+          <input id="krtFile" type="file" accept=".krt" />
+        </div>
+        <div style="margin-top:12px;">
+          <div class="result-line">
+            <div class="result-key">KRT course time</div>
+            <div class="result-val"><span id="krtFrames">—</span> fr <span class="muted">(</span><span id="krtTimeFmt">—</span><span class="muted">)</span></div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <div class="result-line"><div class="result-key">Time bonus</div><div class="result-val" id="rTime">0</div></div>
+          <div class="result-line"><div class="result-key">1st‑place time bonus</div><div class="result-val" id="rFirst">0</div></div>
+          <div class="result-line"><div class="result-key">Rocket start</div><div class="result-val" id="rRocket">0</div></div>
+          <div class="result-line"><div class="result-key">Miniturbos ×2</div><div class="result-val" id="rMini">0</div></div>
+          <div class="result-line"><div class="result-key">Hits on CPUs ×5</div><div class="result-val" id="rHits">0</div></div>
+          <div class="result-line"><div class="result-key">Offroad ÷3</div><div class="result-val" id="rOffroad">0</div></div>
+          <div class="result-line"><div class="result-key">Wall collisions ×‑20</div><div class="result-val" id="rWall">0</div></div>
+          <div class="result-line"><div class="result-key">Object collisions ×‑30</div><div class="result-val" id="rObj">0</div></div>
+          <div class="result-line"><div class="result-key">Out‑of‑bounds ×‑70</div><div class="result-val" id="rOob">0</div></div>
+          <div class="result-line"><div class="result-key">Wii Wheel</div><div class="result-val" id="rWheel">0</div></div>
+          <div class="result-line"><div class="result-key">Automatic drift</div><div class="result-val" id="rAuto">0</div></div>
+          <div class="result-line"><div class="result-key">AI rank bonus</div><div class="result-val" id="rAi">0</div></div>
+          <div class="result-line total"><div class="result-key">Subtotal</div><div class="result-val" id="subtotal">0</div></div>
+          <div class="result-line total"><div class="result-key">Clamped [‑50, 250]</div><div class="result-val" id="final">0</div></div>
+        </div>
+      </div>
+
+      <div class="card col-12">
+        <strong>Notes</strong>
+        <ul style="margin-top:8px; color: var(--muted);">
+          <li>Course list is sourced from the Special Slot ID mapping. Selecting a track sets the KRT index to its slot value (0x00–0x1F).</li>
+          <li>Race/first/offroad times may be entered as <span class="kbd">mm:ss.mmm</span> or directly in frames; if both are provided, frames take priority.</li>
+          <li>Mirror uses 150cc KRT time if its entry is zero in the KRT file.</li>
+          <li>All divisions match the game's integer math: time bonus is truncated (toward zero), other divisions use integer division.</li>
+          <li>The final score is clamped to the range <span class="kbd">[-50, 250]</span>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Built from the in-game logic documented by the user-supplied source. No external libraries needed.
+  </footer>
+
+<script>
+const DEFAULT_KRT = [[10300, 8650, 8650, 0], [9640, 8650, 7660, 0], [11290, 10300, 9310, 0], [14260, 12610, 11950, 0], [12610, 11620, 10630, 0], [12300, 10750, 10090, 0], [13110, 12020, 10830, 0], [12410, 10630, 9940, 0], [11390, 10100, 9310, 0], [13720, 12410, 11620, 0], [14260, 13030, 12300, 0], [13360, 12020, 11290, 0], [14110, 12760, 12020, 0], [14910, 13420, 12760, 0], [16340, 14810, 14260, 0], [14810, 13580, 12920, 0], [11390, 10300, 9310, 0], [10630, 9310, 8650, 0], [10210, 9000, 8340, 0], [13280, 12020, 11390, 0], [14350, 12990, 12360, 0], [12140, 10630, 10010, 0], [14040, 12850, 11860, 0], [14430, 12990, 12230, 0], [12300, 10980, 10380, 0], [11860, 10510, 9940, 0], [13580, 12230, 11500, 0], [13880, 12230, 11500, 0], [13580, 12140, 11500, 0], [14350, 12990, 12360, 0], [14980, 13580, 12920, 0], [15230, 14040, 13210, 0]];
+let krtData = DEFAULT_KRT.slice();
+
+const courseEl = document.getElementById('course');
+const engineEl = document.getElementById('engine');
+const raceTimeEl = document.getElementById('raceTime');
+const raceFramesEl = document.getElementById('raceFrames');
+const firstTimeEl = document.getElementById('firstTime');
+const firstFramesEl = document.getElementById('firstFrames');
+const offroadTimeEl = document.getElementById('offroadTime');
+const offroadFramesEl = document.getElementById('offroadFrames');
+const rocketEl = document.getElementById('rocket');
+const miniturbosEl = document.getElementById('miniturbos');
+const hitsEl = document.getElementById('hits');
+const wallBonksEl = document.getElementById('wallBonks');
+const objHitsEl = document.getElementById('objHits');
+const oobEl = document.getElementById('oob');
+const wheelEl = document.getElementById('wheel');
+const autoDriftEl = document.getElementById('autoDrift');
+const aiBonusEl = document.getElementById('aiBonus');
+const calcBtn = document.getElementById('calc');
+const resetBtn = document.getElementById('reset');
+const krtFramesEl = document.getElementById('krtFrames');
+const krtTimeFmtEl = document.getElementById('krtTimeFmt');
+const rTimeEl = document.getElementById('rTime');
+const rFirstEl = document.getElementById('rFirst');
+const rRocketEl = document.getElementById('rRocket');
+const rMiniEl = document.getElementById('rMini');
+const rHitsEl = document.getElementById('rHits');
+const rOffroadEl = document.getElementById('rOffroad');
+const rWallEl = document.getElementById('rWall');
+const rObjEl = document.getElementById('rObj');
+const rOobEl = document.getElementById('rOob');
+const rWheelEl = document.getElementById('rWheel');
+const rAutoEl = document.getElementById('rAuto');
+const rAiEl = document.getElementById('rAi');
+const subtotalEl = document.getElementById('subtotal');
+const finalEl = document.getElementById('final');
+const krtFileEl = document.getElementById('krtFile');
+const krtInfoEl = document.getElementById('krtInfo');
+
+function pad(n, w=2) { return n.toString().padStart(w, '0'); }
+function framesToTime(fr) {
+  if (!Number.isFinite(fr) || fr <= 0) return '0:00.000';
+  const totalMs = Math.round(fr * 1000 / 60);
+  const m = Math.floor(totalMs / 60000);
+  const s = Math.floor((totalMs % 60000) / 1000);
+  const ms = totalMs % 1000;
+  return `${m}:${pad(s)}.${pad(ms,3)}`;
+}
+function timeToFrames(str) {
+  if (!str) return NaN;
+  const s = str.trim();
+  // Allow "mm:ss.mmm", "ss.mmm", "m:ss", "s"
+  let m=0, sec=0, ms=0;
+  if (s.includes(':')) {
+    const [mStr, rest] = s.split(':');
+    m = parseInt(mStr,10) || 0;
+    if (rest.includes('.')) { const [sStr, msStr] = rest.split('.'); sec = parseInt(sStr,10) || 0; ms = parseInt(msStr.padEnd(3,'0').slice(0,3),10) || 0; }
+    else { sec = parseInt(rest,10) || 0; }
+  } else {
+    // "ss.mmm" or "ss"
+    if (s.includes('.')) { const [sStr, msStr] = s.split('.'); sec = parseInt(sStr,10) || 0; ms = parseInt(msStr.padEnd(3,'0').slice(0,3),10) || 0; }
+    else { sec = parseInt(s,10) || 0; }
+  }
+  const totalMs = (m*60 + sec) * 1000 + ms;
+  return Math.round(totalMs * 60 / 1000);
+}
+function getInputFrames(timeEl, framesEl) {
+  const f = parseInt(framesEl.value, 10);
+  if (Number.isFinite(f) && f >= 0) return f;
+  const t = timeToFrames(timeEl.value);
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function currentKrtTime() {
+  const c = parseInt(courseEl.value,10) || 0; // Special Slot ID (0..31)
+  let e = parseInt(engineEl.value,10) || 0;
+  const row = krtData[c] || [0,0,0,0];
+  let t = row[e] || 0;
+  if (e === 3 && t === 0) t = row[2] || 0; // Mirror falls back to 150cc if zero
+  return t;
+}
+
+function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+
+function compute(silent) {
+  // Gather inputs
+  const krt = currentKrtTime();
+  if ((!krt) && !silent) { alert('Please load a valid KRT or pick another track.'); return; }
+  krtFramesEl.textContent = krt || '—';
+  krtTimeFmtEl.textContent = krt ? framesToTime(krt) : '—';
+
+  const frameCounter = getInputFrames(raceTimeEl, raceFramesEl);
+  const framesInFirst = getInputFrames(firstTimeEl, firstFramesEl) || 0;
+  const offroadFrames = getInputFrames(offroadTimeEl, offroadFramesEl) || 0;
+  const miniturbos = parseInt(miniturbosEl.value,10) || 0;
+  const hits = parseInt(hitsEl.value,10) || 0;
+  const wallBonks = parseInt(wallBonksEl.value,10) || 0;
+  const objHits = parseInt(objHitsEl.value,10) || 0;
+  const oob = parseInt(oobEl.value,10) || 0;
+  const aiBonus = parseInt(aiBonusEl.value,10) || 0;
+  const rocket = !!rocketEl.checked;
+  const wheel = !!wheelEl.checked;
+  const auto = !!autoDriftEl.checked;
+
+  if (!Number.isFinite(frameCounter)) {
+    if (!silent) alert('Please enter a race time (mm:ss.mmm or frames).');
+    return;
+  }
+
+  // Score accumulation (match in-game integer math)
+  let score = 0;
+
+  // Time bonus: truncation toward zero
+  const timeBonusFloat = 1000.0 * (krt - frameCounter) / krt;
+  const timeBonus = Math.trunc(timeBonusFloat);
+  score += timeBonus;
+
+  // Time in 1st place: integer division
+  const firstBonus = Math.trunc((framesInFirst * 150) / krt);
+  score += firstBonus;
+
+  // Rocket start
+  const rocketBonus = rocket ? 25 : 0;
+  score += rocketBonus;
+
+  // Miniturbos + hits
+  const miniBonus = miniturbos * 2;
+  score += miniBonus;
+  const hitsBonus = hits * 5;
+  score += hitsBonus;
+
+  // Offroad penalty (integer division)
+  const offroadPenalty = Math.trunc(offroadFrames / 3);
+  score -= offroadPenalty;
+
+  // Collisions & OOB
+  const wallPenalty = wallBonks * 20;
+  score -= wallPenalty;
+  const objPenalty = objHits * 30;
+  score -= objPenalty;
+  const oobPenalty = oob * 70;
+  score -= oobPenalty;
+
+  // Controller bonuses
+  const wheelBonus = wheel ? 10 : 0;
+  score += wheelBonus;
+  const autoBonus = auto ? 25 : 0;
+  score += autoBonus;
+
+  // AI Rank bonus
+  score += aiBonus;
+
+  // Output lines
+  rTimeEl.textContent = timeBonus;
+  rFirstEl.textContent = firstBonus;
+  rRocketEl.textContent = rocketBonus;
+  rMiniEl.textContent = miniBonus;
+  rHitsEl.textContent = hitsBonus;
+  rOffroadEl.textContent = offroadPenalty ? ('-' + offroadPenalty) : '0';
+  rWallEl.textContent = wallPenalty ? ('-' + wallPenalty) : '0';
+  rObjEl.textContent = objPenalty ? ('-' + objPenalty) : '0';
+  rOobEl.textContent = oobPenalty ? ('-' + oobPenalty) : '0';
+  rWheelEl.textContent = wheelBonus;
+  rAutoEl.textContent = autoBonus;
+  rAiEl.textContent = aiBonus;
+  subtotalEl.textContent = score;
+
+  const finalScore = clamp(score, -50, 250);
+  finalEl.textContent = finalScore;
+}
+
+function resetForm() {
+  document.querySelectorAll('input[type="text"], input[type="number"]').forEach(el => el.value='');
+  document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked=false);
+  miniturbosEl.value = hitsEl.value = wallBonksEl.value = objHitsEl.value = oobEl.value = aiBonusEl.value = 0;
+  engineEl.value = '2'; // default 150cc
+  courseEl.value = '0'; // Mario Circuit (Wii) — 0x00
+  compute(true);
+}
+
+function init() {
+  engineEl.value = '2'; // 150cc default
+  courseEl.value = '0'; // Default to Special Slot 0x00 (Mario Circuit)
+  calcBtn.addEventListener('click', (e)=>{ e.preventDefault(); compute(false); });
+  resetBtn.addEventListener('click', (e)=>{ e.preventDefault(); resetForm(); });
+  [courseEl, engineEl].forEach(el => el.addEventListener('change', ()=>compute(true)));
+  compute(true);
+
+  // KRT upload
+  krtFileEl.addEventListener('change', async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const buf = await f.arrayBuffer();
+      const dv = new DataView(buf);
+      // Verify magic "RKGT"
+      const m0 = dv.getUint8(0), m1 = dv.getUint8(1), m2 = dv.getUint8(2), m3 = dv.getUint8(3);
+      if (String.fromCharCode(m0,m1,m2,m3) !== 'RKGT') throw new Error('Not a KRT file (bad magic).');
+      const nCourses = dv.getUint16(8, false); // big-endian
+      if (nCourses !== 32) console.warn('Unexpected course count:', nCourses);
+      const out = [];
+      let off = 12;
+      for (let i=0; i<32; i++) {
+        const row = [];
+        for (let j=0; j<4; j++) {
+          row.push(dv.getUint16(off, false)); off += 2;
+        }
+        out.push(row);
+      }
+      krtData = out;
+      krtInfoEl.textContent = `Loaded: ${f.name}`;
+      krtInfoEl.className = 'pill ok';
+      compute(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to parse KRT file: ' + err.message);
+      krtInfoEl.textContent = 'Using embedded ranktimeGP.krt';
+      krtInfoEl.className = 'pill warn';
+      krtData = DEFAULT_KRT.slice();
+      compute(true);
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
