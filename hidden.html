@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MKW Hidden GP Score Calculator</title>
+  <title>Hidden GP Score Calculator</title>
   <style>
     :root { --fg:#0b1321; --bg:#f7f8fb; --muted:#6b7280; --card:#ffffff; --accent:#2563eb; }
     * { box-sizing: border-box; }
@@ -58,8 +58,8 @@
 </head>
 <body>
   <header>
-    <h1>MKW Hidden GP Score Calculator</h1>
-    <p class="subtitle">Reproduces Nintendo's per‑race hidden score used for GP star ranks.</p>
+    <h1>Hidden GP Score Calculator</h1>
+    <p class="subtitle">Reproduces MKWii's per‑race hidden score used for GP star ranks.</p>
   </header>
 
   <div class="container">
@@ -71,7 +71,7 @@
             <select id="course">
               <optgroup label="Mushroom Cup"><option value="8">Luigi Circuit (Wii) — 0x08</option><option value="1">Moo Moo Meadows (Wii) — 0x01</option><option value="2">Mushroom Gorge (Wii) — 0x02</option><option value="4">Toad's Factory (Wii) — 0x04</option></optgroup><optgroup label="Flower Cup"><option value="0">Mario Circuit (Wii) — 0x00</option><option value="5">Coconut Mall (Wii) — 0x05</option><option value="6">DK Summit (Wii) — 0x06</option><option value="7">Wario's Gold Mine (Wii) — 0x07</option></optgroup><optgroup label="Star Cup"><option value="9">Daisy Circuit (Wii) — 0x09</option><option value="15">Koopa Cape (Wii) — 0x0F</option><option value="11">Maple Treeway (Wii) — 0x0B</option><option value="3">Grumble Volcano (Wii) — 0x03</option></optgroup><optgroup label="Special Cup"><option value="14">Dry Dry Ruins (Wii) — 0x0E</option><option value="10">Moonview Highway (Wii) — 0x0A</option><option value="12">Bowser's Castle (Wii) — 0x0C</option><option value="13">Rainbow Road (Wii) — 0x0D</option></optgroup><optgroup label="Shell Cup"><option value="16">GCN Peach Beach — 0x10</option><option value="20">DS Yoshi Falls — 0x14</option><option value="25">SNES Ghost Valley 2 — 0x19</option><option value="26">N64 Mario Raceway — 0x1A</option></optgroup><optgroup label="Banana Cup"><option value="27">N64 Sherbet Land — 0x1B</option><option value="31">GBA Shy Guy Beach — 0x1F</option><option value="23">DS Delfino Square — 0x17</option><option value="18">GCN Waluigi Stadium — 0x12</option></optgroup><optgroup label="Leaf Cup"><option value="21">DS Desert Hills — 0x15</option><option value="30">GBA Bowser Castle 3 — 0x1E</option><option value="29">N64 DK's Jungle Parkway — 0x1D</option><option value="17">GCN Mario Circuit — 0x11</option></optgroup><optgroup label="Lightning Cup"><option value="24">SNES Mario Circuit 3 — 0x18</option><option value="22">DS Peach Gardens — 0x16</option><option value="19">GCN DK Mountain — 0x13</option><option value="28">N64 Bowser's Castle — 0x1C</option></optgroup>
             </select>
-            <div class="muted" id="courseNote">Special Slot ID ↔ KRT index mapping from the attached docs.</div>
+            <div class="muted" id="courseNote">Special Slot ID ↔ KRT index mapping as per <a href="https://wiki.tockdom.com/wiki/Slot">wiki</a>.</div>
           </div>
           <div class="col-6">
             <label>Engine class</label>
@@ -145,7 +145,7 @@
           <div class="col-12 row" style="margin-top:6px;">
             <button class="btn" id="calc">Calculate score</button>
             <button class="btn secondary" id="reset">Reset</button>
-            <span id="krtInfo" class="pill">Using embedded ranktimeGP.krt</span>
+            <span id="krtInfo" class="pill">Using embedded KRT data</span>
           </div>
         </div>
       </div>
@@ -154,7 +154,7 @@
         <div class="row" style="justify-content: space-between; align-items: center;">
           <div>
             <strong>KRT file</strong><br/>
-            <span class="muted">Load a different <span class="kbd">ranktimeGP.krt</span> (optional)</span>
+            <span class="muted">Load a <span class="kbd">ranktimeGP.krt</span> (optional, untested)</span>
           </div>
           <input id="krtFile" type="file" accept=".krt" />
         </div>
@@ -196,7 +196,7 @@
   </div>
 
   <footer>
-    Built from the in-game logic documented by the user-supplied source. No external libraries needed.
+    Built from the in-game logic documented by the <a href="https://github.com/riidefi/mkw/blob/78572c95c41dbf6cbb7dd251a567e538560ce1d8/src/system/RaceManager.cpp#L138">MKW decomp team</a>. Made by ChatGPT 5 Thinking. Idea by <a href="https://wiki.tockdom.com/wiki/User:B_squo">B_squo</a>.
   </footer>
 
 <script>
