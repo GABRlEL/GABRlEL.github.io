@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Is this FC possible?</title>
+  <style>
+    :root {
+      --ok: #0a7f2e;
+      --no: #b00020;
+      --muted: #6b7280;
+      --bg: #0b1220;
+      --card: #0f172a;
+      --accent: #60a5fa;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 50% -10%, #1f2937 0%, #0b1220 60%, #060a12 100%);
+      color: #e5e7eb; display: grid; place-items: center; padding: 24px;
+    }
+    .card {
+      width: min(860px, 95vw);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px; padding: 28px 28px 32px; backdrop-filter: blur(6px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    h1 { font-size: clamp(28px, 5vw, 48px); margin: 4px 0 18px; letter-spacing: 0.3px; }
+    p.lead { margin: 0 0 16px; color: #cbd5e1; opacity: .9 }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .row > * { flex: 1 1 auto; }
+    input[type="text"] {
+      width: 100%; font-size: 20px; line-height: 1; padding: 14px 16px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #e5e7eb;
+      outline: none; transition: border 160ms ease, box-shadow 160ms ease; letter-spacing: 1px;
+    }
+    input[type="text"]::placeholder { color: #94a3b8; }
+    input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(96,165,250,0.2); }
+    button {
+      white-space: nowrap; font-size: 18px; padding: 14px 18px; border-radius: 12px; border: none; cursor: pointer;
+      background: linear-gradient(180deg, #3b82f6, #2563eb); color: white; font-weight: 600; letter-spacing: .3px;
+      box-shadow: 0 12px 30px rgba(37,99,235,.35), inset 0 1px 0 rgba(255,255,255,.2);
+      transition: transform 120ms ease, filter 150ms ease; flex: 0 0 auto;
+    }
+    button:hover { filter: brightness(1.05); }
+    button:active { transform: translateY(1px); }
+
+    .big {
+      font-size: clamp(40px, 8vw, 96px); font-weight: 800; line-height: 1.05; margin: 14px 0 2px;
+    }
+    .big.ok { color: var(--ok); text-shadow: 0 6px 22px rgba(10,127,46,.35); }
+    .big.no { color: var(--no); text-shadow: 0 6px 22px rgba(176,0,32,.35); }
+    .sub { font-size: clamp(16px, 2.2vw, 24px); color: #e5e7eb; opacity: 0.92; margin: 8px 0 0; }
+    .muted { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+    .status {
+      margin-top: 18px; padding: 14px 16px; border-radius: 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+      display: flex; align-items: center; gap: 10px; font-size: 16px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--muted); flex: 0 0 auto; }
+    .dot.ok { background: var(--ok); }
+    .dot.no { background: var(--no); }
+
+    .footnote { margin-top: 18px; font-size: 12px; color: #9ca3af; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Is this FC possible?</h1>
+    <p class="lead">Enter a <strong>Mario Kart Wii</strong> friend code (12 digits, with or without dashes). This page checks two things:</p>
+    <ul class="lead" style="margin-top:6px; opacity:.9">
+      <li>Checksum-valid for MKW and <code>PID &lt; 1,000,000,000</code>.</li>
+      <li>Whether that PID is <em>seen</em> on <strong>the RWFC VR leaderboard</strong>.</li>
+    </ul>
+
+    <div class="row" style="margin: 14px 0 4px;">
+      <input id="fc" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1892-8398-0920" aria-label="Mario Kart Wii friend code" />
+      <button id="checkBtn" type="button">Check</button>
+    </div>
+    <div class="muted">Tip: Press Enter to check.</div>
+
+    <div id="result" style="margin-top: 12px;">
+      <div id="big" class="big" aria-live="polite">—</div>
+      <div id="reason" class="sub"></div>
+      <div id="rwfc" class="status" hidden>
+        <span id="rwfcDot" class="dot"></span>
+        <span id="rwfcText">Checking RWFC…</span>
+      </div>
+      <div id="note" class="footnote"></div>
+    </div>
+
+    <div class="footnote">
+      <strong>Implementation notes</strong>: FC validity uses the MKW algorithm
+      (MD5 over <code>LE(PID) + "JCMR"</code>, then <code>(md5[0] &gt;&gt; 1)</code> matches the 7-bit checksum). PID is the lower 32 bits of the 39‑bit FC.
+      RWFC lookup calls <code>https://rwfc.net/api/leaderboard/player/FRIENDCODE</code> (HTTP 200 = taken, 404 = not found). The leaderboard API is not the single source of truth, so please consult the official pinfo API or use the <code>/pinfo</code> command on the Retro WFC bot to make sure.
+    </div>
+  </main>
+
+  <script>
+    // Optional: set this to an HTTPS proxy that forwards to http://rwfc.net with proper CORS headers (see chat for a Cloudflare Worker snippet).
+    // Example: const PROXY_URL = 'https://your-worker.example.workers.dev';
+    
+    // === Utilities ===
+    const $$ = sel => document.querySelector(sel);
+    const fmtFC = n => (n + '').padStart(12, '0').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3');
+
+    function parseFC(input) {
+      const digits = (input || '').replace(/\D/g, '');
+      if (digits.length !== 12) {
+        return { ok: false, err: 'Friend code must have exactly 12 digits.', fc: null, pid: null, csum: null };
+      }
+      // Parse decimal FC into a BigInt to work with bit ops reliably.
+      const fcVal = BigInt(digits);
+      const pid = Number(fcVal & 0xffffffffn); // low 32 bits
+      const csum = Number(fcVal >> 32n);       // high 7 bits
+      return { ok: true, fcVal, pid, csum, raw: digits };
+    }
+
+    // Minimal MD5 implementation returning Uint8Array(16) for a Uint8Array input.
+    // Public-domain style implementation adapted for compactness.
+    (function(){
+      function toUint8(arr){ return arr instanceof Uint8Array ? arr : new Uint8Array(arr); }
+      function rl(x, n){ return (x << n) | (x >>> (32 - n)); }
+      function add(x, y){ return (x + y) >>> 0; }
+      function F(x,y,z){ return (x & y) | (~x & z); }
+      function G(x,y,z){ return (x & z) | (y & ~z); }
+      function H(x,y,z){ return x ^ y ^ z; }
+      function I(x,y,z){ return y ^ (x | ~z); }
+      const S = [
+        7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
+        5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
+        4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
+        6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21
+      ];
+      const K = new Uint32Array(64);
+      for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2**32) >>> 0;
+      function md5core(bytes){
+        bytes = toUint8(bytes);
+        const origLenBits = BigInt(bytes.length) * 8n;
+        // Pad: append 0x80 then 0x00* until length ≡ 56 mod 64, then 64-bit LE length
+        const padLen = (56 - ((bytes.length + 1) % 64) + 64) % 64;
+        const buf = new Uint8Array(bytes.length + 1 + padLen + 8);
+        buf.set(bytes, 0); buf[bytes.length] = 0x80;
+        // 64-bit little-endian length
+        let tmp = origLenBits;
+        for (let i = 0; i < 8; i++) { buf[buf.length - 8 + i] = Number(tmp & 0xffn); tmp >>= 8n; }
+
+        let a = 0x67452301, b = 0xefcdab89, c = 0x98badcfe, d = 0x10325476;
+        const M = new Uint32Array(16);
+        for (let i = 0; i < buf.length; i += 64) {
+          for (let j = 0; j < 16; j++) {
+            const o = i + j*4;
+            M[j] = buf[o] | (buf[o+1] << 8) | (buf[o+2] << 16) | (buf[o+3] << 24);
+          }
+          let A=a, B=b, C=c, D=d;
+          for (let i2 = 0; i2 < 64; i2++) {
+            let f, g;
+            if (i2 < 16) { f = F(B,C,D); g = i2; }
+            else if (i2 < 32) { f = G(B,C,D); g = (5*i2 + 1) & 15; }
+            else if (i2 < 48) { f = H(B,C,D); g = (3*i2 + 5) & 15; }
+            else { f = I(B,C,D); g = (7*i2) & 15; }
+            const tmp2 = D;
+            D = C;
+            C = B;
+            const t = add(add(add(A, f), add(K[i2], M[g])), 0);
+            B = add(B, rl(t, S[i2]));
+            A = tmp2;
+          }
+          a = add(a, A); b = add(b, B); c = add(c, C); d = add(d, D);
+        }
+        const out = new Uint8Array(16);
+        const words = [a,b,c,d];
+        for (let i = 0; i < 4; i++) {
+          out[i*4+0] = words[i] & 0xff;
+          out[i*4+1] = (words[i] >>> 8) & 0xff;
+          out[i*4+2] = (words[i] >>> 16) & 0xff;
+          out[i*4+3] = (words[i] >>> 24) & 0xff;
+        }
+        return out;
+      }
+      window.md5Bytes = md5core;
+    })();
+
+    function expectedChecksum7(pid) {
+      // Build 8-byte buffer: LE(pid) + 'J','C','M','R'
+      const b = new Uint8Array(8);
+      b[0] = pid & 0xff; b[1] = (pid >>> 8) & 0xff; b[2] = (pid >>> 16) & 0xff; b[3] = (pid >>> 24) & 0xff;
+      b[4] = 0x4a; // 'J'
+      b[5] = 0x43; // 'C'
+      b[6] = 0x4d; // 'M'
+      b[7] = 0x52; // 'R'
+      const digest = md5Bytes(b);
+      return (digest[0] >>> 1) & 0x7f; // 7-bit value
+    }
+
+async function checkRWFC(friendCodeDigits) {
+  // Try both digits-only and dashed forms; treat 200 as taken, 404 as not found.
+  const d = String(friendCodeDigits);
+  const candidates = [d, (d.padStart(12, '0').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3'))];
+
+  for (const fc of candidates) {
+    try {
+      const res = await fetch('https://rwfc.net/api/leaderboard/player/' + encodeURIComponent(fc), { method: 'GET' });
+      if (res.ok) return { ok: true, taken: true };   // 200
+      if (res.status === 404) continue;               // try other representation
+      return { ok: false, err: 'Unexpected HTTP ' + res.status };
+    } catch (e) {
+      return { ok: false, err: (e && e.message) ? e.message : String(e) };
+    }
+  }
+  return { ok: true, taken: false };
+}
+
+function setBigAnswer(yes, reasonText) {
+
+      const el = $$('#big');
+      el.textContent = yes ? 'YES' : 'NO';
+      el.classList.toggle('ok', !!yes);
+      el.classList.toggle('no', !yes);
+      $$('#reason').textContent = reasonText || '';
+    }
+
+    async function runCheck() {
+      const v = parseFC($$('#fc').value);
+      $$('#rwfc').hidden = true; $$('#rwfcText').textContent = '';
+      $$('#note').textContent = '';
+
+      if (!v.ok) {
+        setBigAnswer(false, v.err);
+        return;
+      }
+
+      const expected = expectedChecksum7(v.pid);
+      const isValidChecksum = (v.csum === expected);
+      const pidOk = v.pid < 1_000_000_000;
+      const possible = isValidChecksum && pidOk;
+
+      const reason = possible
+        ? `Valid MKW FC. PID ${v.pid} (< 1,000,000,000).`
+        : !isValidChecksum
+            ? `Invalid checksum for MKW. Parsed PID ${v.pid}.`
+            : `PID ${v.pid} is not below 1,000,000,000.`;
+
+      setBigAnswer(possible, reason);
+
+      // RWFC check only gives meaningful info if checksum is valid (PID extraction is always possible, but invalid FCs are not intended to exist).
+      if (isValidChecksum) {
+        $$('#rwfc').hidden = false; $$('#rwfcDot').className = 'dot'; $$('#rwfcText').textContent = 'Checking RWFC…';
+        const rw = await checkRWFC(v.raw);
+        if (rw.ok) {
+          const taken = rw.taken;
+          $$('#rwfcDot').classList.add(taken ? 'no' : 'ok');
+          $$('#rwfcText').textContent = taken ? 'This code is taken on RWFC!' : 'This code is not on the RWFC VR leaderboard!';
+        } else {
+          $$('#rwfcText').textContent = `Couldn't check RWFC: ${rw.err}`;
+        }
+      } else {
+        $$('#note').textContent = 'RWFC lookup skipped for invalid FC.';
+      }
+    }
+
+    // Wire up UI
+    $$('#checkBtn').addEventListener('click', runCheck);
+    $$('#fc').addEventListener('keydown', (e) => { if (e.key === 'Enter') runCheck(); });
+  </script>
+</body>
+</html>
