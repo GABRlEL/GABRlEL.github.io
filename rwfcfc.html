@@ -51,6 +51,7 @@
     }
     .big.ok { color: var(--ok); text-shadow: 0 6px 22px rgba(10,127,46,.35); }
     .big.no { color: var(--no); text-shadow: 0 6px 22px rgba(176,0,32,.35); }
+    .big.warn { color: #d97706; text-shadow: 0 6px 22px rgba(217,119,6,.35); }
     .sub { font-size: clamp(16px, 2.2vw, 24px); color: #e5e7eb; opacity: 0.92; margin: 8px 0 0; }
     .muted { color: var(--muted); font-size: 14px; margin-top: 12px; }
 
@@ -87,7 +88,7 @@
       <div id="reason" class="sub"></div>
       <div id="rwfc" class="status" hidden>
         <span id="rwfcDot" class="dot"></span>
-        <span id="rwfcText">Checking RWFC…</span>
+        <span id="rwfcText">Waiting for input…</span>
       </div>
       <div id="note" class="footnote"></div>
     </div>
@@ -95,13 +96,11 @@
     <div class="footnote">
       <strong>Implementation notes</strong>: FC validity uses the MKW algorithm
       (MD5 over <code>LE(PID) + "JCMR"</code>, then <code>(md5[0] &gt;&gt; 1)</code> matches the 7-bit checksum). PID is the lower 32 bits of the 39‑bit FC.
-      RWFC lookup calls <code>https://rwfc.net/api/leaderboard/player/FRIENDCODE</code> (HTTP 200 = taken, 404 = not found). The leaderboard API is not the single source of truth, so please consult the official pinfo API or use the <code>/pinfo</code> command on the Retro WFC bot to make sure. Tool made by ChatGPT 5 Thinking.
+      RWFC lookup calls <code>https://rwfc.net/api/leaderboard/player/FRIENDCODE</code>. The leaderboard API is not the single source of truth, please use the official pinfo API or the <code>/pinfo</code> command on the Retro WFC bot for PID checking. Made by ChatGPT 5 Thinking.
     </div>
   </main>
 
   <script>
-    // Optional: set this to an HTTPS proxy that forwards to http://rwfc.net with proper CORS headers (see chat for a Cloudflare Worker snippet).
-    // Example: const PROXY_URL = 'https://your-worker.example.workers.dev';
     
     // === Utilities ===
     const $$ = sel => document.querySelector(sel);
@@ -114,8 +113,8 @@
       }
       // Parse decimal FC into a BigInt to work with bit ops reliably.
       const fcVal = BigInt(digits);
-      const pid = Number(fcVal & 0xffffffffn); // low 32 bits
-      const csum = Number(fcVal >> 32n);       // high 7 bits
+      const pid = (Number(fcVal & 0xffffffffn)) >>> 0; // low 32 bits
+      const csum = Number((fcVal >> 32n) & 0x7fn);       // high 7 bits
       return { ok: true, fcVal, pid, csum, raw: digits };
     }
 
@@ -214,53 +213,73 @@ async function checkRWFC(friendCodeDigits) {
   return { ok: true, taken: false };
 }
 
-function setBigAnswer(yes, reasonText) {
-
+function setBigAnswer(mode, reasonText){
       const el = $$('#big');
-      el.textContent = yes ? 'YES' : 'NO';
-      el.classList.toggle('ok', !!yes);
-      el.classList.toggle('no', !yes);
+      el.textContent = (mode === 'no') ? 'NO' : 'YES';
+      el.classList.remove('ok','no','warn');
+      el.classList.add(mode === 'warn' ? 'warn' : (mode === 'no' ? 'no' : 'ok'));
       $$('#reason').textContent = reasonText || '';
     }
 
-    async function runCheck() {
-      const v = parseFC($$('#fc').value);
-      $$('#rwfc').hidden = true; $$('#rwfcText').textContent = '';
-      $$('#note').textContent = '';
+async function runCheck() {
+  const v = parseFC($$('#fc').value);
+  $$('#rwfc').hidden = true;
+  $$('#rwfcText').textContent = '';
+  $$('#note').textContent = '';
 
-      if (!v.ok) {
-        setBigAnswer(false, v.err);
-        return;
-      }
+  if (!v.ok) { setBigAnswer('no', v.err); return; }
 
-      const expected = expectedChecksum7(v.pid);
-      const isValidChecksum = (v.csum === expected);
-      const pidOk = v.pid < 1_000_000_000;
-      const possible = isValidChecksum && pidOk;
+  const expected = expectedChecksum7(v.pid);
+  if (v.csum !== expected) {
+    setBigAnswer('no', 'Invalid checksum for MKW. Parsed PID ' + v.pid + '.');
+    return;
+  }
 
-      const reason = possible
-        ? `Valid MKW FC. PID ${v.pid} (< 1,000,000,000).`
-        : !isValidChecksum
-            ? `Invalid checksum for MKW. Parsed PID ${v.pid}.`
-            : `PID ${v.pid} is not below 1,000,000,000.`;
+  const pid = v.pid;
+  const WIIMMFI_ONLY_LOWER = 1000000000;   // > this and <= upper → Wiimmfi-only
+  const WIIMMFI_ONLY_UPPER = 2147483483;   // per request
+  const WIIMMFI_INVALID_BELOW = 600000000; // note for Wiimmfi invalid
 
-      setBigAnswer(possible, reason);
+  // Wiimmfi-only range → yellow, skip RWFC check
+  if (pid > WIIMMFI_ONLY_LOWER && pid <= WIIMMFI_ONLY_UPPER) {
+    setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
+    return;
+  }
 
-      // RWFC check only gives meaningful info if checksum is valid (PID extraction is always possible, but invalid FCs are not intended to exist).
-      if (isValidChecksum) {
-        $$('#rwfc').hidden = false; $$('#rwfcDot').className = 'dot'; $$('#rwfcText').textContent = 'Checking RWFC…';
-        const rw = await checkRWFC(v.raw);
-        if (rw.ok) {
-          const taken = rw.taken;
-          $$('#rwfcDot').classList.add(taken ? 'no' : 'ok');
-          $$('#rwfcText').textContent = taken ? 'This code is taken on RWFC!' : 'This code is not on the RWFC VR leaderboard!';
-        } else {
-          $$('#rwfcText').textContent = `Couldn't check RWFC: ${rw.err}`;
-        }
-      } else {
-        $$('#note').textContent = 'RWFC lookup skipped for invalid FC.';
-      }
-    }
+  // Above upper bound → not supported anywhere
+  if (pid > WIIMMFI_ONLY_UPPER) {
+    setBigAnswer('no', 'PID ' + pid + ' is above supported ranges.');
+    return;
+  }
+
+  // pid == 1,000,000,000 exactly → treat as Wiimmfi-only (per your rule “above 1e9 up to upper”).
+  if (pid === WIIMMFI_ONLY_LOWER) {
+    setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
+    return;
+  }
+
+  // pid < 1e9 → RWFC-valid range (green) + optional Wiimmfi note + RWFC lookup
+  setBigAnswer('ok', 'Valid MKW FC. PID ' + pid + ' (< 1,000,000,000).');
+  if (pid < WIIMMFI_INVALID_BELOW) {
+    $$('#note').textContent = 'This code is invalid on Wiimmfi, they only allow codes starting with PID 600,000,000.';
+  }
+
+  $$('#rwfc').hidden = false;
+  $$('#rwfcDot').className = 'dot';
+  $$('#rwfcText').textContent = 'Checking RWFC…';
+
+  const rw = await checkRWFC(v.raw);
+  if (rw.ok) {
+    const taken = rw.taken;
+    $$('#rwfcDot').classList.add(taken ? 'no' : 'ok');
+    $$('#rwfcText').textContent = taken
+      ? 'This code is taken on RWFC!'
+      : 'This code is not on the RWFC VR leaderboard!';
+  } else {
+    $$('#rwfcText').textContent = "Couldn't check RWFC: " + rw.err;
+  }
+}
+
 
     // Wire up UI
     $$('#checkBtn').addEventListener('click', runCheck);
