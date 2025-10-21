@@ -50,4 +50,4 @@
 
 [Hidden GP Score Calculator](https://gabrlel.github.io/hidden.html)
 
-[Is this FC possible?](https://gabrlel.github.io/rwfcfc.html)
+[Is This FC Possible?](https://gabrlel.github.io/rwfcfc.html)
