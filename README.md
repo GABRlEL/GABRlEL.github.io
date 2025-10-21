@@ -49,3 +49,5 @@
 [CMG Web - MKWii Country Modifier Generator](https://gabrlel.github.io/cmg.html)
 
 [Hidden GP Score Calculator](https://gabrlel.github.io/hidden.html)
+
+[Is this FC possible?](https://gabrlel.github.io/rwfcfc.html)
