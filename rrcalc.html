@@ -100,8 +100,9 @@
               <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (60%), VS win% (20%), 1st-place count (10%), distance travelled (5%), distance while 1st (5%).</li>
               <li>Normalizations: VR 0–30000 → 0–100; 1st-place: 0–1250 → 0–100 (saturates by 1500); distance: 0–50000 → 0–100 (saturates by 75000); 1st distance: 0–10000 → 0–100 (saturates by 20000); Win% 0–100 (if no VS races, baseline 45%).</li>
               <li>Affine mapping uses anchors so that a strong profile maps near 100 and a weak/brand new profile maps near ~10. Ranks are bucketed by the score (12,24,36,48,60,72,84,94,100).</li>
-              <li>Per-stat lowest possible value for max rank: VR ≥ 26,500; Win% ≥ 65%; Times 1st ≥ 375; Distance & 1st Distance combos to supply ≥3 M-points at 0.05·(distNorm+dist1stNorm) (e.g., 30,000m/0m or 15,000m/3,000m).</li>
-              <li>Nothing is uploaded; everything is client's side. You can save this file and run it offline.</li>
+              <li>Per-stat lowest possible value for max rank: VR ≥ 26,500; Win% ≥ 65%; Times 1st ≥ 375; Distance & 1st Distance combos 30,000m/0m or 15,000m/3,000m.</li>
+              <li>Nothing is uploaded; everything is client-side. You can save this file and run it offline.</li>
+              <li>Made by ChatGPT 5 Thinking.</li>
             </ul>
           </div>
         </details>
