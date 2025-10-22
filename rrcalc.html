@@ -618,6 +618,19 @@ function ensureTab(id, label){
 
   function setRegionBadge(dv){ const id=U16(dv, REGION_ID_OFFSET); const label=REGION_IDS.get(id) || `Unknown (0x${id.toString(16)})`; document.getElementById('region').textContent=label; }
 
+function ensureContributionNote() {
+  const host = document.getElementById('tabsCard');
+  let note = document.getElementById('contrib-note');
+  if (!note) {
+    note = document.createElement('div');
+    note.id = 'contrib-note';
+    note.className = 'note subtle';
+    host.appendChild(note);
+  }
+  note.textContent =
+    'Contributions partition the final score (0–100): each row includes its weighted share of β and any clamp effect. Rows sum to the shown score.';
+}
+  
   function parseBuffer(buf){
     const dv = new DataView(buf);
     appendLicenseTabs(dv);
@@ -625,10 +638,7 @@ function ensureTab(id, label){
     whatIfToggle.disabled = false;
     resetWhatIf.disabled = false;
     // Add/refresh contribution semantics note
-    const note = document.createElement('div');
-    note.className = 'note subtle';
-    note.textContent = 'Contributions partition the final score (0–100): each row includes its weighted share of β and any clamp effect. Rows sum to the shown score.';
-    document.getElementById('tabsCard').appendChild(note);
+    ensureContributionNote();
   }
 
 
