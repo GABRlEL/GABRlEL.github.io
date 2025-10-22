@@ -464,12 +464,20 @@
     }
     return pane;
   }
-  function ensureTab(id, label){
-    const tabsEl = document.getElementById('tabs');
-    let btn = Array.from(tabsEl.querySelectorAll('.tabbtn')).find(b => b.getAttribute('aria-controls')===id);
-    if(!btn){ btn = makeTab(id, label); tabsEl.appendChild(btn); }
-    return btn;
+function ensureTab(id, label){
+  const tabsEl = document.getElementById('tabs');
+  let btn = Array.from(tabsEl.querySelectorAll('.tabbtn'))
+    .find(b => b.getAttribute('aria-controls') === id);
+
+  if (!btn) {
+    btn = makeTab(id, label);
+    tabsEl.appendChild(btn);
+  } else {
+    // **Fix:** refresh label when loading a new save
+    if (btn.textContent !== label) btn.textContent = label;
   }
+  return btn;
+}
   function appendLicenseTabs(dv){
     const names = LICENSE_OFFSETS.map((off,i)=> readMiiName(dv, off) || `License ${i+1}`);
     names.forEach((label,i)=>{
