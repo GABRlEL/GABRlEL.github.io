@@ -8,6 +8,7 @@
     :root {
       --ok: #0a7f2e;
       --no: #b00020;
+      --warn: #d97706;
       --muted: #6b7280;
       --bg: #0b1220;
       --card: #0f172a;
@@ -51,7 +52,7 @@
     }
     .big.ok { color: var(--ok); text-shadow: 0 6px 22px rgba(10,127,46,.35); }
     .big.no { color: var(--no); text-shadow: 0 6px 22px rgba(176,0,32,.35); }
-    .big.warn { color: #d97706; text-shadow: 0 6px 22px rgba(217,119,6,.35); }
+    .big.warn { color: var(--warn); text-shadow: 0 6px 22px rgba(217,119,6,.35); }
     .sub { font-size: clamp(16px, 2.2vw, 24px); color: #e5e7eb; opacity: 0.92; margin: 8px 0 0; }
     .muted { color: var(--muted); font-size: 14px; margin-top: 12px; }
 
@@ -66,11 +67,65 @@
 
     .footnote { margin-top: 18px; font-size: 12px; color: #9ca3af; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+
+    /* Explanation panel */
+    .explain { margin-top:14px; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); }
+    .explain .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .bits { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 13px; padding:2px 6px; border-radius:8px; }
+    .bits.csum { background: rgba(176,0,32,.18); border:1px solid rgba(176,0,32,.35); }
+    .bits.pid  { background: rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.35); }
+    .tag { display:inline-block; padding:2px 6px; border-radius:8px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06); }
+    .tag.ok { border-color: rgba(10,127,46,.5); background: rgba(10,127,46,.2); }
+    .tag.no { border-color: rgba(176,0,32,.5); background: rgba(176,0,32,.2); }
+
+    /* Friend-code digit visualization */
+    .fcviz { display:inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 20px; letter-spacing: 1px; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); }
+    .fcviz .bar { height: 6px; border-radius: 4px; overflow: hidden; margin-top: 6px; display:flex; }
+    .fcviz .seg.csum { background: rgba(176,0,32,.55); width: 17.9487%; } /* 7/39*100 */
+    .fcviz .seg.pid  { background: rgba(96,165,250,.55); flex: 1; }
+  
+    /* Digit-by-digit highlight */
+    .fc-line { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 22px; letter-spacing: 1px; margin-top: 6px; }
+    .fc-caption { display:inline-block; min-width: 96px; color: #cbd5e1; }
+    .dg { display:inline-block; padding: 0 2px; border-radius: 4px; }
+    .dg.same { opacity: 0.92; }
+    .dg.diff { background: rgba(176,0,32,.35); outline: 1px solid rgba(176,0,32,.5); }
+    .dg.fix  { background: rgba(10,127,46,.35); outline: 1px solid rgba(10,127,46,.5); }
+
+  
+    /* Contiguous 39-bit line (7 checksum + 32 PID) */
+    .bitsline {
+      display: inline-flex;
+      white-space: nowrap;
+      gap: 0;
+      line-height: 1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+    .bitsline .seg {
+      display: inline-block;
+      padding: 2px 0;              /* no horizontal padding to keep width = characters */
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .bitsline .seg.csum {
+      background: rgba(176,0,32,.18);
+      border-color: rgba(176,0,32,.35);
+      border-right: 0;
+      border-radius: 8px 0 0 8px;
+    }
+    .bitsline .seg.pid {
+      background: rgba(96,165,250,.15);
+      border-color: rgba(96,165,250,.35);
+      border-left: 0;
+      border-radius: 0 8px 8px 0;
+    }
+
   </style>
 </head>
 <body>
   <main class="card" role="main">
-    <h1>Is This FC Possible?</h1>
+    <h1>Is This FC Possible? <font size=5>v1.1</font></h1>
     <p class="lead">Enter a <strong>Mario Kart Wii</strong> friend code (12 digits, with or without dashes). This page checks two things:</p>
     <ul class="lead" style="margin-top:6px; opacity:.9">
       <li>Checksum-valid for MKW and <code>PID &lt; 1,000,000,000</code>.</li>
@@ -91,6 +146,7 @@
         <span id="rwfcText">Waiting for input…</span>
       </div>
       <div id="note" class="footnote"></div>
+      <div id="explain" class="explain" hidden></div>
     </div>
 
     <div class="footnote">
@@ -101,119 +157,153 @@
   </main>
 
   <script>
-    
     // === Utilities ===
-    const $$ = sel => document.querySelector(sel);
-    const fmtFC = n => (n + '').padStart(12, '0').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3');
+    const $$ = (sel) => document.querySelector(sel);
+    const fmtFC = (n) => String(n).padStart(12, '0').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3');
 
     function parseFC(input) {
       const digits = (input || '').replace(/\D/g, '');
       if (digits.length !== 12) {
         return { ok: false, err: 'Friend code must have exactly 12 digits.', fc: null, pid: null, csum: null };
       }
-      // Parse decimal FC into a BigInt to work with bit ops reliably.
-      const fcVal = BigInt(digits);
-      const pid = (Number(fcVal & 0xffffffffn)) >>> 0; // low 32 bits
-      const csum = Number((fcVal >> 32n) & 0x7fn);       // high 7 bits
+      const fcVal = BigInt(digits);                 const MAX39 = (1n << 39n) - 1n;
+  if (fcVal > MAX39) {
+    return { ok: false, err: 'Out of range: FC must be ≤ 549,755,813,887 (39-bit).', fc: null, pid: null, csum: null, raw: digits };
+  }
+// treat decimal as numeric 39-bit value
+      const pid  = (Number(fcVal & 0xffffffffn)) >>> 0;       // low 32 bits (unsigned)
+      const csum = Number((fcVal >> 32n) & 0x7fn);            // high 7 bits only
       return { ok: true, fcVal, pid, csum, raw: digits };
     }
 
-    // Minimal MD5 implementation returning Uint8Array(16) for a Uint8Array input.
-    // Public-domain style implementation adapted for compactness.
-    (function(){
-      function toUint8(arr){ return arr instanceof Uint8Array ? arr : new Uint8Array(arr); }
-      function rl(x, n){ return (x << n) | (x >>> (32 - n)); }
-      function add(x, y){ return (x + y) >>> 0; }
+    // Minimal MD5 -> Uint8Array(16)
+    function md5Bytes(bytes){
+      bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      function rl(x,n){ return (x << n) | (x >>> (32 - n)); }
+      function add(x,y){ return (x + y) >>> 0; }
       function F(x,y,z){ return (x & y) | (~x & z); }
       function G(x,y,z){ return (x & z) | (y & ~z); }
       function H(x,y,z){ return x ^ y ^ z; }
       function I(x,y,z){ return y ^ (x | ~z); }
-      const S = [
-        7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
-        5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
-        4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
-        6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21
-      ];
-      const K = new Uint32Array(64);
-      for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2**32) >>> 0;
-      function md5core(bytes){
-        bytes = toUint8(bytes);
-        const origLenBits = BigInt(bytes.length) * 8n;
-        // Pad: append 0x80 then 0x00* until length ≡ 56 mod 64, then 64-bit LE length
-        const padLen = (56 - ((bytes.length + 1) % 64) + 64) % 64;
-        const buf = new Uint8Array(bytes.length + 1 + padLen + 8);
-        buf.set(bytes, 0); buf[bytes.length] = 0x80;
-        // 64-bit little-endian length
-        let tmp = origLenBits;
-        for (let i = 0; i < 8; i++) { buf[buf.length - 8 + i] = Number(tmp & 0xffn); tmp >>= 8n; }
-
-        let a = 0x67452301, b = 0xefcdab89, c = 0x98badcfe, d = 0x10325476;
-        const M = new Uint32Array(16);
-        for (let i = 0; i < buf.length; i += 64) {
-          for (let j = 0; j < 16; j++) {
-            const o = i + j*4;
-            M[j] = buf[o] | (buf[o+1] << 8) | (buf[o+2] << 16) | (buf[o+3] << 24);
-          }
-          let A=a, B=b, C=c, D=d;
-          for (let i2 = 0; i2 < 64; i2++) {
-            let f, g;
-            if (i2 < 16) { f = F(B,C,D); g = i2; }
-            else if (i2 < 32) { f = G(B,C,D); g = (5*i2 + 1) & 15; }
-            else if (i2 < 48) { f = H(B,C,D); g = (3*i2 + 5) & 15; }
-            else { f = I(B,C,D); g = (7*i2) & 15; }
-            const tmp2 = D;
-            D = C;
-            C = B;
-            const t = add(add(add(A, f), add(K[i2], M[g])), 0);
-            B = add(B, rl(t, S[i2]));
-            A = tmp2;
-          }
-          a = add(a, A); b = add(b, B); c = add(c, C); d = add(d, D);
+      const S=[7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22, 5,9,14,20, 5,9,14,20, 5,9,14,20, 5,9,14,20, 4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23, 6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21];
+      const K=new Uint32Array(64); for(let i=0;i<64;i++){ K[i]=(Math.floor(Math.abs(Math.sin(i+1))*4294967296)>>>0); }
+      const bitLen = BigInt(bytes.length)*8n;
+      const padLen = (56 - ((bytes.length + 1) % 64) + 64) % 64;
+      const buf = new Uint8Array(bytes.length + 1 + padLen + 8);
+      buf.set(bytes,0); buf[bytes.length]=0x80;
+      let t = bitLen; for(let i=0;i<8;i++){ buf[buf.length-8+i] = Number(t & 0xffn); t >>= 8n; }
+      let a=0x67452301,b=0xefcdab89,c=0x98badcfe,d=0x10325476;
+      const M=new Uint32Array(16);
+      for(let i=0;i<buf.length;i+=64){
+        for(let j=0;j<16;j++){ const o=i+j*4; M[j]=buf[o]|(buf[o+1]<<8)|(buf[o+2]<<16)|(buf[o+3]<<24); }
+        let A=a,B=b,C=c,D=d;
+        for(let i2=0;i2<64;i2++){
+          let f,g; if(i2<16){ f=F(B,C,D); g=i2; } else if(i2<32){ f=G(B,C,D); g=(5*i2+1)&15; } else if(i2<48){ f=H(B,C,D); g=(3*i2+5)&15; } else { f=I(B,C,D); g=(7*i2)&15; }
+          const tmp=D; D=C; C=B; const t0 = add(add(add(A,f), add(K[i2], M[g])), 0); B=add(B, rl(t0, S[i2])); A=tmp;
         }
-        const out = new Uint8Array(16);
-        const words = [a,b,c,d];
-        for (let i = 0; i < 4; i++) {
-          out[i*4+0] = words[i] & 0xff;
-          out[i*4+1] = (words[i] >>> 8) & 0xff;
-          out[i*4+2] = (words[i] >>> 16) & 0xff;
-          out[i*4+3] = (words[i] >>> 24) & 0xff;
+        a=add(a,A); b=add(b,B); c=add(c,C); d=add(d,D);
+      }
+      const out=new Uint8Array(16), w=[a,b,c,d];
+      for(let i=0;i<4;i++){ out[i*4]=w[i]&255; out[i*4+1]=(w[i]>>>8)&255; out[i*4+2]=(w[i]>>>16)&255; out[i*4+3]=(w[i]>>>24)&255; }
+      return out;
+    }
+
+    function expectedChecksum7(pid) {
+      const b = new Uint8Array(8);
+      b[0] = pid & 0xff; b[1] = (pid >>> 8) & 0xff; b[2] = (pid >>> 16) & 0xff; b[3] = (pid >>> 24) & 0xff;
+      b[4] = 0x4a; b[5] = 0x43; b[6] = 0x4d; b[7] = 0x52; // 'J','C','M','R'
+      const digest = md5Bytes(b);
+      return (digest[0] >>> 1) & 0x7f;
+    }
+
+    // ---------------- Explain panel helpers ----------------
+    function clearExplain() {
+      const ex = $$('#explain');
+      if (ex) { ex.hidden = true; ex.innerHTML = ''; }
+    }
+    function renderInvalidChecksumExplain(rawDigits, pid, gotCsum, expected) {
+      const ex = $$('#explain');
+      if (!ex) return;
+
+      const fcVal = BigInt(rawDigits);
+      const fc39 = fcVal & ((1n<<39n) - 1n);
+  const bin = fc39.toString(2).padStart(39,'0');
+const cbits = bin.slice(0,7);
+      const pbits = bin.slice(7);
+
+      // Recompute MD5 byte0 for explanation
+      const b = new Uint8Array(8);
+      b[0]=pid&0xff; b[1]=(pid>>>8)&0xff; b[2]=(pid>>>16)&0xff; b[3]=(pid>>>24)&0xff;
+      b[4]=0x4a; b[5]=0x43; b[6]=0x4d; b[7]=0x52;
+      const d = md5Bytes(b);
+      const d0 = d[0];
+      const d0hex = d0.toString(16).padStart(2,'0');
+      const pidHex = pid.toString(16).padStart(8,'0');
+
+      ex.innerHTML = `
+        <div><strong>Why it's impossible:</strong> checksum mismatch</div>
+        <div style="margin-top:6px">39‑bit layout:</div>
+<div class="bitsline" role="img" aria-label="39-bit layout"><span class="seg csum">${cbits}</span><span class="seg pid">${pbits}</span></div>
+        <div style="margin-top:6px">PID: <span class="tag">${pid} (0x${pidHex})</span></div>
+        <div style="margin-top:6px">Checksum from FC: <span class="tag no">${gotCsum}</span></div>
+        <div style="margin-top:6px">Expected checksum: <span class="tag ok">${expected}</span>
+          <span class="muted">from MD5 byte0 = 0x${d0hex} → (byte0 >> 1) & 0x7F</span>
+        </div>
+        <div class="muted" style="margin-top:6px">Note: The decimal friend-code digits don’t align with bit fields; the binary view shows the 7 checksum bits (left) and 32 PID bits (right).</div>
+      `;
+
+      
+      const correctedVal = (BigInt(expected) << 32n) | BigInt(pid);
+      const enteredDigits = String(rawDigits).padStart(12,'0');
+      const correctedDigits = correctedVal.toString(10).padStart(12,'0');
+
+      function dashedSpans(leftDigits, rightDigits, kind) {
+        leftDigits = String(leftDigits).padStart(12,'0');
+        rightDigits = String(rightDigits).padStart(12,'0');
+        let out = '';
+        for (let i = 0; i < 12; i++) {
+          const same = leftDigits[i] === rightDigits[i];
+          const cls = same ? 'dg same' : ('dg ' + kind);
+          const ch = leftDigits[i];
+          out += '<span class="' + cls + '" title="' + (same ? 'matches' : ('should be ' + rightDigits[i])) + '">' + ch + '</span>';
+          if (i === 3 || i === 7) out += '<span>-</span>';
         }
         return out;
       }
-      window.md5Bytes = md5core;
-    })();
 
-    function expectedChecksum7(pid) {
-      // Build 8-byte buffer: LE(pid) + 'J','C','M','R'
-      const b = new Uint8Array(8);
-      b[0] = pid & 0xff; b[1] = (pid >>> 8) & 0xff; b[2] = (pid >>> 16) & 0xff; b[3] = (pid >>> 24) & 0xff;
-      b[4] = 0x4a; // 'J'
-      b[5] = 0x43; // 'C'
-      b[6] = 0x4d; // 'M'
-      b[7] = 0x52; // 'R'
-      const digest = md5Bytes(b);
-      return (digest[0] >>> 1) & 0x7f; // 7-bit value
+      const enteredHTML = dashedSpans(enteredDigits, correctedDigits, 'diff');
+      const correctedHTML = dashedSpans(correctedDigits, enteredDigits, 'fix');
+
+      ex.innerHTML += `
+        <div style="margin-top:10px">
+          <div class="fc-line"><span class="fc-caption">Entered:</span> ${enteredHTML}</div>
+          <div class="fc-line"><span class="fc-caption">Corrected:</span> ${correctedHTML}</div>
+          <div class="muted">Digits that differ from the correct friend code are highlighted.</div>
+        </div>`;
+      ex.hidden = false;
+
     }
 
-async function checkRWFC(friendCodeDigits) {
-  // Try both digits-only and dashed forms; treat 200 as taken, 404 as not found.
-  const d = String(friendCodeDigits);
-  const candidates = [d, (d.padStart(12, '0').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3'))];
-
-  for (const fc of candidates) {
-    try {
-      const res = await fetch('https://rwfc.net/api/leaderboard/player/' + encodeURIComponent(fc), { method: 'GET' });
-      if (res.ok) return { ok: true, taken: true };   // 200
-      if (res.status === 404) continue;               // try other representation
-      return { ok: false, err: 'Unexpected HTTP ' + res.status };
-    } catch (e) {
-      return { ok: false, err: (e && e.message) ? e.message : String(e) };
+    // ---------------- RWFC (Leaderboard) check ----------------
+    async function checkRWFC(friendCodeDigits) {
+      // Try digits-only and dashed forms; treat 200 as taken, 404 as not found.
+      const d = String(friendCodeDigits);
+      const candidates = [d, fmtFC(d)];
+      for (const fc of candidates) {
+        try {
+          const res = await fetch('https://rwfc.net/api/leaderboard/player/' + encodeURIComponent(fc), { method: 'GET' });
+          if (res.ok) return { ok: true, taken: true };      // 200
+          if (res.status === 404) continue;                  // try other representation
+          return { ok: false, err: 'Unexpected HTTP ' + res.status };
+        } catch (e) {
+          return { ok: false, err: (e && e.message) ? e.message : String(e) };
+        }
+      }
+      return { ok: true, taken: false };
     }
-  }
-  return { ok: true, taken: false };
-}
 
-function setBigAnswer(mode, reasonText){
+    // ---------------- UI ----------------
+    function setBigAnswer(mode, reasonText) {
       const el = $$('#big');
       el.textContent = (mode === 'no') ? 'NO' : 'YES';
       el.classList.remove('ok','no','warn');
@@ -221,69 +311,72 @@ function setBigAnswer(mode, reasonText){
       $$('#reason').textContent = reasonText || '';
     }
 
-async function runCheck() {
-  const v = parseFC($$('#fc').value);
-  $$('#rwfc').hidden = true;
-  $$('#rwfcText').textContent = '';
-  $$('#note').textContent = '';
+    // Known-good runCheck: all awaits inside async, balanced braces
+    async function runCheck() {
+      const v = parseFC($$('#fc').value);
+      $$('#rwfc').hidden = true;
+      $$('#rwfcText').textContent = '';
+      $$('#note').textContent = '';
+      clearExplain();
 
-  if (!v.ok) { setBigAnswer('no', v.err); return; }
+      if (!v.ok) { setBigAnswer('no', v.err); return; }
 
-  const expected = expectedChecksum7(v.pid);
-  if (v.csum !== expected) {
-    setBigAnswer('no', 'Invalid checksum for MKW. Parsed PID ' + v.pid + '.');
-    return;
-  }
+      const expected = expectedChecksum7(v.pid);
+      if (v.csum !== expected) {
+        setBigAnswer('no', 'Invalid checksum for MKW. Parsed PID ' + v.pid + '.');
+        renderInvalidChecksumExplain(v.raw, v.pid, v.csum, expected);
+        return;
+      }
 
-  const pid = v.pid;
-  const WIIMMFI_ONLY_LOWER = 1000000000;   // > this and <= upper → Wiimmfi-only
-  const WIIMMFI_ONLY_UPPER = 2147483483;   // per request
-  const WIIMMFI_INVALID_BELOW = 600000000; // note for Wiimmfi invalid
+      const pid = v.pid;
+      const WIIMMFI_ONLY_LOWER = 1000000000;   // > this and <= upper → Wiimmfi-only
+      const WIIMMFI_ONLY_UPPER = 2147483483;   // per request
+      const WIIMMFI_INVALID_BELOW = 600000000; // note for Wiimmfi invalid
 
-  // Wiimmfi-only range → yellow, skip RWFC check
-  if (pid > WIIMMFI_ONLY_LOWER && pid <= WIIMMFI_ONLY_UPPER) {
-    setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
-    return;
-  }
+      // Wiimmfi-only range → yellow, skip RWFC check
+      if (pid > WIIMMFI_ONLY_LOWER && pid <= WIIMMFI_ONLY_UPPER) {
+        setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
+        return;
+      }
 
-  // Above upper bound → not supported anywhere
-  if (pid > WIIMMFI_ONLY_UPPER) {
-    setBigAnswer('no', 'PID ' + pid + ' is above supported ranges.');
-    return;
-  }
+      // Above upper bound → not supported anywhere
+      if (pid > WIIMMFI_ONLY_UPPER) {
+        setBigAnswer('no', 'PID ' + pid + ' is above supported ranges.');
+        return;
+      }
 
-  // pid == 1,000,000,000 exactly → treat as Wiimmfi-only (per your rule “above 1e9 up to upper”).
-  if (pid === WIIMMFI_ONLY_LOWER) {
-    setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
-    return;
-  }
+      // pid == 1,000,000,000 exactly → treat as Wiimmfi-only (per your rule)
+      if (pid === WIIMMFI_ONLY_LOWER) {
+        setBigAnswer('warn', 'Valid MKW FC. PID ' + pid + '. Only valid on Wiimmfi.');
+        return;
+      }
 
-  // pid < 1e9 → RWFC-valid range (green) + optional Wiimmfi note + RWFC lookup
-  setBigAnswer('ok', 'Valid MKW FC. PID ' + pid + ' (< 1,000,000,000).');
-  if (pid < WIIMMFI_INVALID_BELOW) {
-    $$('#note').textContent = 'This code is invalid on Wiimmfi, they only allow codes starting with PID 600,000,000.';
-  }
+      // pid < 1e9 → RWFC-valid range (green) + optional Wiimmfi note + RWFC lookup
+      setBigAnswer('ok', 'Valid MKW FC. PID ' + pid + ' (< 1,000,000,000).');
+      if (pid < WIIMMFI_INVALID_BELOW) {
+        $$('#note').textContent = 'invalid on Wiimmfi';
+      }
 
-  $$('#rwfc').hidden = false;
-  $$('#rwfcDot').className = 'dot';
-  $$('#rwfcText').textContent = 'Checking RWFC…';
+      $$('#rwfc').hidden = false;
+      $$('#rwfcDot').className = 'dot';
+      $$('#rwfcText').textContent = 'Checking RWFC…';
 
-  const rw = await checkRWFC(v.raw);
-  if (rw.ok) {
-    const taken = rw.taken;
-    $$('#rwfcDot').classList.add(taken ? 'no' : 'ok');
-    $$('#rwfcText').textContent = taken
-      ? 'This code is taken on RWFC!'
-      : 'This code is not on the RWFC VR leaderboard!';
-  } else {
-    $$('#rwfcText').textContent = "Couldn't check RWFC: " + rw.err;
-  }
-}
-
+      const rw = await checkRWFC(v.raw);
+      if (rw.ok) {
+        const taken = rw.taken;
+        $$('#rwfcDot').classList.add(taken ? 'no' : 'ok');
+        $$('#rwfcText').textContent = taken
+          ? 'This code is taken on RWFC!'
+          : 'This code is not on the RWFC VR leaderboard!';
+      } else {
+        const _errMsg = "Couldn't check RWFC: " + rw.err + (/Failed to fetch/i.test(rw.err) ? " (network/CORS?)" : "");
+  $$('#rwfcText').textContent = _errMsg;
+      }
+    }
 
     // Wire up UI
     $$('#checkBtn').addEventListener('click', runCheck);
-    $$('#fc').addEventListener('keydown', (e) => { if (e.key === 'Enter') runCheck(); });
+    $$('#fc').addEventListener('keydown', (e)=>{ if (e.key === 'Enter') runCheck(); });
   </script>
 </body>
 </html>
