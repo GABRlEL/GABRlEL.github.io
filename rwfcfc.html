@@ -354,7 +354,7 @@ const cbits = bin.slice(0,7);
       // pid < 1e9 → RWFC-valid range (green) + optional Wiimmfi note + RWFC lookup
       setBigAnswer('ok', 'Valid MKW FC. PID ' + pid + ' (< 1,000,000,000).');
       if (pid < WIIMMFI_INVALID_BELOW) {
-        $$('#note').textContent = 'invalid on Wiimmfi';
+        $$('#note').textContent = 'This code is invalid on Wiimmfi, they only allow codes starting with PID 600,000,000.';
       }
 
       $$('#rwfc').hidden = false;
