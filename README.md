@@ -51,3 +51,5 @@
 [Hidden GP Score Calculator](https://gabrlel.github.io/hidden.html)
 
 [Is This FC Possible?](https://gabrlel.github.io/rwfcfc.html)
+
+[Settingpad - Wii setting.txt Generator & Editor](https://gabrlel.github.io/settingpad.html)
