@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Settingpad - Wii setting.txt Generator & Editor</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #020617;
+      border-radius: 14px;
+      padding: 24px 24px 30px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.7);
+      border: 1px solid #111827;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.7rem;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    h1 small {
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: #9ca3af;
+    }
+
+    fieldset {
+      border: 1px solid #374151;
+      border-radius: 10px;
+      padding: 14px 16px 16px;
+      margin-bottom: 16px;
+    }
+
+    legend {
+      padding: 0 6px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 2px;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.9rem;
+    }
+
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 1px #2563eb55;
+    }
+
+    textarea {
+      min-height: 80px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      resize: vertical;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: #2563eb;
+      color: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #status {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-top: 6px;
+      white-space: pre-line;
+    }
+
+    code.inline {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: #020617;
+      padding: 1px 4px;
+      border-radius: 4px;
+      border: 1px solid #111827;
+      font-size: 0.85em;
+    }
+
+    #byteInfo {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    #byteInfo.over {
+      color: #f97373;
+      font-weight: 600;
+    }
+
+    /* Custom combo (input + preset dropdown) */
+    .combo {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      position: relative;
+    }
+
+    .combo input[type="text"] {
+      flex: 1 1 auto;
+    }
+
+    .combo-btn {
+      flex: 0 0 auto;
+      padding-inline: 8px;
+      font-size: 0.8rem;
+      line-height: 1;
+      border-radius: 999px;
+      background: #374151;
+      cursor: pointer;
+    }
+
+    .combo-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 4px;
+      background: #020617;
+      border: 1px solid #4b5563;
+      border-radius: 8px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+      min-width: 100%;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 40;
+      padding: 4px 0;
+    }
+
+    .combo-menu.open {
+      display: block;
+    }
+
+    .combo-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 6px 10px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: #e5e7eb;
+    }
+
+    .combo-item:hover {
+      background: #111827;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      .container {
+        padding: 16px 14px 22px;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      <code class="inline">Settingpad</code>
+      <small>decrypt · edit · encrypt - Credits to Wiibrew, Consolemods, GaryOderNichts/vWii-Decaffeinator and GPT 5.1-Thinking</small>
+    </h1>
+
+    <!-- 1. Load existing encrypted file -->
+    <fieldset>
+      <legend>1. Load existing encrypted <code class="inline">setting.txt</code> (optional)</legend>
+      <input type="file" id="fileInput" accept=".txt,.bin">
+      <div id="status"></div>
+    </fieldset>
+
+    <!-- 2. Structured fields -->
+    <fieldset>
+      <legend>2. Edit structured fields</legend>
+      <div class="grid">
+        <div>
+          <label for="areaInput">AREA</label>
+          <div class="combo">
+            <input type="text" id="areaInput" placeholder="e.g. EUR">
+            <button type="button" class="combo-btn" data-target="areaInput" data-options="area" title="Show presets">▾</button>
+            <div class="combo-menu" data-target="areaInput"></div>
+          </div>
+        </div>
+
+        <div>
+          <label for="modelInput">MODEL</label>
+          <div class="combo">
+            <input type="text" id="modelInput" placeholder="e.g. RVL-001(EUR)">
+            <button type="button" class="combo-btn" data-target="modelInput" data-options="model" title="Show presets">▾</button>
+            <div class="combo-menu" data-target="modelInput"></div>
+          </div>
+        </div>
+
+        <div>
+          <label for="dvdInput">DVD</label>
+          <input type="text" id="dvdInput" placeholder="e.g. 0">
+        </div>
+
+        <div>
+          <label for="mpchInput">MPCH</label>
+          <input type="text" id="mpchInput" placeholder="e.g. 0x7FFE">
+        </div>
+
+        <div>
+          <label for="codeInput">CODE (serial prefix)</label>
+          <div class="combo">
+            <input type="text" id="codeInput" placeholder="e.g. LU, LEH">
+            <button type="button" class="combo-btn" data-target="codeInput" data-options="code" title="Show presets">▾</button>
+            <div class="combo-menu" data-target="codeInput"></div>
+          </div>
+        </div>
+
+        <div>
+          <label for="sernoInput">SERNO (serial number)</label>
+          <div class="combo">
+            <input type="text" id="sernoInput" placeholder="e.g. 123456789">
+            <button type="button" class="combo-btn" id="sernoRandomBtn" title="Generate random serial">🎲</button>
+          </div>
+        </div>
+
+        <div>
+          <label for="videoInput">VIDEO</label>
+          <div class="combo">
+            <input type="text" id="videoInput" placeholder="e.g. PAL">
+            <button type="button" class="combo-btn" data-target="videoInput" data-options="video" title="Show presets">▾</button>
+            <div class="combo-menu" data-target="videoInput"></div>
+          </div>
+        </div>
+
+        <div>
+          <label for="gameInput">GAME</label>
+          <div class="combo">
+            <input type="text" id="gameInput" placeholder="e.g. EU">
+            <button type="button" class="combo-btn" data-target="gameInput" data-options="game" title="Show presets">▾</button>
+            <div class="combo-menu" data-target="gameInput"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <label for="extraInput">Extra / unknown lines (preserved verbatim)</label>
+        <textarea id="extraInput" spellcheck="false"
+          placeholder="Any additional KEY=value lines&#10;will be kept as-is when re-encrypting."></textarea>
+      </div>
+
+      <!-- Region preset generator -->
+      <div class="buttons" style="margin-top:10px; align-items:center;">
+        <label style="font-size:0.8rem; color:#9ca3af; margin:0;">
+          Generate plausible console preset:
+        </label>
+        <select id="presetRegionSelect"
+          style="min-width:140px; padding:4px 8px; border-radius:999px; border:1px solid #4b5563; background:#020617; color:#e5e7eb; font-size:0.85rem;">
+          <option value="JPN">JPN (Japan)</option>
+          <option value="USA">USA (North America)</option>
+          <option value="EUR" selected>EUR (Europe)</option>
+          <option value="AUS">AUS (Australia)</option>
+          <option value="BRA">BRA (Brazil)</option>
+          <option value="LTN">LTN (Latin America)</option>
+          <option value="TWN">TWN (Taiwan)</option>
+          <option value="ROC">ROC (Taiwan / ROC)</option>
+          <option value="HKG">HKG (Hong Kong)</option>
+          <option value="ASI">ASI (Asia generic)</option>
+          <option value="KOR">KOR (Korea)</option>
+          <option value="SAF">SAF (South Africa)</option>
+        </select>
+        <button type="button" class="secondary" id="applyPresetBtn">Apply preset</button>
+      </div>
+    </fieldset>
+
+    <!-- 3. Plaintext view -->
+    <fieldset>
+      <legend>3. Plaintext preview (optional, fully editable)</legend>
+      <textarea id="plaintextArea" spellcheck="false"
+        placeholder="Plaintext representation of setting.txt will appear here after loading or generating.&#10;You can also edit it directly."></textarea>
+      <div id="byteInfo">0 / 256 bytes</div>
+      <div class="buttons">
+        <button id="fromFieldsBtn" type="button">Update plaintext from fields</button>
+        <button id="toFieldsBtn" type="button" class="secondary">Parse plaintext into fields</button>
+      </div>
+    </fieldset>
+
+    <!-- 4. Export -->
+    <fieldset>
+      <legend>4. Export encrypted file</legend>
+      <div class="buttons">
+        <button id="downloadBtn" type="button">Download encrypted setting.txt</button>
+      </div>
+    </fieldset>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // Preset values for simple dropdowns
+      const PRESETS = {
+        area: ["JPN", "USA", "EUR", "AUS", "BRA", "TWN", "ROC", "KOR", "HKG", "ASI", "LTN", "SAF"],
+        video: ["NTSC", "PAL", "MPAL"],
+        game: ["JP", "US", "EU", "KR", "CN"],
+        code: ["LU", "LAH", "LEH", "LEF", "LJ", "LFJ", "LKM"],
+        model: [
+          "RVL-001(EUR)",
+          "RVL-001(USA)",
+          "RVL-001(JPN)",
+          "RVL-001(AUS)",
+          "RVL-001(KOR)",
+          "RVL-001",
+          "RVT-001"
+        ]
+      };
+
+      // Region presets based on common real-world combos
+      const REGION_PRESETS = {
+        JPN: {
+          area: "JPN",
+          models: ["RVL-001(JPN)"],
+          video: "NTSC",
+          game: "JP",
+          codePrefixes: ["LFJ", "LJ"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        USA: {
+          area: "USA",
+          models: ["RVL-001(USA)"],
+          video: "NTSC",
+          game: "US",
+          codePrefixes: ["LU", "LB"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        EUR: {
+          area: "EUR",
+          models: ["RVL-001(EUR)"],
+          video: "PAL",
+          game: "EU",
+          codePrefixes: ["LEH"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        AUS: {
+          area: "AUS",
+          models: ["RVL-001(AUS)"],
+          video: "PAL",
+          game: "EU",
+          codePrefixes: ["LEH"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        BRA: {
+          area: "BRA",
+          models: ["RVL-001(USA)"],
+          video: "MPAL",
+          game: "US",
+          codePrefixes: ["LU"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        LTN: {
+          area: "LTN",
+          models: ["RVL-001(USA)"],
+          video: "NTSC",
+          game: "US",
+          codePrefixes: ["LU"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        TWN: {
+          area: "TWN",
+          models: ["RVL-001(JPN)"],
+          video: "NTSC",
+          game: "JP",
+          codePrefixes: ["LFJ"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        ROC: {
+          area: "ROC",
+          models: ["RVL-001(JPN)"],
+          video: "NTSC",
+          game: "JP",
+          codePrefixes: ["LFJ"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        HKG: {
+          area: "HKG",
+          models: ["RVL-001(JPN)"],
+          video: "NTSC",
+          game: "JP",
+          codePrefixes: ["LFJ"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        ASI: {
+          area: "ASI",
+          models: ["RVL-001(USA)", "RVL-001(JPN)"],
+          video: "NTSC",
+          game: "US",
+          codePrefixes: ["LU"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        KOR: {
+          area: "KOR",
+          models: ["RVL-001(KOR)"],
+          video: "NTSC",
+          game: "KR",
+          codePrefixes: ["LKM"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        SAF: {
+          area: "SAF",
+          models: ["RVL-001(EUR)"],
+          video: "PAL",
+          game: "EU",
+          codePrefixes: ["LEH"],
+          dvd: "0",
+          mpch: "0x7FFE"
+        }
+      };
+
+      function pickRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+
+      function generateRandomSerial() {
+        // 9-digit numeric serial, zero-padded
+        const n = Math.floor(Math.random() * 1000000000);
+        return String(n).padStart(9, "0");
+      }
+
+      // --- DOM refs ---
+      const fileInput = document.getElementById("fileInput");
+      const statusEl = document.getElementById("status");
+
+      const areaInput = document.getElementById("areaInput");
+      const modelInput = document.getElementById("modelInput");
+      const dvdInput = document.getElementById("dvdInput");
+      const mpchInput = document.getElementById("mpchInput");
+      const codeInput = document.getElementById("codeInput");
+      const sernoInput = document.getElementById("sernoInput");
+      const sernoRandomBtn = document.getElementById("sernoRandomBtn");
+      const videoInput = document.getElementById("videoInput");
+      const gameInput = document.getElementById("gameInput");
+      const extraInput = document.getElementById("extraInput");
+
+      const presetRegionSelect = document.getElementById("presetRegionSelect");
+      const applyPresetBtn = document.getElementById("applyPresetBtn");
+
+      const plaintextArea = document.getElementById("plaintextArea");
+      const fromFieldsBtn = document.getElementById("fromFieldsBtn");
+      const toFieldsBtn = document.getElementById("toFieldsBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const byteInfo = document.getElementById("byteInfo");
+
+      const KNOWN_KEYS = ["AREA", "MODEL", "DVD", "MPCH", "CODE", "SERNO", "VIDEO", "GAME"];
+
+      // state: track line ending style ("CRLF" or "LF"); default matches Wii console
+      let newlineStyle = "CRLF";
+      // guard to avoid infinite sync loops
+      let isSyncing = false;
+
+      function setStatus(msg) {
+        statusEl.textContent = msg || "";
+      }
+
+      // Convert UI text (uses "\n") into wire-format text (with chosen newline style)
+      function uiToWirePlain(uiPlain) {
+        let t = (uiPlain || "").replace(/\r\n/g, "\n");
+        if (newlineStyle === "CRLF") {
+          t = t.replace(/\n/g, "\r\n");
+        }
+        return t;
+      }
+
+      // Compute wire-format byte length from UI text, including newline conversion
+      function computeWireLenFromUI(uiPlain) {
+        const encoder = new TextEncoder();
+        const wireText = uiToWirePlain(uiPlain || "");
+        return encoder.encode(wireText).length;
+      }
+
+      function updateByteInfo() {
+        const len = computeWireLenFromUI(plaintextArea.value || "");
+        byteInfo.textContent = len + " / 256 bytes";
+        if (len > 256) {
+          byteInfo.classList.add("over");
+        } else {
+          byteInfo.classList.remove("over");
+        }
+      }
+
+      // --- Crypto core: XOR with key 0x73B5DBFA over actual plaintext length ---
+
+      function decryptSetting(cipherBytes) {
+        const buf = new Uint8Array(cipherBytes); // copy
+        const maxLen = Math.min(256, buf.length);
+
+        // Encrypted data is only up to first 0x00, rest is padding.
+        let encLen = maxLen;
+        for (let i = 0; i < maxLen; i++) {
+          if (buf[i] === 0) {
+            encLen = i;
+            break;
+          }
+        }
+
+        let key = 0x73B5DBFA >>> 0;
+        for (let i = 0; i < encLen; i++) {
+          buf[i] ^= (key & 0xFF);
+          key = ((key << 1) | (key >>> 31)) >>> 0;
+        }
+
+        const decoder = new TextDecoder("ascii");
+        const plain = decoder.decode(buf.subarray(0, encLen));
+        return { plain, encLen };
+      }
+
+      function encryptSetting(plainText) {
+        const encoder = new TextEncoder();
+        const plainBytes = encoder.encode(plainText);
+
+        if (plainBytes.length > 256) {
+          throw new Error("Plaintext is longer than 256 bytes.");
+        }
+
+        const buf = new Uint8Array(256); // zero-padded
+        buf.set(plainBytes);
+
+        let key = 0x73B5DBFA >>> 0;
+        for (let i = 0; i < plainBytes.length; i++) {
+          buf[i] ^= (key & 0xFF);
+          key = ((key << 1) | (key >>> 31)) >>> 0;
+        }
+
+        return buf;
+      }
+
+      // --- Parsing helpers ---
+
+      function parsePlaintextIntoFields(text) {
+        const lines = (text || "").split(/\r?\n/);
+        const values = {};
+        const extras = [];
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
+
+          const eq = line.indexOf("=");
+          if (eq === -1) {
+            extras.push(rawLine);
+            continue;
+          }
+
+          const key = line.slice(0, eq).trim();
+          const value = line.slice(eq + 1).trim();
+
+          if (KNOWN_KEYS.includes(key)) {
+            values[key] = value;
+          } else {
+            extras.push(rawLine);
+          }
+        }
+
+        areaInput.value = values.AREA || "";
+        modelInput.value = values.MODEL || "";
+        dvdInput.value = values.DVD || "";
+        mpchInput.value = values.MPCH || "";
+        codeInput.value = values.CODE || "";
+        sernoInput.value = values.SERNO || "";
+        videoInput.value = values.VIDEO || "";
+        gameInput.value = values.GAME || "";
+        extraInput.value = extras.join("\n");
+      }
+
+      function buildPlaintextFromFields() {
+        const lines = [];
+
+        if (areaInput.value)  lines.push("AREA=" + areaInput.value);
+        if (modelInput.value) lines.push("MODEL=" + modelInput.value);
+        if (dvdInput.value)   lines.push("DVD=" + dvdInput.value);
+        if (mpchInput.value)  lines.push("MPCH=" + mpchInput.value);
+        if (codeInput.value)  lines.push("CODE=" + codeInput.value);
+        if (sernoInput.value) lines.push("SERNO=" + sernoInput.value);
+        if (videoInput.value) lines.push("VIDEO=" + videoInput.value);
+        if (gameInput.value)  lines.push("GAME=" + gameInput.value);
+
+        const extra = (extraInput.value || "").replace(/\r\n/g, "\n");
+        if (extra.trim().length > 0) {
+          const extraLines = extra.split("\n");
+          for (const l of extraLines) {
+            if (l.trim().length > 0) {
+              lines.push(l);
+            }
+          }
+        }
+
+        return lines.join("\n") + "\n";
+      }
+
+      // --- Two-way sync helpers ---
+
+      function syncFromFields() {
+        if (isSyncing) return;
+        isSyncing = true;
+        const text = buildPlaintextFromFields();
+        plaintextArea.value = text;
+        updateByteInfo();
+        isSyncing = false;
+      }
+
+      function syncFromPlain() {
+        if (isSyncing) return;
+        isSyncing = true;
+        parsePlaintextIntoFields(plaintextArea.value || "");
+        updateByteInfo();
+        isSyncing = false;
+      }
+
+      // --- File loading ---
+
+      fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+          try {
+            const bytes = new Uint8Array(e.target.result);
+            if (bytes.length === 0) {
+              setStatus("Selected file is empty, nya.");
+              return;
+            }
+
+            const { plain, encLen } = decryptSetting(bytes);
+
+            // Detect newline style from file: prefer CRLF if present.
+            if (plain.indexOf("\r\n") !== -1) {
+              newlineStyle = "CRLF";
+            } else {
+              newlineStyle = "LF";
+            }
+
+            // Normalize newlines for textarea, but keep newlineStyle for export.
+            const normalized = plain.replace(/\r\n/g, "\n");
+
+            isSyncing = true;
+            plaintextArea.value = normalized;
+            parsePlaintextIntoFields(normalized);
+            updateByteInfo();
+            isSyncing = false;
+
+            setStatus(
+              "Decrypted " + bytes.length + " bytes. " +
+              "Detected plaintext length: " + encLen + " bytes. " +
+              "Newline style: " + newlineStyle + "."
+            );
+          } catch (err) {
+            console.error(err);
+            setStatus("Error while decrypting file: " + err.message);
+          }
+        };
+
+        reader.onerror = function () {
+          setStatus("Failed to read file.");
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+
+      // --- Buttons & inputs ---
+
+      fromFieldsBtn.addEventListener("click", function () {
+        syncFromFields();
+      });
+
+      toFieldsBtn.addEventListener("click", function () {
+        syncFromPlain();
+      });
+
+      plaintextArea.addEventListener("input", function () {
+        syncFromPlain();
+      });
+
+      // Structured inputs -> update plaintext
+      const structuredInputs = [
+        areaInput,
+        modelInput,
+        dvdInput,
+        mpchInput,
+        codeInput,
+        sernoInput,
+        videoInput,
+        gameInput,
+        extraInput
+      ];
+
+      structuredInputs.forEach(function (el) {
+        el.addEventListener("input", function () {
+          syncFromFields();
+        });
+      });
+
+      // Random serial generator (SERNO)
+      if (sernoRandomBtn) {
+        sernoRandomBtn.addEventListener("click", function () {
+          sernoInput.value = generateRandomSerial();
+          syncFromFields();
+        });
+      }
+
+      // Apply region preset
+      if (applyPresetBtn && presetRegionSelect) {
+        applyPresetBtn.addEventListener("click", function () {
+          const areaCode = presetRegionSelect.value || "EUR";
+          const cfg = REGION_PRESETS[areaCode] || REGION_PRESETS["EUR"];
+
+          areaInput.value  = cfg.area;
+          modelInput.value = pickRandom(cfg.models);
+          dvdInput.value   = cfg.dvd;
+          mpchInput.value  = cfg.mpch;
+          codeInput.value  = pickRandom(cfg.codePrefixes);
+          sernoInput.value = generateRandomSerial();
+          videoInput.value = cfg.video;
+          gameInput.value  = cfg.game;
+
+          syncFromFields();
+        });
+      }
+
+      downloadBtn.addEventListener("click", function () {
+        try {
+          let uiPlain = plaintextArea.value;
+
+          if (!uiPlain.trim()) {
+            // If user cleared plaintext, rebuild from fields.
+            syncFromFields();
+            uiPlain = plaintextArea.value;
+          }
+
+          const wirePlain = uiToWirePlain(uiPlain);
+          const encoder = new TextEncoder();
+          const realLen = encoder.encode(wirePlain).length;
+
+          // update visible counter to reflect wire length
+          byteInfo.textContent = realLen + " / 256 bytes";
+          if (realLen > 256) {
+            byteInfo.classList.add("over");
+            const msg =
+              "Plaintext is " + realLen +
+              " bytes, but Wii setting.txt must be 256 bytes or less before encryption.\n" +
+              "Please remove some lines or characters, nya.";
+            setStatus(msg);
+            alert(msg);
+            return;
+          } else {
+            byteInfo.classList.remove("over");
+          }
+
+          const bytes = encryptSetting(wirePlain);
+          const blob = new Blob([bytes], { type: "application/octet-stream" });
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "setting.txt";
+          document.body.appendChild(a);
+          a.click();
+
+          setTimeout(function () {
+            URL.revokeObjectURL(url);
+            a.remove();
+          }, 0);
+
+          setStatus("Encrypted and downloaded 256-byte setting.txt, nya.");
+        } catch (err) {
+          console.error(err);
+          setStatus("Error while encrypting/generating file: " + err.message);
+        }
+      });
+
+      // --- Custom preset dropdown wiring ---
+
+      function setupComboDropdowns() {
+        // Only buttons with data-options participate in dropdowns
+        const buttons = document.querySelectorAll(".combo-btn[data-options]");
+
+        buttons.forEach(function (btn) {
+          const targetId = btn.dataset.target;
+          const typeKey = btn.dataset.options;
+          const input = document.getElementById(targetId);
+          const menu = document.querySelector('.combo-menu[data-target="' + targetId + '"]');
+          const options = PRESETS[typeKey] || [];
+
+          if (!input || !menu) return;
+
+          // Build menu once
+          menu.innerHTML = "";
+          options.forEach(function (val) {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "combo-item";
+            item.textContent = val;
+            item.addEventListener("click", function () {
+              input.value = val;
+              menu.classList.remove("open");
+              syncFromFields();
+            });
+            menu.appendChild(item);
+          });
+
+          btn.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            const isOpen = menu.classList.contains("open");
+            document.querySelectorAll(".combo-menu.open").forEach(function (m) {
+              m.classList.remove("open");
+            });
+            if (!isOpen) {
+              menu.classList.add("open");
+            }
+          });
+        });
+
+        // Close when clicking outside
+        document.addEventListener("click", function () {
+          document.querySelectorAll(".combo-menu.open").forEach(function (m) {
+            m.classList.remove("open");
+          });
+        });
+      }
+
+      // --- Basic defaults for new generation (no file loaded) ---
+      dvdInput.value = "0";
+      mpchInput.value = "0x7FFE";
+      // newlineStyle already defaulted to CRLF -> matches console behavior
+
+      // Initialize byte counter & combo dropdowns
+      updateByteInfo();
+      setupComboDropdowns();
+    })();
+  </script>
+</body>
+</html>
