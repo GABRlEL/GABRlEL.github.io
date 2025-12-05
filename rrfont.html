@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BETA RR Font Fixer</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .drop-zone {
+      border: 2px dashed #666;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-top: 1rem;
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .drop-zone.dragover {
+      border-color: #0af;
+      background-color: #111a;
+    }
+    input[type="file"] {
+      margin-top: 0.5rem;
+    }
+    #log {
+      margin-top: 1.5rem;
+      max-width: 640px;
+      width: 100%;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    small {
+      opacity: 0.75;
+    }
+  </style>
+</head>
+<body>
+  <h1>BETA Font.szs tt_kart_extension_font.brfnt Replacer</h1>
+  <p>Drop a <code>Font.szs</code> below or click to select it, nya.</p>
+  <p>Made by ChatGPT 5.1 Thinking, thanks to BrawlCrate and Wiimms SZS Tools for inspiration</p>
+
+  <div id="drop-zone" class="drop-zone">
+    <strong>Drop Font.szs here</strong><br>
+    <small>or click to choose a file</small><br><br>
+    <input id="font-file-input" type="file" accept=".szs">
+  </div>
+
+  <p>
+    <small>
+      The tool automatically tries to load <code>tt_kart_extension_font.brfnt</code>
+      from the same folder as this HTML.<br>
+      If that fails (e.g. due to file:// restrictions), you can also select it manually:
+    </small>
+    <br>
+    <input id="brfnt-file-input" type="file" accept=".brfnt">
+  </p>
+
+  <pre id="log"></pre>
+
+  <script>
+    // --- Utility logging ----------------------------------------------------
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      logEl.textContent = msg;
+    }
+    function appendLog(msg) {
+      logEl.textContent += msg + "\n";
+    }
+
+    // --- File reading helpers ----------------------------------------------
+    function readFileAsUint8Array(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => {
+          resolve(new Uint8Array(reader.result));
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // --- Yaz0 decompression -------------------------------------------------
+    function yaz0Decompress(src) {
+      if (src[0] !== 0x59 || src[1] !== 0x61 || src[2] !== 0x7A || src[3] !== 0x30) {
+        throw new Error("Input is not Yaz0-compressed (missing 'Yaz0' magic).");
+      }
+
+      const dv = new DataView(src.buffer, src.byteOffset, src.byteLength);
+      const uncompressedSize = dv.getUint32(4, false); // big-endian
+      const dst = new Uint8Array(uncompressedSize);
+
+      let srcPos = 16; // skip Yaz0 header
+      let dstPos = 0;
+      let currCodeByte = 0;
+      let validBitCount = 0;
+
+      while (dstPos < uncompressedSize) {
+        if (validBitCount === 0) {
+          if (srcPos >= src.length) break;
+          currCodeByte = src[srcPos++];
+          validBitCount = 8;
+        }
+
+        if (currCodeByte & 0x80) {
+          // Literal byte
+          if (srcPos >= src.length) throw new Error("Yaz0 stream truncated (literal).");
+          dst[dstPos++] = src[srcPos++];
+        } else {
+          // Compressed run
+          if (srcPos + 1 >= src.length) {
+            throw new Error("Yaz0 stream truncated (compressed pair).");
+          }
+          const byte1 = src[srcPos++];
+          const byte2 = src[srcPos++];
+          let dist = ((byte1 & 0x0F) << 8) | byte2;
+          dist += 1;
+
+          let length = byte1 >> 4;
+          if (length === 0) {
+            if (srcPos >= src.length) throw new Error("Yaz0 stream truncated (length extension).");
+            length = src[srcPos++] + 0x12;
+          } else {
+            length += 2;
+          }
+
+          for (let i = 0; i < length; i++) {
+            dst[dstPos] = dst[dstPos - dist];
+            dstPos++;
+          }
+        }
+
+        currCodeByte <<= 1;
+        validBitCount--;
+      }
+
+      if (dstPos !== uncompressedSize) {
+        appendLog("Warning: decompressed size mismatch (expected " + uncompressedSize +
+                  ", got " + dstPos + ").");
+      }
+
+      return dst;
+    }
+
+    // --- Yaz0 compression (literal-only, valid but not optimized) ----------
+    // Yaz0 compression with simple LZ-style matching.
+// Good enough to get sizes close to Nintendo's originals.
+function yaz0Compress(uncompressed) {
+  const size = uncompressed.length;
+  const out = [];
+
+  // Yaz0 header
+  out.push(0x59, 0x61, 0x7A, 0x30); // 'Yaz0'
+  out.push(
+    (size >>> 24) & 0xFF,
+    (size >>> 16) & 0xFF,
+    (size >>> 8) & 0xFF,
+    size & 0xFF
+  );
+  // 8 reserved bytes
+  for (let i = 0; i < 8; i++) out.push(0x00);
+
+  const MAX_SEARCH_DEPTH = 8;      // tradeoff: speed vs. ratio
+  const head = new Int32Array(0x10000);
+  const prev = new Int32Array(size);
+  head.fill(-1);
+  prev.fill(-1);
+
+  let pos = 0;
+
+  while (pos < size) {
+    const ctrlPos = out.length;
+    out.push(0x00); // control byte placeholder
+    let mask = 0x80;
+
+    for (let b = 0; b < 8 && pos < size; b++) {
+      let bestLen = 0;
+      let bestDist = 0;
+
+      if (pos < size - 2) {
+        // Look for a match starting at pos.
+        const k = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
+        let idx = head[k];
+        let searchCount = 0;
+
+        while (idx >= 0 && (pos - idx) <= 0x1000 && searchCount < MAX_SEARCH_DEPTH) {
+          const dist = pos - idx;
+          let maxLen = size - pos;
+          if (maxLen > 0x111) maxLen = 0x111;
+          const maxLenIdx = size - idx;
+          if (maxLen > maxLenIdx) maxLen = maxLenIdx;
+
+          let length = 2; // first 2 bytes already match by key
+          while (
+            length < maxLen &&
+            uncompressed[idx + length] === uncompressed[pos + length]
+          ) {
+            length++;
+          }
+
+          if (length > bestLen && length >= 3) {
+            bestLen = length;
+            bestDist = dist;
+            if (length === maxLen) break;
+          }
+
+          searchCount++;
+          idx = prev[idx];
+        }
+      }
+
+      if (bestLen >= 3) {
+        // Emit compressed run
+        const runLen = bestLen;
+        const distMinus1 = bestDist - 1;
+
+        if (runLen >= 0x12) {
+          // 3-byte form: len = extra byte + 0x12
+          out.push(((0) << 4) | ((distMinus1 >> 8) & 0x0F));
+          out.push(distMinus1 & 0xFF);
+          out.push((runLen - 0x12) & 0xFF);
+        } else {
+          // 2-byte form: len = (high nibble) + 2
+          out.push(((runLen - 2) << 4) | ((distMinus1 >> 8) & 0x0F));
+          out.push(distMinus1 & 0xFF);
+        }
+
+        // Update dictionary for all positions we just consumed.
+        const start = pos;
+        const end = Math.min(pos + runLen, size - 1);
+        for (let i = start; i < end; i++) {
+          const k2 = ((uncompressed[i] << 8) | uncompressed[i + 1]) & 0xFFFF;
+          prev[i] = head[k2];
+          head[k2] = i;
+        }
+
+        pos += runLen;
+      } else {
+        // Literal byte
+        out[ctrlPos] |= mask;
+        out.push(uncompressed[pos]);
+
+        if (pos < size - 1) {
+          const k2 = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
+          prev[pos] = head[k2];
+          head[k2] = pos;
+        }
+
+        pos += 1;
+      }
+
+      mask >>= 1;
+    }
+  }
+
+  return new Uint8Array(out);
+}
+
+
+    // --- U8 archive parsing -------------------------------------------------
+    function parseU8(u8) {
+      if (u8[0] !== 0x55 || u8[1] !== 0xAA || u8[2] !== 0x38 || u8[3] !== 0x2D) {
+        throw new Error("Not a U8 archive (missing U8 magic).");
+      }
+
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      const rootOffset  = dv.getUint32(4,  false); // big-endian
+      const headerSize  = dv.getUint32(8,  false);
+      const dataOffset  = dv.getUint32(12, false);
+
+      function readNode(idx) {
+        const off = rootOffset + idx * 12;
+        const type = u8[off];
+        const nameOffset = ((u8[off + 1] << 16) | (u8[off + 2] << 8) | u8[off + 3]) >>> 0;
+        const dataOff = dv.getUint32(off + 4, false);
+        const size = dv.getUint32(off + 8, false);
+        return { type, nameOffset, dataOffset: dataOff, size, off, index: idx };
+      }
+
+      const rootNode = readNode(0);
+      const nodeCount = rootNode.size;
+      const nodes = new Array(nodeCount);
+      for (let i = 0; i < nodeCount; i++) {
+        nodes[i] = readNode(i);
+      }
+
+      const stringBase = rootOffset + nodeCount * 12;
+      const paths = new Array(nodeCount);
+      paths[0] = "";
+
+      // Stack-based directory traversal; root's children are [1, nodeCount)
+      const stack = [
+        { index: 0, firstChild: 1, endIndex: nodeCount }
+      ];
+
+      for (let idx = 1; idx < nodeCount; idx++) {
+        const node = nodes[idx];
+
+        // Find current parent directory
+        while (stack.length) {
+          const top = stack[stack.length - 1];
+          if (top.firstChild <= idx && idx < top.endIndex) break;
+          stack.pop();
+        }
+        const parentIndex = stack.length ? stack[stack.length - 1].index : 0;
+
+        // Read name
+        const nameStart = stringBase + node.nameOffset;
+        let p = nameStart;
+        const bytes = [];
+        while (p < u8.length && u8[p] !== 0x00) {
+          bytes.push(u8[p++]);
+        }
+        const name = String.fromCharCode.apply(null, bytes);
+        const parentPath = paths[parentIndex];
+        const fullPath = parentPath ? (parentPath + "/" + name) : name;
+        paths[idx] = fullPath;
+
+        if (node.type === 1) {
+          // Directory: dataOffset = first child index, size = end index
+          stack.push({ index: idx, firstChild: node.dataOffset, endIndex: node.size });
+        }
+      }
+
+      return { nodes, paths, rootOffset, headerSize, dataOffset };
+    }
+
+    // --- U8 patching: replace tt_kart_extension_font.brfnt ------------------
+    function replaceBrfntInU8(u8, replacementUint8, targetSuffix = "tt_kart_extension_font.brfnt") {
+      const { nodes, paths, rootOffset, headerSize, dataOffset } = parseU8(u8);
+
+      // Copy header + any padding up to dataOffset
+      const header = new Uint8Array(u8.subarray(0, dataOffset));
+      const headerView = new DataView(header.buffer, header.byteOffset, header.byteLength);
+
+      // Data part will be built incrementally
+      const dataBytes = [];
+
+      function currentOffset() {
+        return header.length + dataBytes.length;
+      }
+
+      function padToAlignment(alignment) {
+        const offset = currentOffset();
+        const pad = (alignment - (offset % alignment)) & (alignment - 1);
+        for (let i = 0; i < pad; i++) dataBytes.push(0x00);
+      }
+
+      for (let idx = 1; idx < nodes.length; idx++) {
+        const node = nodes[idx];
+        if (node.type === 1) {
+          // Directory node: keep header fields as-is
+          continue;
+        }
+
+        // Align each file to 0x20 bytes (matches MKWii archives)
+        padToAlignment(0x20);
+        const newOffset = currentOffset();
+
+        const fullPath = paths[idx] || "";
+        const isTarget = fullPath.endsWith(targetSuffix);
+
+        let fileData;
+        if (isTarget) {
+          fileData = replacementUint8;
+        } else {
+          fileData = u8.subarray(node.dataOffset, node.dataOffset + node.size);
+        }
+
+        // Patch node's dataOffset and size in header
+        const nodeHeaderOff = rootOffset + idx * 12;
+        headerView.setUint32(nodeHeaderOff + 4, newOffset, false);
+        headerView.setUint32(nodeHeaderOff + 8, fileData.length, false);
+
+        // Append file data
+        for (let i = 0; i < fileData.length; i++) {
+          dataBytes.push(fileData[i]);
+        }
+      }
+
+      const dataArr = Uint8Array.from(dataBytes);
+      const newU8 = new Uint8Array(header.length + dataArr.length);
+      newU8.set(header, 0);
+      newU8.set(dataArr, header.length);
+
+      return newU8;
+    }
+
+    // --- Replacement brfnt loader ------------------------------------------
+    let cachedReplacement = null;
+
+    async function getReplacementBrfnt() {
+      if (cachedReplacement) return cachedReplacement;
+
+      // 1) If user selected a brfnt manually, use that first
+      const brfntInput = document.getElementById('brfnt-file-input');
+      if (brfntInput.files && brfntInput.files.length > 0) {
+        appendLog("Using replacement .brfnt from file input.");
+        const buf = await readFileAsUint8Array(brfntInput.files[0]);
+        cachedReplacement = buf;
+        return cachedReplacement;
+      }
+
+      // 2) Otherwise, try to fetch from same folder as HTML
+      try {
+        appendLog("Trying to load tt_kart_extension_font.brfnt next to this HTML...");
+        const res = await fetch("tt_kart_extension_font.brfnt");
+        if (!res.ok) {
+          throw new Error("HTTP status " + res.status);
+        }
+        const arr = new Uint8Array(await res.arrayBuffer());
+        cachedReplacement = arr;
+        appendLog("Loaded tt_kart_extension_font.brfnt via fetch.");
+        return cachedReplacement;
+      } catch (e) {
+        throw new Error(
+          "Could not load tt_kart_extension_font.brfnt automatically.\n" +
+          "Error: " + e.message + "\n" +
+          "Select the .brfnt manually using the second file input."
+        );
+      }
+    }
+
+    // --- Download helper ----------------------------------------------------
+    function downloadUint8AsFile(bytes, fileName) {
+      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // --- Main processing ----------------------------------------------------
+    async function handleFontFile(file) {
+      try {
+        log("Reading " + file.name + " ...");
+        const fontData = await readFileAsUint8Array(file);
+
+        appendLog("Decompressing Yaz0...");
+        const u8 = yaz0Decompress(fontData);
+
+        appendLog("Loading replacement tt_kart_extension_font.brfnt...");
+        const replacement = await getReplacementBrfnt();
+
+        appendLog("Patching U8 archive (replacing tt_kart_extension_font.brfnt)...");
+        const newU8 = replaceBrfntInU8(u8, replacement);
+
+        appendLog("Re-compressing as Yaz0 (literal-only)...");
+        const newSZS = yaz0Compress(newU8);
+
+        const baseName = file.name.replace(/\.szs$/i, "");
+        const outName = baseName + "_tt_ext_patched.szs";
+
+        appendLog("Done! Triggering download: " + outName);
+        downloadUint8AsFile(newSZS, outName);
+        appendLog("All good, nya~");
+      } catch (e) {
+        appendLog("Error: " + e.message);
+        console.error(e);
+      }
+    }
+
+    // --- UI wiring ----------------------------------------------------------
+    (function setupUI() {
+      const dropZone = document.getElementById('drop-zone');
+const fontInput = document.getElementById('font-file-input');
+
+// Clicking anywhere in the drop zone *except* directly on the input
+// should trigger the file dialog once.
+dropZone.addEventListener('click', (e) => {
+  // If the actual click target is the <input>, let it handle itself.
+  if (e.target === fontInput) return;
+  fontInput.click();
+});
+
+// Prevent the input's click from bubbling up and retriggering the drop zone handler.
+fontInput.addEventListener('click', (e) => {
+  e.stopPropagation();
+});
+
+fontInput.addEventListener('change', () => {
+  if (fontInput.files && fontInput.files.length > 0) {
+    handleFontFile(fontInput.files[0]);
+  }
+});
+
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        dropZone.classList.add('dragover');
+      });
+
+      dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+          handleFontFile(files[0]);
+        }
+      });
+
+      log("Ready. Drop a Font.szs, and I'll replace tt_kart_extension_font.brfnt for you, nya~");
+    })();
+  </script>
+</body>
+</html>
