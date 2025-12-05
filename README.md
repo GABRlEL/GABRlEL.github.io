@@ -53,3 +53,5 @@
 [Is This FC Possible?](https://gabrlel.github.io/rwfcfc.html)
 
 [Settingpad - Wii setting.txt Generator & Editor](https://gabrlel.github.io/settingpad.html)
+
+[RR TKEF Font Patcher](https://gabrlel.github.io/rrfont.html)
