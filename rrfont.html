@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BETA RR Font Fixer</title>
+  <title>RR TKEF Font Patcher</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -17,7 +17,11 @@
     }
     h1 {
       font-size: 1.4rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.2rem;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 0.2rem;
     }
     .drop-zone {
       border: 2px dashed #666;
@@ -48,12 +52,18 @@
     small {
       opacity: 0.75;
     }
+    p {
+      text-align: center;
+    }
+p.compress-toggle {
+  margin-top: 0.2rem;
+}
   </style>
 </head>
 <body>
-  <h1>BETA Font.szs tt_kart_extension_font.brfnt Replacer</h1>
-  <p>Drop a <code>Font.szs</code> below or click to select it, nya.</p>
-  <p>Made by ChatGPT 5.1 Thinking, thanks to BrawlCrate and Wiimms SZS Tools for inspiration</p>
+  <h1>Font.szs tt_kart_extension_font.brfnt Replacer (Catgirl Edition)</h1>	
+  <h2>Made with Retro Rewind in mind, RR variant is automatically applied</h2>
+  <p>Drop a <code>Font.szs</code> below or click to select it, nya.<br>Made by ChatGPT 5.1 Thinking, thanks to BrawlCrate and Wiimms SZS Tools for inspiration.</p>
 
   <div id="drop-zone" class="drop-zone">
     <strong>Drop Font.szs here</strong><br>
@@ -65,10 +75,18 @@
     <small>
       The tool automatically tries to load <code>tt_kart_extension_font.brfnt</code>
       from the same folder as this HTML.<br>
-      If that fails (e.g. due to file:// restrictions), you can also select it manually:
+      If that fails (e.g. due to file:// restrictions) or you want to load your own, you can also select it manually:
     </small>
     <br>
     <input id="brfnt-file-input" type="file" accept=".brfnt">
+  </p>
+
+  <!-- New: literal-only toggle -->
+  <p class="compress-toggle">
+    <label>
+      <input type="checkbox" id="literal-only-checkbox">
+      Use literal-only Yaz0 (no real compression) – only recommended if compressed output causes issues
+    </label>
   </p>
 
   <pre id="log"></pre>
@@ -157,120 +175,153 @@
       return dst;
     }
 
-    // --- Yaz0 compression (literal-only, valid but not optimized) ----------
+    // --- Yaz0 compression (optimized) --------------------------------------
     // Yaz0 compression with simple LZ-style matching.
-// Good enough to get sizes close to Nintendo's originals.
-function yaz0Compress(uncompressed) {
-  const size = uncompressed.length;
-  const out = [];
+    // Good enough to get sizes close to Nintendo's originals.
+    function yaz0Compress(uncompressed) {
+      const size = uncompressed.length;
+      const out = [];
 
-  // Yaz0 header
-  out.push(0x59, 0x61, 0x7A, 0x30); // 'Yaz0'
-  out.push(
-    (size >>> 24) & 0xFF,
-    (size >>> 16) & 0xFF,
-    (size >>> 8) & 0xFF,
-    size & 0xFF
-  );
-  // 8 reserved bytes
-  for (let i = 0; i < 8; i++) out.push(0x00);
+      // Yaz0 header
+      out.push(0x59, 0x61, 0x7A, 0x30); // 'Yaz0'
+      out.push(
+        (size >>> 24) & 0xFF,
+        (size >>> 16) & 0xFF,
+        (size >>> 8) & 0xFF,
+        size & 0xFF
+      );
+      // 8 reserved bytes
+      for (let i = 0; i < 8; i++) out.push(0x00);
 
-  const MAX_SEARCH_DEPTH = 8;      // tradeoff: speed vs. ratio
-  const head = new Int32Array(0x10000);
-  const prev = new Int32Array(size);
-  head.fill(-1);
-  prev.fill(-1);
+      const MAX_SEARCH_DEPTH = 8;      // tradeoff: speed vs. ratio
+      const head = new Int32Array(0x10000);
+      const prev = new Int32Array(size);
+      head.fill(-1);
+      prev.fill(-1);
 
-  let pos = 0;
+      let pos = 0;
 
-  while (pos < size) {
-    const ctrlPos = out.length;
-    out.push(0x00); // control byte placeholder
-    let mask = 0x80;
+      while (pos < size) {
+        const ctrlPos = out.length;
+        out.push(0x00); // control byte placeholder
+        let mask = 0x80;
 
-    for (let b = 0; b < 8 && pos < size; b++) {
-      let bestLen = 0;
-      let bestDist = 0;
+        for (let b = 0; b < 8 && pos < size; b++) {
+          let bestLen = 0;
+          let bestDist = 0;
 
-      if (pos < size - 2) {
-        // Look for a match starting at pos.
-        const k = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
-        let idx = head[k];
-        let searchCount = 0;
+          if (pos < size - 2) {
+            // Look for a match starting at pos.
+            const k = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
+            let idx = head[k];
+            let searchCount = 0;
 
-        while (idx >= 0 && (pos - idx) <= 0x1000 && searchCount < MAX_SEARCH_DEPTH) {
-          const dist = pos - idx;
-          let maxLen = size - pos;
-          if (maxLen > 0x111) maxLen = 0x111;
-          const maxLenIdx = size - idx;
-          if (maxLen > maxLenIdx) maxLen = maxLenIdx;
+            while (idx >= 0 && (pos - idx) <= 0x1000 && searchCount < MAX_SEARCH_DEPTH) {
+              const dist = pos - idx;
+              let maxLen = size - pos;
+              if (maxLen > 0x111) maxLen = 0x111;
+              const maxLenIdx = size - idx;
+              if (maxLen > maxLenIdx) maxLen = maxLenIdx;
 
-          let length = 2; // first 2 bytes already match by key
-          while (
-            length < maxLen &&
-            uncompressed[idx + length] === uncompressed[pos + length]
-          ) {
-            length++;
+              let length = 2; // first 2 bytes already match by key
+              while (
+                length < maxLen &&
+                uncompressed[idx + length] === uncompressed[pos + length]
+              ) {
+                length++;
+              }
+
+              if (length > bestLen && length >= 3) {
+                bestLen = length;
+                bestDist = dist;
+                if (length === maxLen) break;
+              }
+
+              searchCount++;
+              idx = prev[idx];
+            }
           }
 
-          if (length > bestLen && length >= 3) {
-            bestLen = length;
-            bestDist = dist;
-            if (length === maxLen) break;
+          if (bestLen >= 3) {
+            // Emit compressed run
+            const runLen = bestLen;
+            const distMinus1 = bestDist - 1;
+
+            if (runLen >= 0x12) {
+              // 3-byte form: len = extra byte + 0x12
+              out.push(((0) << 4) | ((distMinus1 >> 8) & 0x0F));
+              out.push(distMinus1 & 0xFF);
+              out.push((runLen - 0x12) & 0xFF);
+            } else {
+              // 2-byte form: len = (high nibble) + 2
+              out.push(((runLen - 2) << 4) | ((distMinus1 >> 8) & 0x0F));
+              out.push(distMinus1 & 0xFF);
+            }
+
+            // Update dictionary for all positions we just consumed.
+            const start = pos;
+            const end = Math.min(pos + runLen, size - 1);
+            for (let i = start; i < end; i++) {
+              const k2 = ((uncompressed[i] << 8) | uncompressed[i + 1]) & 0xFFFF;
+              prev[i] = head[k2];
+              head[k2] = i;
+            }
+
+            pos += runLen;
+          } else {
+            // Literal byte
+            out[ctrlPos] |= mask;
+            out.push(uncompressed[pos]);
+
+            if (pos < size - 1) {
+              const k2 = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
+              prev[pos] = head[k2];
+              head[k2] = pos;
+            }
+
+            pos += 1;
           }
 
-          searchCount++;
-          idx = prev[idx];
+          mask >>= 1;
         }
       }
 
-      if (bestLen >= 3) {
-        // Emit compressed run
-        const runLen = bestLen;
-        const distMinus1 = bestDist - 1;
-
-        if (runLen >= 0x12) {
-          // 3-byte form: len = extra byte + 0x12
-          out.push(((0) << 4) | ((distMinus1 >> 8) & 0x0F));
-          out.push(distMinus1 & 0xFF);
-          out.push((runLen - 0x12) & 0xFF);
-        } else {
-          // 2-byte form: len = (high nibble) + 2
-          out.push(((runLen - 2) << 4) | ((distMinus1 >> 8) & 0x0F));
-          out.push(distMinus1 & 0xFF);
-        }
-
-        // Update dictionary for all positions we just consumed.
-        const start = pos;
-        const end = Math.min(pos + runLen, size - 1);
-        for (let i = start; i < end; i++) {
-          const k2 = ((uncompressed[i] << 8) | uncompressed[i + 1]) & 0xFFFF;
-          prev[i] = head[k2];
-          head[k2] = i;
-        }
-
-        pos += runLen;
-      } else {
-        // Literal byte
-        out[ctrlPos] |= mask;
-        out.push(uncompressed[pos]);
-
-        if (pos < size - 1) {
-          const k2 = ((uncompressed[pos] << 8) | uncompressed[pos + 1]) & 0xFFFF;
-          prev[pos] = head[k2];
-          head[k2] = pos;
-        }
-
-        pos += 1;
-      }
-
-      mask >>= 1;
+      return new Uint8Array(out);
     }
-  }
 
-  return new Uint8Array(out);
-}
+    // --- Yaz0 compression (literal-only fallback) ---------------------------
+    function yaz0CompressLiteralOnly(uncompressed) {
+      const size = uncompressed.length;
+      const out = [];
 
+      // Yaz0 magic
+      out.push(0x59, 0x61, 0x7A, 0x30);
+      // Uncompressed size (big-endian)
+      out.push(
+        (size >>> 24) & 0xFF,
+        (size >>> 16) & 0xFF,
+        (size >>> 8) & 0xFF,
+        size & 0xFF
+      );
+      // 8 reserved bytes
+      for (let i = 0; i < 8; i++) out.push(0x00);
+
+      let i = 0;
+      while (i < size) {
+        const ctrlIndex = out.length;
+        out.push(0x00); // placeholder for control byte
+        let mask = 0x80;
+
+        for (let bit = 0; bit < 8 && i < size; bit++) {
+          // Emit literal byte
+          out[ctrlIndex] |= mask;
+          out.push(uncompressed[i++]);
+          mask >>= 1;
+        }
+      }
+
+      return Uint8Array.from(out);
+    }
 
     // --- U8 archive parsing -------------------------------------------------
     function parseU8(u8) {
@@ -464,8 +515,16 @@ function yaz0Compress(uncompressed) {
         appendLog("Patching U8 archive (replacing tt_kart_extension_font.brfnt)...");
         const newU8 = replaceBrfntInU8(u8, replacement);
 
-        appendLog("Re-compressing as Yaz0 (literal-only)...");
-        const newSZS = yaz0Compress(newU8);
+        const literalCheckbox = document.getElementById('literal-only-checkbox');
+        let newSZS;
+
+        if (literalCheckbox && literalCheckbox.checked) {
+          appendLog("Re-compressing as Yaz0 (literal-only, no real compression)...");
+          newSZS = yaz0CompressLiteralOnly(newU8);
+        } else {
+          appendLog("Re-compressing as Yaz0 (optimized compression)...");
+          newSZS = yaz0Compress(newU8);
+        }
 
         const baseName = file.name.replace(/\.szs$/i, "");
         const outName = baseName + "_tt_ext_patched.szs";
@@ -482,27 +541,26 @@ function yaz0Compress(uncompressed) {
     // --- UI wiring ----------------------------------------------------------
     (function setupUI() {
       const dropZone = document.getElementById('drop-zone');
-const fontInput = document.getElementById('font-file-input');
+      const fontInput = document.getElementById('font-file-input');
 
-// Clicking anywhere in the drop zone *except* directly on the input
-// should trigger the file dialog once.
-dropZone.addEventListener('click', (e) => {
-  // If the actual click target is the <input>, let it handle itself.
-  if (e.target === fontInput) return;
-  fontInput.click();
-});
+      // Clicking anywhere in the drop zone *except* directly on the input
+      // should trigger the file dialog once.
+      dropZone.addEventListener('click', (e) => {
+        // If the actual click target is the <input>, let it handle itself.
+        if (e.target === fontInput) return;
+        fontInput.click();
+      });
 
-// Prevent the input's click from bubbling up and retriggering the drop zone handler.
-fontInput.addEventListener('click', (e) => {
-  e.stopPropagation();
-});
+      // Prevent the input's click from bubbling up and retriggering the drop zone handler.
+      fontInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
 
-fontInput.addEventListener('change', () => {
-  if (fontInput.files && fontInput.files.length > 0) {
-    handleFontFile(fontInput.files[0]);
-  }
-});
-
+      fontInput.addEventListener('change', () => {
+        if (fontInput.files && fontInput.files.length > 0) {
+          handleFontFile(fontInput.files[0]);
+        }
+      });
 
       dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
