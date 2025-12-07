@@ -54,4 +54,6 @@
 
 [Settingpad - Wii setting.txt Generator & Editor](https://gabrlel.github.io/settingpad.html)
 
+[!vrloss - Retro Rewind RRRating.pul Editor](https://gabrlel.github.io/vrloss.html)
+
 [RR TKEF Font Patcher](https://gabrlel.github.io/rrfont.html)
