@@ -64,7 +64,7 @@
 </head>
 <body>
   <header>
-    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.5-t5 — </h1>
+    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.5-t5</h1>
     <div class="row">
       <input id="file" type="file" accept=".dat" />
       <div id="dropzone" class="card">Drop <code>rksys.dat</code> here</div>
@@ -102,7 +102,7 @@
               <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (50%), VS win% (30%), 1st-place count (10%), distance travelled (5%), distance while 1st (5%).</li>
               <li>Normalizations: VR 0–10,000.00 (or 0–1,000,000 in “fancy” VR) → 0–100 (via internal 0–1000 clamp); 1st-place: 0–2500 → 0–100; distance: 0–50000 → 0–100; 1st distance: 0–10000 → 0–100; Win% 0–100 (if no VS races, baseline 45%).</li>
               <li>Affine mapping uses anchors so that a strong profile maps near 100 and a weak/brand new profile maps near ~10. Ranks are bucketed by the score (12,24,36,48,60,72,84,94,100).</li>
-              <li>Per-stat notes for max rank (with other stats maxed): VR ≈ 655,000 (≈6,550.00 rating); VS Win% ≈ 43%; there is no hard minimum for Times 1st or distance metrics — extremely strong VR and Win% can still reach max rank even with low 1st-place and distance values.</li>
+              <li>Per-stat notes for max rank (with other stats near their effective caps): VR effectively caps for the ranking model around 100,000 VR (≈1,000.00 rating); VS Win% is anchored around 55%; there is no simple hard minimum for Times 1st or distance metrics — they still help, but strong VR and Win% dominate and can achieve top rank even if 1st-place and distance values are not maxed.</li>
               <li>Nothing is uploaded; everything is client-side. You can save this file and run it offline.</li>
               <li>Made by ChatGPT 5 Thinking.</li>
             </ul>
@@ -187,6 +187,8 @@
   const M2=W_VR*AL.VR + W_RWIN*AL.RWIN + W_FIRSTS*AL.FIRSTS + W_DIST*AL.DIST + W_DIST1ST*AL.DIST1ST;
   const ALPHA = 90.0 / (M1 - M2);
   const BETA  = 100.0 - ALPHA * M1;
+  const MIN_VS_MATCHES = 100;
+
 
   // Rank icon mapping (index 1..9). Put these PNGs next to the HTML, or
   // define window.RR_RANK_ICONS as an array of data-URIs to embed inline.
@@ -233,14 +235,11 @@
   function toInternalVr(vrPoints){
     let v = Number(vrPoints);
     if (!isFinite(v)) v = 0;
-    // Users and RRRating.pul should effectively work in whole units; normalize any stray decimals.
+    // Work purely in "fancy" VR units (rating × 100) for UI / save values.
     v = Math.round(v);
     v = clamp(v, 0, MAX_VR_FANCY);
-    if (v > MAX_VR_FLOAT) {
-      // treat values above the float cap as "fancy" VR
-      v = v / 100.0;
-    }
-    return clamp(v, 0, MAX_VR_FLOAT);
+    const rating = v / 100.0;
+    return clamp(rating, 0, MAX_VR_FLOAT);
   }
 
   function computeScore(stats){
@@ -262,8 +261,15 @@
     const dist1stNorm= (dist1st>= 10000.0) ? 100.0 : (100.0 * dist1st/ 10000.0);
 
     const M = W_VR*vrNorm + W_RWIN*winPct + W_FIRSTS*firstsNorm + W_DIST*distNorm + W_DIST1ST*dist1stNorm;
-    const score = clamp(ALPHA*M + BETA, 0, 100);
-    return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm};
+    let score = clamp(ALPHA*M + BETA, 0, 100);
+
+    const meetsRaceReq = (totalVs >= MIN_VS_MATCHES);
+    if (!meetsRaceReq) {
+      // Mirror in-game behavior: no rank until minimum VS matches are met.
+      score = 0.0;
+    }
+
+    return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm, totalVs, meetsRaceReq};
   }
 
   function neededForNext(stats){
@@ -296,22 +302,13 @@
 
     // VR:
     //   vrNorm = 100 * vrClamped / 1000, with vrClamped in [0,1000]
-    //   → required internal VR before fancy/legacy mapping:
+    //   → required internal VR; UI always uses "fancy" VR = rating × 100
     const vrInternalRaw = clamp(
       Math.ceil(vrNormReq * 10.0),  // vrNorm = vrInternal / 10
       0,
       1000.0
     );
-
-    let vrRaw;
-    if (stats && stats.vrPoints > MAX_VR_FLOAT) {
-      // current VR is entered in "fancy" points (×100 relative to rating / internal)
-      // Expose requirement in the same fancy scale.
-      vrRaw = Math.round(vrInternalRaw * 100.0);
-    } else {
-      // current VR is in internal / rating units (0–1000 for internal)
-      vrRaw = vrInternalRaw;
-    }
+    const vrRaw = Math.round(vrInternalRaw * 100.0);
 
     const winPctRaw = clamp(Math.ceil(winPctReq * 100) / 100, 0, 100); // show 2dp
     const firstsRaw = clamp(Math.ceil(firstsNormReq * 25.0), 0, 2500);   // 100→2500
@@ -332,7 +329,7 @@
       threshold: thr,
       M_req,
       byStat: {
-        VR:       {neededNorm:vrNormReq,   neededRaw:vrRaw,    unit:(stats && stats.vrPoints>MAX_VR_FLOAT ? 'fancy VR' : 'VR'),   feasibility:feas(vrNormReq)},
+        VR:       {neededNorm:vrNormReq,   neededRaw:vrRaw,    unit:'VR',   feasibility:feas(vrNormReq)},
         WinPct:   {neededNorm:winPctReq,   neededRaw:round2(winPctRaw), unit:'%', feasibility:feas(winPctReq), extraWins},
         Firsts:   {neededNorm:firstsNormReq, neededRaw:firstsRaw, unit:'times', feasibility:feas(firstsNormReq)},
         Distance: {neededNorm:distNormReq,   neededRaw:distRaw,  unit:'m',    feasibility:feas(distNormReq)},
@@ -453,6 +450,10 @@
     const scoreSpan = el('span','pill','—');
     const rankImg = new Image(); rankImg.className = 'rank-icon'; rankImg.alt = 'rank icon';
     scoreWrap.appendChild(scoreSpan); scoreWrap.appendChild(rankImg);
+    const raceWarn = el('span','subtle','');
+    raceWarn.style.display = 'block';
+    raceWarn.style.marginTop = '2px';
+    scoreWrap.appendChild(raceWarn);
     const nextSpan  = el('span','pill','—');
     renderKV(header, [
       ['Mii / License name', name],
@@ -525,6 +526,13 @@
       rankImg.src = ICONS[rr.rank] || ''; rankImg.style.display = rr.rank>0 ? 'inline-block' : 'none';
       nextSpan.textContent  = (need.threshold==null? '— (max)' : `${need.threshold.toFixed(0)}`);
 
+      // Minimum VS race requirement warning
+      if (!calced.meetsRaceReq) {
+        raceWarn.textContent = `Needs at least ${MIN_VS_MATCHES} VS races for a non-zero rank; currently ${calced.totalVs}.`;
+      } else {
+        raceWarn.textContent = '';
+      }
+
       // Current column
       currentCells.vr.textContent = `${stats.vrPoints} VR`;
       const total = stats.vsWins + stats.vsLosses; const winLine = `${calced.winPct.toFixed(2)}%  (W ${stats.vsWins} / L ${stats.vsLosses}, total ${total})`;
@@ -554,7 +562,7 @@
       inp.addEventListener('input', ()=>{ let v=Number(inp.value); if(!isFinite(v)) v=0; v=Math.max(Number(inp.min), Math.min(Number(inp.max), v)); cur[k]=v; update(); });
     }
 
-    STATE.licenses[licIndex] = { base:baseStats, cur, inputs, update, profileId, vrWarning:vrWarn };
+    STATE.licenses[licIndex] = { base:baseStats, cur, inputs, update, profileId, vrWarning:vrWarn, raceWarning:raceWarn };
     update();
   }
 
@@ -602,6 +610,10 @@ function ensureTab(id, label){
     const scoreSpan = el('span','pill','—');
     const rankImg = new Image(); rankImg.className = 'rank-icon'; rankImg.alt = 'rank icon';
     scoreWrap.appendChild(scoreSpan); scoreWrap.appendChild(rankImg);
+    const raceWarn = el('span','subtle','');
+    raceWarn.style.display = 'block';
+    raceWarn.style.marginTop = '2px';
+    scoreWrap.appendChild(raceWarn);
     const nextSpan  = el('span','pill','—');
     renderKV(header,[
       ['Mode', 'Manual input (no file needed)'],
@@ -662,11 +674,16 @@ function ensureTab(id, label){
       const stats = cur;
       const calced = computeScore(stats);
       const need   = neededForNext(stats);
-      const rr = rankLabel(calced.score);
-      scoreSpan.textContent = `${calced.score.toFixed(2)} (rank ${rr.rank})`;
+      const baseScore = clamp(ALPHA*calced.M + BETA, 0, 100);
+      const rr = rankLabel(baseScore);
+      scoreSpan.textContent = `${baseScore.toFixed(2)} (rank ${rr.rank})`;
       const ICONS = (window.RR_RANK_ICONS && Array.isArray(window.RR_RANK_ICONS)) ? window.RR_RANK_ICONS : RANK_ICON_URLS;
       rankImg.src = ICONS[rr.rank] || ''; rankImg.style.display = rr.rank>0 ? 'inline-block' : 'none';
-      nextSpan.textContent  = (need.threshold==null? '— (max)' : `${need.threshold.toFixed(0)}`);
+      const thr = nextThresholdFromScore(baseScore);
+      nextSpan.textContent  = (thr==null? '— (max)' : `${thr.toFixed(0)}`);
+
+      // Calculator ignores the minimum VS race requirement
+      raceWarn.textContent = '';
 
       // Current column
       currentCells.vr.textContent      = `${stats.vrPoints} VR`;
