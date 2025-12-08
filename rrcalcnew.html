@@ -64,7 +64,7 @@
 </head>
 <body>
   <header>
-    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.5</h1>
+    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.5 — IN BETA, ADD 10 TO END SCORE APPROX.</h1>
     <div class="row">
       <input id="file" type="file" accept=".dat" />
       <div id="dropzone" class="card">Drop <code>rksys.dat</code> here</div>
@@ -100,7 +100,7 @@
             <p>This tool reads <code>rksys.dat</code> locally in your browser and shows, for each license, the stats used by Retro Rewind’s VS ranking alongside the <em>minimum</em> value each stat would have to reach (if changed in isolation) to hit the next rank threshold.</p>
             <ul>
               <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (50%), VS win% (30%), 1st-place count (10%), distance travelled (5%), distance while 1st (5%).</li>
-              <li>Normalizations: VR 0–10,000.00 (or 0–1,000,000 in “fancy” VR) → 0–100; 1st-place: 0–1250 → 0–100 (saturates by 2725); distance: 0–50000 → 0–100 (saturates by 100000); 1st distance: 0–10000 → 0–100 (saturates by 25000); Win% 0–100 (if no VS races, baseline 45%).</li>
+              <li>Normalizations: VR 0–10,000.00 (or 0–1,000,000 in “fancy” VR) → 0–100 (via internal 0–1000 clamp); 1st-place: 0–2500 → 0–100; distance: 0–50000 → 0–100; 1st distance: 0–10000 → 0–100; Win% 0–100 (if no VS races, baseline 45%).</li>
               <li>Affine mapping uses anchors so that a strong profile maps near 100 and a weak/brand new profile maps near ~10. Ranks are bucketed by the score (12,24,36,48,60,72,84,94,100).</li>
               <li>Per-stat notes for max rank (with other stats maxed): VR ≈ 655,000 (≈6,550.00 rating); VS Win% ≈ 43%; there is no hard minimum for Times 1st or distance metrics — extremely strong VR and Win% can still reach max rank even with low 1st-place and distance values.</li>
               <li>Nothing is uploaded; everything is client-side. You can save this file and run it offline.</li>
@@ -179,13 +179,13 @@
   }
   function pidToFriendCode(pid){ pid=(pid>>>0); const buf=new Uint8Array(8); buf[0]=pid&0xFF; buf[1]=(pid>>>8)&0xFF; buf[2]=(pid>>>16)&0xFF; buf[3]=(pid>>>24)&0xFF; buf[4]=0x4A; buf[5]=0x43; buf[6]=0x4D; buf[7]=0x52; const md=md5Bytes(buf), csum=md[0]>>>1; const fc=(BigInt(csum)<<32n)|BigInt(pid); let s=fc.toString(); if(s.length<12) s=s.padStart(12,'0'); return `${s.slice(0,4)}-${s.slice(4,8)}-${s.slice(8,12)}`; }
 
-  // ===== Ranking model (mirrors Retro Rewind implementation)
-  const W_VR=0.50, W_RWIN=0.30, W_FIRSTS=0.10, W_DIST=0.05, W_DIST1ST=0.05;
-  const AH={VR:100.0,RWIN:65.0,FIRSTS:55.0,DIST:75.0,DIST1ST:80.0};
-  const AL={VR:16.6667,RWIN:50.0,FIRSTS:0.0,DIST:0.0,DIST1ST:0.0};
+  // ===== Ranking model (mirrors Retro Rewind implementation, Ranking_latest.cpp)
+  const W_VR=0.60, W_RWIN=0.15, W_FIRSTS=0.15, W_DIST=0.05, W_DIST1ST=0.05;
+  const AH={VR:100.0,RWIN:55.0,FIRSTS:100.0,DIST:100.0,DIST1ST:100.0};
+  const AL={VR:5.0,RWIN:50.0,FIRSTS:0.0,DIST:0.0,DIST1ST:0.0};
   const M1=W_VR*AH.VR + W_RWIN*AH.RWIN + W_FIRSTS*AH.FIRSTS + W_DIST*AH.DIST + W_DIST1ST*AH.DIST1ST;
   const M2=W_VR*AL.VR + W_RWIN*AL.RWIN + W_FIRSTS*AL.FIRSTS + W_DIST*AL.DIST + W_DIST1ST*AL.DIST1ST;
-  const ALPHA = 89.0 / (M1 - M2);
+  const ALPHA = 90.0 / (M1 - M2);
   const BETA  = 100.0 - ALPHA * M1;
 
   // Rank icon mapping (index 1..9). Put these PNGs next to the HTML, or
@@ -204,7 +204,18 @@
   ];
 
   const RANK_THRESH = [12,24,36,48,60,72,84,94,100];
-  function scoreToRank(score){ if(score>=100) return 9; if(score>=94) return 8; if(score>=84) return 7; if(score>=72) return 6; if(score>=60) return 5; if(score>=48) return 4; if(score>=36) return 3; if(score>=24) return 2; if(score>=12) return 1; return 0; }
+  function scoreToRank(score){
+    if(score>=100.0) return 9;
+    if(score>=94.0)  return 8;
+    if(score>=84.0)  return 7;
+    if(score>=72.0)  return 6;
+    if(score>=60.0)  return 5;
+    if(score>=48.0)  return 4;
+    if(score>=36.0)  return 3;
+    if(score>=24.0)  return 2;
+    if(score>=12.0)  return 1;
+    return 0;
+  }
   function nextThresholdFromScore(score){ const r=scoreToRank(score); if(r>=9) return null; return RANK_THRESH[r]; }
 
   function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
@@ -237,13 +248,19 @@
     const totalVs = vsWins + vsLosses;
     const winPct = totalVs>0 ? (100.0 * vsWins / totalVs) : 45.0;
 
-    // New VR normalization with support for both plain rating and fancy VR
+    // VR normalization mirrors ComputeVsScoreFromLicense:
+    // toInternalVr plays the role of PointRating::GetUserVR, then we clamp to [0,1000]
     const vrInternal = toInternalVr(vrPoints);
-    const vrNorm = clamp((vrInternal / MAX_VR_FLOAT) * 100.0, 0, 100);
+    let vrClamped = vrInternal;
+    if (vrClamped > 1000.0) vrClamped = 1000.0;
+    if (vrClamped < 0.0)   vrClamped = 0.0;
+    const vrNorm = (vrClamped / 1000.0) * 100.0;
 
-    const firstsNorm = (firsts >= 2725) ? 100.0 : (100.0*firsts/1250.0);
-    const distNorm = (dist >= 100000) ? 100.0 : (100.0*dist/50000.0);
-    const dist1stNorm = (dist1st >= 25000) ? 100.0 : (100.0*dist1st/10000.0);
+    // Other stats as in Ranking_latest.cpp
+    const firstsNorm = (firsts >= 2500.0) ? 100.0 : (100.0 * firsts / 2500.0);
+    const distNorm   = (dist   >= 50000.0) ? 100.0 : (100.0 * dist   / 50000.0);
+    const dist1stNorm= (dist1st>= 10000.0) ? 100.0 : (100.0 * dist1st/ 10000.0);
+
     const M = W_VR*vrNorm + W_RWIN*winPct + W_FIRSTS*firstsNorm + W_DIST*distNorm + W_DIST1ST*dist1stNorm;
     const score = clamp(ALPHA*M + BETA, 0, 100);
     return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm};
@@ -258,8 +275,8 @@
     const totals = { VR:W_VR, RWIN:W_RWIN, FIRSTS:W_FIRSTS, DIST:W_DIST, DIST1ST:W_DIST1ST };
 
     const otherSum = (omit) => {
-      const {vrNorm, winPct, firstsNorm, distNorm, dist1stNorm} = computeScore(stats);
-      const parts = { VR:vrNorm, RWIN:winPct, FIRSTS:firstsNorm, DIST:distNorm, DIST1ST:dist1stNorm };
+      const base = computeScore(stats);
+      const parts = { VR:base.vrNorm, RWIN:base.winPct, FIRSTS:base.firstsNorm, DIST:base.distNorm, DIST1ST:base.dist1stNorm };
       let s=0; for(const k of Object.keys(parts)){ if(k!==omit) s += totals[k]*parts[k]; }
       return s;
     };
@@ -267,38 +284,39 @@
     function solveNorm(omit){
       const sumOthers = otherSum(omit);
       const w = totals[omit];
-      const neededNorm = (M_req - sumOthers) / w; // raw 0..100-ish
+      const neededNorm = (M_req - sumOthers) / w; // raw 0..100-ish (but may exceed 100 → infeasible)
       return neededNorm;
     }
 
-    const vrNormReq     = solveNorm('VR');
-    const winPctReq     = solveNorm('RWIN');
-    const firstsNormReq = solveNorm('FIRSTS');
-    const distNormReq   = solveNorm('DIST');
-    const dist1stNormReq= solveNorm('DIST1ST');
+    const vrNormReq      = solveNorm('VR');
+    const winPctReq      = solveNorm('RWIN');
+    const firstsNormReq  = solveNorm('FIRSTS');
+    const distNormReq    = solveNorm('DIST');
+    const dist1stNormReq = solveNorm('DIST1ST');
 
     // VR:
-    //   norm 100 → 10000 internal rating
-    //   and, if user is using fancy VR, we present the requirement in 0–1,000,000.
+    //   vrNorm = 100 * vrClamped / 1000, with vrClamped in [0,1000]
+    //   → required internal VR before fancy/legacy mapping:
     const vrInternalRaw = clamp(
-      Math.ceil(vrNormReq * (MAX_VR_FLOAT / 100.0)),
+      Math.ceil(vrNormReq * 10.0),  // vrNorm = vrInternal / 10
       0,
-      MAX_VR_FLOAT
+      1000.0
     );
 
     let vrRaw;
     if (stats && stats.vrPoints > MAX_VR_FLOAT) {
-      // current VR is "fancy", so return fancy as well (rating * 100)
-      vrRaw = Math.min(Math.round(vrInternalRaw * 100.0), MAX_VR_FANCY);
+      // current VR is entered in "fancy" points (×100 relative to rating / internal)
+      // Expose requirement in the same fancy scale.
+      vrRaw = Math.round(vrInternalRaw * 100.0);
     } else {
-      // current VR is plain rating; return requirement as plain rating
+      // current VR is in internal / rating units (0–1000 for internal)
       vrRaw = vrInternalRaw;
     }
 
     const winPctRaw = clamp(Math.ceil(winPctReq * 100) / 100, 0, 100); // show 2dp
-    const firstsRaw = clamp(Math.ceil(firstsNormReq * 12.5), 0, 2725);   // 100→1250 (saturates by 2725)
-    const distRaw   = clamp(Math.ceil(distNormReq   * 500), 0, 100000);  // 100→50000 (saturates by 100000)
-    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 100), 0, 25000);  // 100→10000 (saturates by 25000)
+    const firstsRaw = clamp(Math.ceil(firstsNormReq * 25.0), 0, 2500);   // 100→2500
+    const distRaw   = clamp(Math.ceil(distNormReq   * 500.0), 0, 50000);  // 100→50000
+    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 100.0), 0, 10000);  // 100→10000
 
     function feas(normReq){ return normReq<=100 ? 'ok' : (normReq<=110 ? 'warn' : 'bad'); }
 
@@ -314,7 +332,7 @@
       threshold: thr,
       M_req,
       byStat: {
-        VR:       {neededNorm:vrNormReq,   neededRaw:vrRaw,    unit:'VR',   feasibility:feas(vrNormReq)},
+        VR:       {neededNorm:vrNormReq,   neededRaw:vrRaw,    unit:(stats && stats.vrPoints>MAX_VR_FLOAT ? 'fancy VR' : 'VR'),   feasibility:feas(vrNormReq)},
         WinPct:   {neededNorm:winPctReq,   neededRaw:round2(winPctRaw), unit:'%', feasibility:feas(winPctReq), extraWins},
         Firsts:   {neededNorm:firstsNormReq, neededRaw:firstsRaw, unit:'times', feasibility:feas(firstsNormReq)},
         Distance: {neededNorm:distNormReq,   neededRaw:distRaw,  unit:'m',    feasibility:feas(distNormReq)},
