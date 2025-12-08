@@ -26,7 +26,7 @@
 
 [Gabs Multi BIN Editor](https://gabrlel.github.io/bin.html)
 
-[WebPort - wstrt port derivate](https://gabrlel.github.io/port/webport.html) [license: GPL 2.0, web-based derivate from wstrt port](https://gabrlel.github.io/port/gpl-2.0.txt)
+[Gabs WebPort](https://gabrlel.github.io/port/webport.html)
 
 [BMM Web](https://gabrlel.github.io/bmm.html)
 
@@ -54,6 +54,8 @@
 
 [Settingpad - Wii setting.txt Generator & Editor](https://gabrlel.github.io/settingpad.html)
 
+[RR TKEF Font Patcher](https://gabrlel.github.io/rrfont.html)
+
 [!vrloss - Retro Rewind RRRating.pul Editor](https://gabrlel.github.io/vrloss.html)
 
-[RR TKEF Font Patcher](https://gabrlel.github.io/rrfont.html)
+RR Rank Helper [for v6.4.1 (pre-1M VR)](https://gabrlel.github.io/rrcalc.html), [for v6.5 (post-1M VR)](https://gabrlel.github.io/rrcalcnew.html)
