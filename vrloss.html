@@ -207,6 +207,28 @@
     .right {
       text-align: right;
     }
+
+    .inline-input {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .inline-input input {
+      flex: 1 1 auto;
+      min-width: 4.5rem;
+    }
+
+    .vr-lookup-btn {
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      border-radius: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .hidden-col {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -237,7 +259,8 @@
     </div>
     <div class="small-note">
       • File format: <span class="mono">u32 magic ("RRRT"), u16 version, u16 count, then <em>count</em> × (s32 profileId, float vr, float br, u32 flags) in big-endian.</span><br>
-      • VR/BR here are the raw floats stored by the mod. The “×100” columns show the integer value you’d usually think of as “rating points”.
+      • VR is entered as the effective points value (the number you see on the leaderboard). It is stored as <span class="mono">float / 100</span> in the file.<br>
+      • BR is entered as the effective points value (the number you see on the leaderboard). It is stored as <span class="mono">float / 100</span> in the file.
     </div>
   </div>
 
@@ -252,11 +275,9 @@
   <th>Profile ID<br><span class="muted">(> 0 = valid)</span></th>
   <th>Friend Code<br><span class="muted">(auto from PID)</span></th>
   <th>RWFC Name<br><span class="muted">from leaderboard</span></th>
-  <th>VR (float)</th>
-  <th>VR ×100</th>
-  <th>BR (float)</th>
-  <th>BR ×100</th>
-  <th>Flags (hex)</th>
+  <th>VR<br><span class="muted">(points)</span></th>
+  <th>BR<br><span class="muted">(points)</span></th>
+  <th class="hidden-col">Flags (hex)</th>
 </tr>
 
         </thead>
@@ -431,27 +452,74 @@ function clamp(value, min, max) {
     }
 
     const friendCache = Object.create(null);
+    const vrCache = Object.create(null);
 
-    function fetchRwfcNameForFriendCode(fcDigits, cb) {
-      if (!fcDigits) {
-        cb("error", null);
-        return;
-      }
+    function extractVrFromLeaderboard(data) {
+      const tryKeys = (obj) => {
+        if (!obj || typeof obj !== "object") return null;
+        const keys = [
+          "vr", "VR", "vrPoints", "vr_points", "raceRating", "race_rating",
+          "rating", "currentVr", "current_vr", "rr_vr", "rrVr"
+        ];
+        for (const k of keys) {
+          const v = obj[k];
+          if (typeof v === "number" && Number.isFinite(v)) return v;
+          if (typeof v === "string") {
+            const n = parseFloat(v);
+            if (Number.isFinite(n)) return n;
+          }
+        }
+        return null;
+      };
+
+      let vrVal = tryKeys(data);
+      if (vrVal == null && data && data.player) vrVal = tryKeys(data.player);
+      if (vrVal == null && data && data.stats) vrVal = tryKeys(data.stats);
+      return vrVal;
+    }
+
+    async function fetchRwfcVrForFriendCode(fcDigits) {
+      if (!fcDigits) return { status: "error", message: "Missing friend code." };
+
+      const cached = vrCache[fcDigits];
+      if (cached) return cached;
 
       if (typeof fetch !== "function") {
-        console.warn("fetch() not available in this browser; skipping RWFC lookup.");
-        cb("error", null);
-        return;
-      }
-
-      const cached = friendCache[fcDigits];
-      if (cached) {
-        cb(cached.status, cached.name || null);
-        return;
+        return { status: "error", message: "fetch() not available in this browser." };
       }
 
       const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(fcDigits);
-      fetch(url)
+      try {
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!res.ok) {
+          const status = (res.status === 404) ? "notfound" : "error";
+          const result = { status, message: "HTTP " + res.status };
+          if (status !== "error") vrCache[fcDigits] = result;
+          return result;
+        }
+
+        const data = await res.json();
+        const vrVal = extractVrFromLeaderboard(data);
+        if (vrVal == null) {
+          const result = { status: "novr", message: "No VR field found." };
+          vrCache[fcDigits] = result;
+          return result;
+        }
+
+        const result = { status: "ok", vr: vrVal };
+        vrCache[fcDigits] = result;
+        return result;
+      } catch (err) {
+        return { status: "error", message: err && err.message ? err.message : String(err) };
+      }
+    }
+
+    const nameLookupQueue = [];
+    let nameLookupBusy = false;
+
+    function runNameLookup(fcDigits, cb) {
+      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(fcDigits);
+      return fetch(url)
         .then((res) => {
           if (!res.ok) {
             if (res.status === 404) {
@@ -476,6 +544,43 @@ function clamp(value, min, max) {
           friendCache[fcDigits] = { status: "error", name: null };
           cb("error", null);
         });
+    }
+
+    function processNameLookupQueue() {
+      if (nameLookupBusy || nameLookupQueue.length === 0) return;
+      nameLookupBusy = true;
+
+      const item = nameLookupQueue.shift();
+      runNameLookup(item.fcDigits, item.cb)
+        .finally(() => {
+          // Wait 100ms before starting the next lookup.
+          setTimeout(() => {
+            nameLookupBusy = false;
+            processNameLookupQueue();
+          }, 100);
+        });
+    }
+
+    function fetchRwfcNameForFriendCode(fcDigits, cb) {
+      if (!fcDigits) {
+        cb("error", null);
+        return;
+      }
+
+      if (typeof fetch !== "function") {
+        console.warn("fetch() not available in this browser; skipping RWFC lookup.");
+        cb("error", null);
+        return;
+      }
+
+      const cached = friendCache[fcDigits];
+      if (cached) {
+        cb(cached.status, cached.name || null);
+        return;
+      }
+
+      nameLookupQueue.push({ fcDigits, cb });
+      processNameLookupQueue();
     }
 
     function updateFriendInfoForRow(tr) {
@@ -656,8 +761,8 @@ br = clamp(br, -10000, 10000);
 
     const active = isEntryActive(entry);
 
-    const vrTimes100 = Math.round(entry.vr * 100);
-    const brTimes100 = Math.round(entry.br * 100);
+    const vrEffective = Math.round(entry.vr * 100);
+    const brEffective = Math.round(entry.br * 100);
 
     const indexCell = document.createElement("td");
     indexCell.textContent = String(idx);
@@ -710,48 +815,96 @@ br = clamp(br, -10000, 10000);
 
     const vrCell = document.createElement("td");
     vrCell.className = "mono";
+    const vrWrap = document.createElement("div");
+    vrWrap.className = "inline-input";
     const vrInput = document.createElement("input");
     vrInput.type = "number";
-    vrInput.step = "0.01";
-    vrInput.min = "0.01";
-    vrInput.max = "10000";
-    vrInput.value = Number.isFinite(entry.vr) ? entry.vr.toFixed(2) : "0.00";
-    vrInput.className = "vr-input";
+    vrInput.step = "1";
+    vrInput.min = "-1000000";
+    vrInput.max = "1000000";
+    vrInput.value = Number.isFinite(vrEffective) ? String(vrEffective) : "0";
+    vrInput.className = "vr-effective-input";
     vrInput.addEventListener("input", () => {
       updateDerived(tr);
     });
-    vrCell.appendChild(vrInput);
-    tr.appendChild(vrCell);
+    const vrBtn = document.createElement("button");
+    vrBtn.type = "button";
+    vrBtn.className = "secondary vr-lookup-btn";
+    vrBtn.textContent = "Get VR from leaderboard";
+    vrBtn.addEventListener("click", async () => {
+      const profileInput = tr.querySelector(".profile-id-input");
+      const vrField = tr.querySelector(".vr-effective-input");
+      if (!profileInput || !vrField) return;
 
-    const vrxCell = document.createElement("td");
-    vrxCell.className = "right mono vr-x100-cell";
-    vrxCell.textContent = String(vrTimes100);
-    tr.appendChild(vrxCell);
+      let pid = parseInt(profileInput.value, 10);
+      if (!Number.isFinite(pid) || pid <= 0) {
+        alert("Please enter a valid Profile ID (PID) first.");
+        return;
+      }
+
+      let fcDigits = tr.dataset.fc || "";
+      if (!fcDigits) {
+        fcDigits = pidToFriendCodeDigits(pid);
+      }
+      if (!fcDigits) {
+        alert("Failed to compute friend code from PID.");
+        return;
+      }
+
+      const prevText = vrBtn.textContent;
+      vrBtn.disabled = true;
+      vrBtn.textContent = "Loading…";
+
+      try {
+        const result = await fetchRwfcVrForFriendCode(fcDigits);
+        if (result.status === "notfound") {
+          alert("Friend code not found on the Retro WFC leaderboard.");
+          return;
+        }
+        if (result.status === "novr") {
+          alert("Leaderboard response did not include a recognizable VR field.");
+          return;
+        }
+        if (result.status !== "ok") {
+          throw new Error(result.message || "Request failed.");
+        }
+
+        let vrRaw = result.vr;
+        if (!Number.isInteger(vrRaw)) vrRaw = Math.round(vrRaw);
+        vrRaw = clamp(vrRaw, -1000000, 1000000);
+        vrField.value = String(vrRaw);
+        updateDerived(tr);
+      } catch (err) {
+        alert("Failed to load VR from leaderboard.\n\n" + (err && err.message ? err.message : err));
+      } finally {
+        vrBtn.disabled = false;
+        vrBtn.textContent = prevText;
+      }
+    });
+    vrWrap.appendChild(vrInput);
+    vrWrap.appendChild(vrBtn);
+    vrCell.appendChild(vrWrap);
+    tr.appendChild(vrCell);
 
     const brCell = document.createElement("td");
     brCell.className = "mono";
     const brInput = document.createElement("input");
     brInput.type = "number";
-    brInput.step = "0.01";
-    brInput.min = "0.01";
-    brInput.max = "10000";
-    brInput.value = Number.isFinite(entry.br) ? entry.br.toFixed(2) : "0.00";
-    brInput.className = "br-input";
+    brInput.step = "1";
+    brInput.min = "-1000000";
+    brInput.max = "1000000";
+    brInput.value = Number.isFinite(brEffective) ? String(brEffective) : "0";
+    brInput.className = "br-effective-input";
     brInput.addEventListener("input", () => {
       updateDerived(tr);
     });
     brCell.appendChild(brInput);
     tr.appendChild(brCell);
 
-    const brxCell = document.createElement("td");
-    brxCell.className = "right mono br-x100-cell";
-    brxCell.textContent = String(brTimes100);
-    tr.appendChild(brxCell);
-
     const flagsCell = document.createElement("td");
-    flagsCell.className = "mono";
+    flagsCell.className = "hidden-col";
     const flagsInput = document.createElement("input");
-    flagsInput.type = "text";
+    flagsInput.type = "hidden";
     flagsInput.className = "flags-input";
     flagsInput.value = "0x" + (entry.flags >>> 0).toString(16).padStart(8, "0");
     flagsCell.appendChild(flagsInput);
@@ -813,23 +966,22 @@ br = clamp(br, -10000, 10000);
 
 
 function updateDerived(tr) {
-  const vrInput = tr.querySelector(".vr-input");
-  const brInput = tr.querySelector(".br-input");
-  const vrxCell = tr.querySelector(".vr-x100-cell");
-  const brxCell = tr.querySelector(".br-x100-cell");
+  const vrInput = tr.querySelector(".vr-effective-input");
+  const brInput = tr.querySelector(".br-effective-input");
 
-  let vr = parseFloat(vrInput.value.replace(",", "."));
-  if (!Number.isFinite(vr)) vr = 0;
-  vr = clamp(vr, 0.01, 10000);
-  vrInput.value = vr.toFixed(2);
+  if (vrInput) {
+    let vr = parseFloat(vrInput.value.replace(",", "."));
+    if (!Number.isFinite(vr)) vr = 0;
+    vr = clamp(vr, -1000000, 1000000);
+    vrInput.value = String(Math.round(vr));
+  }
 
-  let br = parseFloat(brInput.value.replace(",", "."));
-  if (!Number.isFinite(br)) br = 0;
-  br = clamp(br, 0.01, 10000);
-  brInput.value = br.toFixed(2);
-
-  vrxCell.textContent = String(Math.round(vr * 100));
-  brxCell.textContent = String(Math.round(br * 100));
+  if (brInput) {
+    let br = parseFloat(brInput.value.replace(",", "."));
+    if (!Number.isFinite(br)) br = 0;
+    br = clamp(br, -1000000, 1000000);
+    brInput.value = String(Math.round(br));
+  }
 }
 
 
@@ -839,8 +991,8 @@ function updateDerived(tr) {
         rows.forEach((tr, idx) => {
           const activeCheckbox = tr.querySelector(".active-checkbox");
           const profileInput = tr.querySelector(".profile-id-input");
-          const vrInput = tr.querySelector(".vr-input");
-          const brInput = tr.querySelector(".br-input");
+          const vrInput = tr.querySelector(".vr-effective-input");
+          const brInput = tr.querySelector(".br-effective-input");
           const flagsInput = tr.querySelector(".flags-input");
 
           const active = !!activeCheckbox.checked;
@@ -850,12 +1002,18 @@ let profileId = parseInt(profileInput.value, 10);
 if (!Number.isFinite(profileId)) profileId = 0;
 profileId = Math.round(clamp(profileId, 0, 1000000000));
 
-let vr = parseFloat(vrInput.value.replace(",", "."));
-if (!Number.isFinite(vr)) vr = 0;
+let vrEffective = parseFloat(vrInput.value.replace(",", "."));
+if (!Number.isFinite(vrEffective)) vrEffective = 0;
+vrEffective = clamp(vrEffective, -1000000, 1000000);
+vrEffective = Math.round(vrEffective);
+let vr = vrEffective / 100;
 vr = clamp(vr, -10000, 10000);
 
-let br = parseFloat(brInput.value.replace(",", "."));
-if (!Number.isFinite(br)) br = 0;
+let brEffective = parseFloat(brInput.value.replace(",", "."));
+if (!Number.isFinite(brEffective)) brEffective = 0;
+brEffective = clamp(brEffective, -1000000, 1000000);
+brEffective = Math.round(brEffective);
+let br = brEffective / 100;
 br = clamp(br, -10000, 10000);
 
 
@@ -1001,19 +1159,15 @@ br = clamp(br, -10000, 10000);
 
           const activeCheckbox = tr.querySelector(".active-checkbox");
           const profileInput = tr.querySelector(".profile-id-input");
-          const vrInput = tr.querySelector(".vr-input");
-          const brInput = tr.querySelector(".br-input");
+          const vrInput = tr.querySelector(".vr-effective-input");
+          const brInput = tr.querySelector(".br-effective-input");
           const flagsInput = tr.querySelector(".flags-input");
-          const vrxCell = tr.querySelector(".vr-x100-cell");
-          const brxCell = tr.querySelector(".br-x100-cell");
 
           activeCheckbox.checked = false;
           profileInput.value = "0";
-          vrInput.value = "0.00";
-          brInput.value = "0.00";
+          vrInput.value = "0";
+          brInput.value = "0";
           flagsInput.value = "0x00000000";
-          vrxCell.textContent = "0";
-          brxCell.textContent = "0";
           selCheckbox.checked = false;
 
           toggleRowValidity(tr);
