@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>!vrloss - RRRating.pul Editor</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 1.5rem;
+      background: #111827;
+      color: #e5e7eb;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.6rem;
+      color: #fbbf24;
+    }
+
+    .card {
+      background: #020617;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      border: 1px solid #1f2937;
+      margin-bottom: 1rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .controls label {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    input[type="file"] {
+      color: #e5e7eb;
+    }
+
+    button {
+      border-radius: 9999px;
+      border: none;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      background: #4f46e5;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    button[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.danger {
+      background: #b91c1c;
+    }
+
+    .summary {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    thead {
+      background: #111827;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th, td {
+      padding: 0.35rem 0.4rem;
+      border-bottom: 1px solid #1f2937;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      color: #9ca3af;
+      font-size: 0.8rem;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    tbody tr.invalid {
+      background: rgba(127, 29, 29, 0.35);
+    }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.2rem 0.3rem;
+      border-radius: 0.35rem;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.8rem;
+    }
+
+    input[type="number"]:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.6);
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.1);
+      cursor: pointer;
+    }
+
+    .mono {
+      font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .friendcode-cell {
+      white-space: nowrap;
+    }
+
+    .rwfc-name-cell {
+      max-width: 14rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1rem 0.45rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      background: #111827;
+      color: #9ca3af;
+      border: 1px solid #1f2937;
+      gap: 0.2rem;
+    }
+
+    .pill span.value {
+      color: #e5e7eb;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 0.8rem;
+    }
+
+    .scroll-container {
+      max-height: 60vh;
+      overflow: auto;
+      border-radius: 0.75rem;
+      border: 1px solid #1f2937;
+      background: #020617;
+    }
+
+    .status-ok {
+      color: #22c55e;
+    }
+    .status-warn {
+      color: #eab308;
+    }
+    .status-bad {
+      color: #f97316;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      font-size: 0.7rem;
+      border-radius: 9999px;
+      border: 1px solid #1f2937;
+      background: rgba(31, 41, 55, 0.75);
+      color: #9ca3af;
+      margin-left: 0.3rem;
+    }
+
+    .small-note {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+
+    .right {
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <h1>!vrloss - Retro Rewind RRRating.pul Editor</h1>
+
+  <div class="card">
+    <div class="controls">
+      <label>
+        Load file:
+        <input type="file" id="fileInput" accept=".pul,application/octet-stream">
+      </label>
+
+      <button id="btnDownload" disabled>
+        ⬇ Download edited RRRating.pul
+      </button>
+
+      <button id="btnAddEntry" class="secondary" disabled>
+        ＋ Add / reuse slot
+      </button>
+
+      <button id="btnClearSelection" class="secondary" disabled>
+        ✕ Clear selected
+      </button>
+    </div>
+
+    <div class="summary" id="fileSummary">
+      No file loaded yet.
+    </div>
+    <div class="small-note">
+      • File format: <span class="mono">u32 magic ("RRRT"), u16 version, u16 count, then <em>count</em> × (s32 profileId, float vr, float br, u32 flags) in big-endian.</span><br>
+      • VR/BR here are the raw floats stored by the mod. The “×100” columns show the integer value you’d usually think of as “rating points”.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="scroll-container">
+      <table>
+        <thead>
+          <tr>
+  <th>#</th>
+  <th>Sel</th>
+  <th>Active</th>
+  <th>Profile ID<br><span class="muted">(> 0 = valid)</span></th>
+  <th>Friend Code<br><span class="muted">(auto from PID)</span></th>
+  <th>RWFC Name<br><span class="muted">from leaderboard</span></th>
+  <th>VR (float)</th>
+  <th>VR ×100</th>
+  <th>BR (float)</th>
+  <th>BR ×100</th>
+  <th>Flags (hex)</th>
+</tr>
+
+        </thead>
+        <tbody id="entriesBody">
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+function clamp(value, min, max) {
+  value = Number(value);
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+    // --- MD5 implementation (for MKW friend-code checksum) ---
+    function md5(bytes) {
+      const origLen = bytes.length >>> 0;
+      const bitLen = (origLen * 8) >>> 0;
+
+      // Compute total length: pad with 0x80, zeros, then 8 bytes length
+      const newLen = (((origLen + 9 + 63) >> 6) << 6) >>> 0;
+      const buf = new Uint8Array(newLen);
+      buf.set(bytes, 0);
+      buf[origLen] = 0x80;
+
+      // Write 32-bit bit length in low 4 bytes of the 8-byte length field (little endian).
+      const lenPos = newLen - 8;
+      buf[lenPos + 0] = bitLen & 0xff;
+      buf[lenPos + 1] = (bitLen >>> 8) & 0xff;
+      buf[lenPos + 2] = (bitLen >>> 16) & 0xff;
+      buf[lenPos + 3] = (bitLen >>> 24) & 0xff;
+      // high 4 bytes stay 0
+
+      let a0 = 0x67452301;
+      let b0 = 0xefcdab89;
+      let c0 = 0x98badcfe;
+      let d0 = 0x10325476;
+
+      const r = [
+        7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
+        5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
+        4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
+        6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,
+      ];
+
+      const k = new Array(64);
+      for (let i = 0; i < 64; i++) {
+        k[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0;
+      }
+
+      function leftRotate(x, amount) {
+        x = x >>> 0;
+        return ((x << amount) | (x >>> (32 - amount))) >>> 0;
+      }
+
+      for (let offset = 0; offset < newLen; offset += 64) {
+        const M = new Array(16);
+        for (let j = 0; j < 16; j++) {
+          const i = offset + j * 4;
+          M[j] =
+            (buf[i]      ) |
+            (buf[i + 1] << 8) |
+            (buf[i + 2] << 16) |
+            (buf[i + 3] << 24);
+        }
+
+        let A = a0;
+        let B = b0;
+        let C = c0;
+        let D = d0;
+
+        for (let i = 0; i < 64; i++) {
+          let F, g;
+          if (i < 16) {
+            F = (B & C) | (~B & D);
+            g = i;
+          } else if (i < 32) {
+            F = (D & B) | (~D & C);
+            g = (5 * i + 1) % 16;
+          } else if (i < 48) {
+            F = B ^ C ^ D;
+            g = (3 * i + 5) % 16;
+          } else {
+            F = C ^ (B | ~D);
+            g = (7 * i) % 16;
+          }
+
+          F = (F + A + k[i] + M[g]) >>> 0;
+          A = D;
+          D = C;
+          C = B;
+          B = (B + leftRotate(F, r[i])) >>> 0;
+        }
+
+        a0 = (a0 + A) >>> 0;
+        b0 = (b0 + B) >>> 0;
+        c0 = (c0 + C) >>> 0;
+        d0 = (d0 + D) >>> 0;
+      }
+
+      const out = new Uint8Array(16);
+      let v = a0;
+      out[0] = v & 0xff;
+      out[1] = (v >>> 8) & 0xff;
+      out[2] = (v >>> 16) & 0xff;
+      out[3] = (v >>> 24) & 0xff;
+
+      v = b0;
+      out[4] = v & 0xff;
+      out[5] = (v >>> 8) & 0xff;
+      out[6] = (v >>> 16) & 0xff;
+      out[7] = (v >>> 24) & 0xff;
+
+      v = c0;
+      out[8] = v & 0xff;
+      out[9] = (v >>> 8) & 0xff;
+      out[10] = (v >>> 16) & 0xff;
+      out[11] = (v >>> 24) & 0xff;
+
+      v = d0;
+      out[12] = v & 0xff;
+      out[13] = (v >>> 8) & 0xff;
+      out[14] = (v >>> 16) & 0xff;
+      out[15] = (v >>> 24) & 0xff;
+
+      return out;
+    }
+
+    // Convert RWFC PID -> 12-digit MKW friend code for Retro Rewind
+    function pidToFriendCodeDigits(pid) {
+      pid = Number(pid);
+      if (!Number.isFinite(pid) || pid <= 0) return "";
+      // Clamp to RWFC PID range
+      pid = Math.round(clamp(pid, 0, 1000000000)) >>> 0;
+      if (pid === 0) return "";
+
+      const buf = new Uint8Array(8);
+      buf[0] =  pid         & 0xff;
+      buf[1] = (pid >>> 8)  & 0xff;
+      buf[2] = (pid >>> 16) & 0xff;
+      buf[3] = (pid >>> 24) & 0xff;
+      buf[4] = 0x4a; // 'J'
+      buf[5] = 0x43; // 'C'
+      buf[6] = 0x4d; // 'M'
+      buf[7] = 0x52; // 'R'
+
+      const digest = md5(buf);
+      const csum = (digest[0] >>> 1) & 0x7f;
+
+      const fcBig = (BigInt(csum) << 32n) | BigInt(pid >>> 0);
+      let digits = fcBig.toString(10);
+      if (digits.length > 12) {
+        // Should never happen for MKW, but guard anyway
+        return "";
+      }
+      return digits.padStart(12, "0");
+    }
+
+    function formatFriendCodePretty(digits) {
+      if (!digits) return "";
+      return digits.slice(0, 4) + "-" +
+             digits.slice(4, 8) + "-" +
+             digits.slice(8, 12);
+    }
+
+    const friendCache = Object.create(null);
+
+    function fetchRwfcNameForFriendCode(fcDigits, cb) {
+      if (!fcDigits) {
+        cb("error", null);
+        return;
+      }
+
+      if (typeof fetch !== "function") {
+        console.warn("fetch() not available in this browser; skipping RWFC lookup.");
+        cb("error", null);
+        return;
+      }
+
+      const cached = friendCache[fcDigits];
+      if (cached) {
+        cb(cached.status, cached.name || null);
+        return;
+      }
+
+      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(fcDigits);
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) {
+            if (res.status === 404) {
+              friendCache[fcDigits] = { status: "notfound", name: null };
+              cb("notfound", null);
+              return null;
+            }
+            friendCache[fcDigits] = { status: "error", name: null };
+            cb("error", null);
+            return null;
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (!data) return;
+          const name = (data && typeof data.name === "string") ? data.name : null;
+          friendCache[fcDigits] = { status: "ok", name };
+          cb("ok", name);
+        })
+        .catch((err) => {
+          console.warn("RWFC API error for FC", fcDigits, err);
+          friendCache[fcDigits] = { status: "error", name: null };
+          cb("error", null);
+        });
+    }
+
+    function updateFriendInfoForRow(tr) {
+      const profileInput = tr.querySelector(".profile-id-input");
+      const fcCell = tr.querySelector(".friendcode-cell");
+      const nameCell = tr.querySelector(".rwfc-name-cell");
+      if (!profileInput || !fcCell || !nameCell) return;
+
+      let pid = parseInt(profileInput.value, 10);
+      if (!Number.isFinite(pid) || pid <= 0) {
+        fcCell.textContent = "";
+        nameCell.textContent = "—";
+        tr.dataset.fc = "";
+        return;
+      }
+
+      pid = Math.round(clamp(pid, 0, 1000000000));
+
+      const digits = pidToFriendCodeDigits(pid);
+      if (!digits) {
+        fcCell.textContent = "";
+        nameCell.textContent = "—";
+        tr.dataset.fc = "";
+        return;
+      }
+
+      const pretty = formatFriendCodePretty(digits);
+      fcCell.textContent = pretty;
+      tr.dataset.fc = digits;
+
+      const cached = friendCache[digits];
+      if (cached) {
+        if (cached.status === "ok") {
+          nameCell.textContent = cached.name || "—";
+        } else if (cached.status === "notfound") {
+          nameCell.textContent = "not found";
+        } else {
+          nameCell.textContent = "—";
+        }
+        return;
+      }
+
+      nameCell.textContent = "…";
+      fetchRwfcNameForFriendCode(digits, (status, name) => {
+        if (tr.dataset.fc !== digits) return;
+        if (status === "ok") {
+          nameCell.textContent = name || "—";
+        } else if (status === "notfound") {
+          nameCell.textContent = "not found";
+        } else {
+          nameCell.textContent = "—";
+        }
+      });
+    }
+
+
+
+      const state = {
+        magic: null,
+        version: null,
+        count: 0,
+        entries: [],
+        originalByteLength: 0,
+        filename: "RRRating.pul"
+      };
+
+      const fileInput = document.getElementById("fileInput");
+      const fileSummary = document.getElementById("fileSummary");
+      const entriesBody = document.getElementById("entriesBody");
+      const btnDownload = document.getElementById("btnDownload");
+      const btnAddEntry = document.getElementById("btnAddEntry");
+      const btnClearSelection = document.getElementById("btnClearSelection");
+
+      fileInput.addEventListener("change", function (ev) {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        state.filename = file.name || "RRRating.pul";
+        loadPulFile(file);
+      });
+
+      btnDownload.addEventListener("click", function () {
+        if (!state.entries || !state.entries.length) return;
+        const buffer = buildBufferFromUI();
+        if (!buffer) return;
+        downloadBuffer(buffer, state.filename || "RRRating.pul");
+      });
+
+      btnAddEntry.addEventListener("click", function () {
+        addOrReuseSlot();
+      });
+
+      btnClearSelection.addEventListener("click", function () {
+        clearSelectedRows();
+      });
+
+      function loadPulFile(file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const arrayBuffer = e.target.result;
+          try {
+            parsePul(arrayBuffer);
+            renderTable();
+            updateSummary();
+            btnDownload.disabled = false;
+            btnAddEntry.disabled = false;
+            btnClearSelection.disabled = false;
+          } catch (err) {
+            console.error(err);
+            alert("Failed to parse RRRating.pul: " + err.message);
+            fileSummary.textContent = "Failed to parse file.";
+            btnDownload.disabled = true;
+            btnAddEntry.disabled = true;
+            btnClearSelection.disabled = true;
+            entriesBody.innerHTML = "";
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function parsePul(buffer) {
+        const view = new DataView(buffer);
+        if (view.byteLength < 8) {
+          throw new Error("File too small to be a valid RRRating.pul (needs at least 8 bytes).");
+        }
+
+        let magic = "";
+        for (let i = 0; i < 4; i++) {
+          magic += String.fromCharCode(view.getUint8(i));
+        }
+
+        const version = view.getUint16(4, false); // big-endian
+        const count = view.getUint16(6, false);   // big-endian
+
+        const maxEntriesBySize = Math.floor((view.byteLength - 8) / 16);
+        const entriesToRead = Math.min(count, maxEntriesBySize);
+
+        if (magic !== "RRRT") {
+          console.warn("Unexpected magic:", magic);
+        }
+
+        if (entriesToRead < count) {
+          console.warn("Header count larger than capacity from file size; truncating to", entriesToRead);
+        }
+
+        const entries = [];
+        for (let i = 0; i < entriesToRead; i++) {
+          const base = 8 + i * 16;
+          const profileId = view.getInt32(base, false);
+          let vr = view.getFloat32(base + 4, false);
+          let br = view.getFloat32(base + 8, false);
+          const flags = view.getUint32(base + 12, false);
+
+vr = clamp(vr, -10000, 10000);
+br = clamp(br, -10000, 10000);
+
+          entries.push({
+            index: i,
+            profileId: profileId,
+            vr: vr,
+            br: br,
+            flags: flags >>> 0
+          });
+        }
+
+        state.magic = magic;
+        state.version = version;
+        state.count = count;
+        state.entries = entries;
+        state.originalByteLength = view.byteLength;
+      }
+
+            function renderTable() {
+  entriesBody.innerHTML = "";
+
+  state.entries.forEach((entry, idx) => {
+    const tr = document.createElement("tr");
+    tr.dataset.index = String(idx);
+
+    const active = isEntryActive(entry);
+
+    const vrTimes100 = Math.round(entry.vr * 100);
+    const brTimes100 = Math.round(entry.br * 100);
+
+    const indexCell = document.createElement("td");
+    indexCell.textContent = String(idx);
+    indexCell.className = "mono";
+    tr.appendChild(indexCell);
+
+    const selCell = document.createElement("td");
+    const selCheckbox = document.createElement("input");
+    selCheckbox.type = "checkbox";
+    selCheckbox.className = "row-select";
+    selCell.appendChild(selCheckbox);
+    tr.appendChild(selCell);
+
+    const activeCell = document.createElement("td");
+    const activeCheckbox = document.createElement("input");
+    activeCheckbox.type = "checkbox";
+    activeCheckbox.className = "active-checkbox";
+    activeCheckbox.checked = active;
+    activeCheckbox.addEventListener("change", () => {
+      toggleRowValidity(tr);
+    });
+    activeCell.appendChild(activeCheckbox);
+    tr.appendChild(activeCell);
+
+    const profileCell = document.createElement("td");
+    profileCell.className = "mono";
+    const profileInput = document.createElement("input");
+    profileInput.type = "number";
+    profileInput.step = "1";
+    profileInput.min = "0";
+    profileInput.max = "1000000000";
+    profileInput.value = String(entry.profileId);
+    profileInput.className = "profile-id-input";
+    profileInput.addEventListener("input", () => {
+      toggleRowValidity(tr);
+      updateFriendInfoForRow(tr);
+    });
+    profileCell.appendChild(profileInput);
+    tr.appendChild(profileCell);
+
+    // friend code + RWFC name
+    const fcCell = document.createElement("td");
+    fcCell.className = "mono friendcode-cell";
+    tr.appendChild(fcCell);
+
+    const nameCell = document.createElement("td");
+    nameCell.className = "rwfc-name-cell";
+    nameCell.textContent = "—";
+    tr.appendChild(nameCell);
+
+    const vrCell = document.createElement("td");
+    vrCell.className = "mono";
+    const vrInput = document.createElement("input");
+    vrInput.type = "number";
+    vrInput.step = "0.01";
+    vrInput.min = "0.01";
+    vrInput.max = "10000";
+    vrInput.value = Number.isFinite(entry.vr) ? entry.vr.toFixed(2) : "0.00";
+    vrInput.className = "vr-input";
+    vrInput.addEventListener("input", () => {
+      updateDerived(tr);
+    });
+    vrCell.appendChild(vrInput);
+    tr.appendChild(vrCell);
+
+    const vrxCell = document.createElement("td");
+    vrxCell.className = "right mono vr-x100-cell";
+    vrxCell.textContent = String(vrTimes100);
+    tr.appendChild(vrxCell);
+
+    const brCell = document.createElement("td");
+    brCell.className = "mono";
+    const brInput = document.createElement("input");
+    brInput.type = "number";
+    brInput.step = "0.01";
+    brInput.min = "0.01";
+    brInput.max = "10000";
+    brInput.value = Number.isFinite(entry.br) ? entry.br.toFixed(2) : "0.00";
+    brInput.className = "br-input";
+    brInput.addEventListener("input", () => {
+      updateDerived(tr);
+    });
+    brCell.appendChild(brInput);
+    tr.appendChild(brCell);
+
+    const brxCell = document.createElement("td");
+    brxCell.className = "right mono br-x100-cell";
+    brxCell.textContent = String(brTimes100);
+    tr.appendChild(brxCell);
+
+    const flagsCell = document.createElement("td");
+    flagsCell.className = "mono";
+    const flagsInput = document.createElement("input");
+    flagsInput.type = "text";
+    flagsInput.className = "flags-input";
+    flagsInput.value = "0x" + (entry.flags >>> 0).toString(16).padStart(8, "0");
+    flagsCell.appendChild(flagsInput);
+    tr.appendChild(flagsCell);
+
+    // Initial validity + friend info
+    toggleRowValidity(tr);
+    updateFriendInfoForRow(tr);
+    entriesBody.appendChild(tr);
+  });
+}
+
+
+
+      function isEntryActive(entry) {
+        const hasDataFlag = (entry.flags & 0x1) !== 0;
+        return hasDataFlag && entry.profileId > 0;
+      }
+
+      function toggleRowValidity(tr) {
+  const activeCheckbox = tr.querySelector(".active-checkbox");
+  const profileInput   = tr.querySelector(".profile-id-input");
+  const flagsInput     = tr.querySelector(".flags-input");
+
+  const active     = !!activeCheckbox.checked;
+  const profileVal = parseInt(profileInput.value, 10) || 0;
+
+  // Visual validity marker (red row when active + invalid profileId)
+  const isValidActive = !active || profileVal > 0;
+  if (!isValidActive) {
+    tr.classList.add("invalid");
+  } else {
+    tr.classList.remove("invalid");
+  }
+
+  // --- NEW: keep flags bit 0 in sync with Active + profileId > 0 ---
+  if (flagsInput) {
+    let flagsText = (flagsInput.value || "").trim();
+    if (/^0x/i.test(flagsText)) {
+      flagsText = flagsText.slice(2);
+    }
+
+    let flags = parseInt(flagsText, 16);
+    if (!Number.isFinite(flags)) {
+      flags = 0;
+    }
+
+    if (active && profileVal > 0) {
+      // set "hasData" bit (bit 0)
+      flags |= 0x1;
+    } else {
+      // clear "hasData" bit
+      flags &= ~0x1;
+    }
+
+    flagsInput.value = "0x" + (flags >>> 0).toString(16).padStart(8, "0");
+  }
+}
+
+
+function updateDerived(tr) {
+  const vrInput = tr.querySelector(".vr-input");
+  const brInput = tr.querySelector(".br-input");
+  const vrxCell = tr.querySelector(".vr-x100-cell");
+  const brxCell = tr.querySelector(".br-x100-cell");
+
+  let vr = parseFloat(vrInput.value.replace(",", "."));
+  if (!Number.isFinite(vr)) vr = 0;
+  vr = clamp(vr, 0.01, 10000);
+  vrInput.value = vr.toFixed(2);
+
+  let br = parseFloat(brInput.value.replace(",", "."));
+  if (!Number.isFinite(br)) br = 0;
+  br = clamp(br, 0.01, 10000);
+  brInput.value = br.toFixed(2);
+
+  vrxCell.textContent = String(Math.round(vr * 100));
+  brxCell.textContent = String(Math.round(br * 100));
+}
+
+
+      function collectEntriesFromTable() {
+        const rows = entriesBody.querySelectorAll("tr");
+        const entries = [];
+        rows.forEach((tr, idx) => {
+          const activeCheckbox = tr.querySelector(".active-checkbox");
+          const profileInput = tr.querySelector(".profile-id-input");
+          const vrInput = tr.querySelector(".vr-input");
+          const brInput = tr.querySelector(".br-input");
+          const flagsInput = tr.querySelector(".flags-input");
+
+          const active = !!activeCheckbox.checked;
+
+// PID: clamp to 0 .. 1,000,000,000 (and still fit in s32)
+let profileId = parseInt(profileInput.value, 10);
+if (!Number.isFinite(profileId)) profileId = 0;
+profileId = Math.round(clamp(profileId, 0, 1000000000));
+
+let vr = parseFloat(vrInput.value.replace(",", "."));
+if (!Number.isFinite(vr)) vr = 0;
+vr = clamp(vr, -10000, 10000);
+
+let br = parseFloat(brInput.value.replace(",", "."));
+if (!Number.isFinite(br)) br = 0;
+br = clamp(br, -10000, 10000);
+
+
+          let flagsText = (flagsInput.value || "").trim();
+          if (/^0x/i.test(flagsText)) {
+            flagsText = flagsText.slice(2);
+          }
+          let flags = parseInt(flagsText, 16);
+          if (!Number.isFinite(flags)) flags = 0;
+          flags >>>= 0;
+
+          // Bit 0 indicates "hasData"
+          if (active && profileId > 0) {
+            flags |= 0x1;
+          } else {
+            flags &= ~0x1;
+          }
+
+          entries.push({
+            index: idx,
+            profileId: profileId,
+            vr: vr,
+            br: br,
+            flags: flags >>> 0
+          });
+        });
+        return entries;
+      }
+
+      function buildBufferFromUI() {
+        const entries = collectEntriesFromTable();
+
+        const count = Math.min(state.count || entries.length, entries.length);
+        const totalEntries = count;
+
+        const byteLength = 8 + totalEntries * 16;
+        const buffer = new ArrayBuffer(byteLength);
+        const view = new DataView(buffer);
+
+        // Magic "RRRT"
+        const magic = state.magic || "RRRT";
+        view.setUint8(0, magic.charCodeAt(0) || "R".charCodeAt(0));
+        view.setUint8(1, magic.charCodeAt(1) || "R".charCodeAt(0));
+        view.setUint8(2, magic.charCodeAt(2) || "R".charCodeAt(0));
+        view.setUint8(3, magic.charCodeAt(3) || "T".charCodeAt(0));
+
+        const version = typeof state.version === "number" ? state.version : 1;
+        view.setUint16(4, version & 0xffff, false); // big-endian
+        view.setUint16(6, totalEntries & 0xffff, false);
+
+        for (let i = 0; i < totalEntries; i++) {
+          const e = entries[i];
+          const base = 8 + i * 16;
+          view.setInt32(base, e.profileId | 0, false);
+          view.setFloat32(base + 4, e.vr, false);
+          view.setFloat32(base + 8, e.br, false);
+          view.setUint32(base + 12, e.flags >>> 0, false);
+        }
+
+        return buffer;
+      }
+
+      function downloadBuffer(buffer, suggestedName) {
+        const blob = new Blob([buffer], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = suggestedName || "RRRating.pul";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(url);
+      }
+
+      function updateSummary() {
+        if (!state.entries || !state.entries.length) {
+          fileSummary.textContent = "No entries parsed.";
+          return;
+        }
+
+        const activeCount = state.entries.filter(isEntryActive).length;
+        const total = state.entries.length;
+
+        const magic = state.magic || "RRRT";
+        const version = state.version != null ? state.version : "?";
+        const count = state.count != null ? state.count : total;
+
+        let statusClass = "status-ok";
+        let statusText = "OK";
+
+        if (magic !== "RRRT") {
+          statusClass = "status-warn";
+          statusText = "Magic != RRRT (unexpected)";
+        } else if (version !== 1) {
+          statusClass = "status-warn";
+          statusText = "Version != 1";
+        }
+
+        fileSummary.innerHTML =
+          `<span class="${statusClass}">Status: ${statusText}</span>` +
+          `<span class="badge">magic: <span class="mono">${magic}</span></span>` +
+          `<span class="badge">version: <span class="mono">${version}</span></span>` +
+          `<span class="badge">header count: <span class="mono">${count}</span></span>` +
+          `<span class="badge">parsed entries: <span class="mono">${total}</span></span>` +
+          `<span class="badge">active entries: <span class="mono">${activeCount}</span></span>`;
+      }
+
+      function addOrReuseSlot() {
+        const rows = entriesBody.querySelectorAll("tr");
+        if (!rows.length) return;
+
+        // First try to reuse an inactive + empty slot
+        for (const tr of rows) {
+          const activeCheckbox = tr.querySelector(".active-checkbox");
+          const profileInput = tr.querySelector(".profile-id-input");
+          const flagsInput = tr.querySelector(".flags-input");
+
+          const active = !!activeCheckbox.checked;
+          const profileId = parseInt(profileInput.value, 10) || 0;
+          const flagsText = (flagsInput.value || "").trim();
+          const flagsVal = parseInt(flagsText.replace(/^0x/i, ""), 16) || 0;
+
+          if (!active && profileId === 0 && flagsVal === 0) {
+            activeCheckbox.checked = true;
+            profileInput.focus();
+            toggleRowValidity(tr);
+            return;
+          }
+        }
+
+        alert("No completely empty slot available to reuse (all " + rows.length + " slots are used).");
+      }
+
+      function clearSelectedRows() {
+        const rows = entriesBody.querySelectorAll("tr");
+        let cleared = 0;
+
+        rows.forEach(tr => {
+          const selCheckbox = tr.querySelector(".row-select");
+          if (!selCheckbox || !selCheckbox.checked) return;
+
+          const activeCheckbox = tr.querySelector(".active-checkbox");
+          const profileInput = tr.querySelector(".profile-id-input");
+          const vrInput = tr.querySelector(".vr-input");
+          const brInput = tr.querySelector(".br-input");
+          const flagsInput = tr.querySelector(".flags-input");
+          const vrxCell = tr.querySelector(".vr-x100-cell");
+          const brxCell = tr.querySelector(".br-x100-cell");
+
+          activeCheckbox.checked = false;
+          profileInput.value = "0";
+          vrInput.value = "0.00";
+          brInput.value = "0.00";
+          flagsInput.value = "0x00000000";
+          vrxCell.textContent = "0";
+          brxCell.textContent = "0";
+          selCheckbox.checked = false;
+
+          toggleRowValidity(tr);
+          cleared++;
+        });
+
+        if (cleared > 0) {
+          updateSummary();
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
+
