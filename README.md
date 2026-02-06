@@ -59,3 +59,5 @@
 [!vrloss - Retro Rewind RRRating.pul Editor](https://gabrlel.github.io/vrloss.html)
 
 RR Rank Helper [for v6.4.1 (pre-1M VR)](https://gabrlel.github.io/rrcalc.html), [for v6.5 (post-1M VR)](https://gabrlel.github.io/rrcalcnew.html)
+
+[GODTOOL - THE ULTIMATE MKWII SAVE FILE EDITOR.](https://gabrlel.github.io/godtool.html)
