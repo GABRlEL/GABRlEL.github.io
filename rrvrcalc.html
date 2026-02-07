@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retro Rewind VR Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0f1d1f;
+      --muted: #5b6a70;
+      --accent: #f29e4c;
+      --accent-2: #2b8a87;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-strong: rgba(255, 255, 255, 0.96);
+      --shadow: 0 18px 40px rgba(15, 29, 31, 0.12);
+      --border: rgba(15, 29, 31, 0.08);
+      --danger: #c44536;
+      --success: #2b8a87;
+      --bg: #f6f0e6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 20%, rgba(242, 158, 76, 0.25), transparent 55%),
+        radial-gradient(circle at 90% 10%, rgba(43, 138, 135, 0.25), transparent 50%),
+        linear-gradient(140deg, #f9f3ea, #efe6d7 60%, #f4efe8 100%);
+    }
+
+    body[data-theme="dark"] {
+      --ink: #e8f1f1;
+      --muted: #9bb0b5;
+      --accent: #f29e4c;
+      --accent-2: #4ab0ab;
+      --panel: rgba(16, 24, 26, 0.88);
+      --panel-strong: rgba(16, 24, 26, 0.96);
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      --border: rgba(232, 241, 241, 0.08);
+      --danger: #d25a4a;
+      --success: #4ab0ab;
+      --bg: #0c1416;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(242, 158, 76, 0.18), transparent 55%),
+        radial-gradient(circle at 90% 10%, rgba(74, 176, 171, 0.2), transparent 50%),
+        linear-gradient(140deg, #0c1416, #0f1a1d 60%, #111c1f 100%);
+    }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 28px;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    .eyebrow {
+      font-weight: 700;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      font-size: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(32px, 5vw, 54px);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 720px;
+      line-height: 1.5;
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--panel-strong);
+      border: 1px solid var(--border);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status[data-kind="error"] {
+      color: var(--danger);
+      border-color: rgba(196, 69, 54, 0.3);
+      background: rgba(196, 69, 54, 0.08);
+    }
+
+    .status[data-kind="warn"] {
+      color: #a66b21;
+      border-color: rgba(166, 107, 33, 0.3);
+      background: rgba(242, 158, 76, 0.15);
+    }
+
+    .status[data-kind="ok"] {
+      color: var(--success);
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+      animation: fadeUp 0.7s ease both;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      text-transform: uppercase;
+      font-size: 14px;
+      letter-spacing: 0.3em;
+    }
+
+    .setup {
+      grid-column: span 5;
+    }
+
+    .mods {
+      grid-column: span 7;
+    }
+
+    .roster,
+    .trace {
+      grid-column: span 12;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+
+    .field input[type="number"] {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 14px;
+      background: var(--panel-strong);
+      color: var(--ink);
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+    }
+
+    .field input[type="number"].invalid {
+      border-color: rgba(196, 69, 54, 0.6);
+      box-shadow: 0 0 0 2px rgba(196, 69, 54, 0.2);
+    }
+
+    .toggle {
+      align-content: center;
+    }
+
+    .toggle input {
+      accent-color: var(--accent-2);
+    }
+
+    .toggle span {
+      font-size: 11px;
+    }
+
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      background: var(--ink);
+      color: #fffaf2;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 14px rgba(15, 29, 31, 0.18);
+    }
+
+    button.primary {
+      background: linear-gradient(120deg, var(--accent-2), #1c6461);
+    }
+
+    body[data-theme="dark"] button {
+      background: #152022;
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+
+    body[data-theme="dark"] button.primary {
+      background: linear-gradient(120deg, var(--accent-2), #1c6461);
+      color: #fffaf2;
+      border: 0;
+    }
+
+    .multiplier-box {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+    }
+
+    .multiplier-box div {
+      background: var(--panel-strong);
+      border-radius: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      display: grid;
+      gap: 6px;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+
+    .multiplier-box strong {
+      font-size: 18px;
+      color: var(--ink);
+      letter-spacing: 0.12em;
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    th {
+      color: var(--muted);
+    }
+
+    td input[type="number"] {
+      width: 120px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      background: var(--panel-strong);
+      color: var(--ink);
+      caret-color: var(--ink);
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-size: 12px;
+    }
+
+    td input[type="number"].invalid {
+      border-color: rgba(196, 69, 54, 0.6);
+      box-shadow: 0 0 0 2px rgba(196, 69, 54, 0.2);
+    }
+
+    .num {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      letter-spacing: 0.08em;
+    }
+
+    .delta-output {
+      display: inline-block;
+    }
+
+    .delta-input {
+      display: none;
+    }
+
+    body[data-mode="reverse"] .delta-output {
+      display: none;
+    }
+
+    body[data-mode="reverse"] .delta-input {
+      display: inline-block;
+    }
+
+    body[data-mode="reverse"] .detail-row {
+      display: none !important;
+    }
+
+    body[data-mode="reverse"] .detail-toggle {
+      display: none;
+    }
+
+    .detail-row {
+      display: none;
+    }
+
+    .detail-row[data-open="true"] {
+      display: table-row;
+    }
+
+    .detail-panel {
+      margin: 6px 0 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      padding: 10px 12px;
+    }
+
+    .detail-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .detail-table th,
+    .detail-table td {
+      padding: 6px 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-table th {
+      color: var(--muted);
+    }
+
+    .detail-total td {
+      border-bottom: 0;
+      font-weight: 600;
+    }
+
+    .swap-controls {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .swap-btn {
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .swap-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    details {
+      border-radius: 16px;
+      background: var(--panel-strong);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+    }
+
+    details summary {
+      cursor: pointer;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.28em;
+      font-weight: 600;
+    }
+
+    .trace table {
+      min-width: 820px;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 960px) {
+      .setup,
+      .mods {
+        grid-column: span 12;
+      }
+
+      .hero p {
+        letter-spacing: 0.08em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">RETRO REWIND</div>
+      <h1>VR CALCULATOR</h1>
+      <p>SIMULATE VR GAINS AND LOSSES USING THE SAME SPLINE, CAPS, AND MODIFIERS AS THE GAME CODE.</p>
+      <div class="status" id="status" data-kind="ok">READY</div>
+    </header>
+
+    <section class="panels">
+      <article class="panel setup">
+        <h2>RACE SETUP</h2>
+        <div class="control-grid">
+          <label class="field">
+            <span>PLAYERS (2-12)</span>
+            <input id="playerCount" type="number" min="2" max="12" step="1" value="12" />
+          </label>
+          <label class="field">
+            <span>MIN RATING</span>
+            <input id="minRating" type="number" step="0.01" value="1" />
+          </label>
+          <label class="field">
+            <span>MAX RATING</span>
+            <input id="maxRating" type="number" step="0.01" value="1000000" />
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="vrMode" type="checkbox" checked />
+              VR MODE RULES
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="reverseMode" type="checkbox" />
+              REVERSE MODE
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="darkMode" type="checkbox" />
+              DARK MODE
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="allDisconnected" type="checkbox" />
+              ALL DISCONNECTED
+            </span>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="seedDefaults">SEED DEFAULTS</button>
+          <button id="autoPositions">RESET ORDER</button>
+          <button id="simulateBtn" class="primary">SIMULATE</button>
+        </div>
+      </article>
+
+      <article class="panel mods">
+        <h2>MODIFIERS</h2>
+        <div class="control-grid">
+          <label class="field toggle">
+            <span>
+              <input id="eventDay" type="checkbox" />
+              EVENT DAY (2.0X)
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="itemRain" type="checkbox" />
+              SPECIAL MULTIPLIER (1.25X)
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="weekend" type="checkbox" />
+              WEEKEND MULTIPLIER (1.25X)
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="battleBonus" type="checkbox" />
+              BATTLE ELIM BONUS (COUNT BASED)
+            </span>
+          </label>
+          <label class="field toggle">
+            <span>
+              <input id="betaBuild" type="checkbox" />
+              BETA BUILD (1.15X)
+            </span>
+          </label>
+        </div>
+        <div class="multiplier-box">
+          <div>
+            <span>BASE MULTIPLIER</span>
+            <strong id="baseMult" class="num">1.00</strong>
+          </div>
+          <div>
+            <span>BATTLE BONUS</span>
+            <strong id="battleMult" class="num">0.00</strong>
+          </div>
+          <div>
+            <span>TOTAL MULTIPLIER</span>
+            <strong id="totalMult" class="num">1.00</strong>
+          </div>
+        </div>
+        <div class="hint">MULTIPLIERS APPLY BEFORE CAPS AND VR RULES.</div>
+      </article>
+
+      <article class="panel roster">
+        <h2>PLAYER RESULTS</h2>
+        <div class="hint">ROW ORDER = FINISH ORDER. USE THE ARROWS TO REORDER PLAYERS.</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>PLAYER</th>
+                <th id="vrHeader">VR</th>
+                <th>MOVE</th>
+                <th id="deltaHeader">DELTA</th>
+                <th id="newVrHeader">NEW VR</th>
+              </tr>
+            </thead>
+            <tbody id="playerBody"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel trace">
+        <details>
+          <summary>CALC TRACE</summary>
+          <div class="hint">PAIR SUM -&gt; MULTIPLIER -&gt; CAPS -&gt; VR RULES -&gt; FINAL DELTA.</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>PLAYER</th>
+                  <th>PAIR SUM</th>
+                  <th>AFTER MULT</th>
+                  <th>AFTER CAPS</th>
+                  <th>VR RULE</th>
+                  <th>FINAL DELTA</th>
+                </tr>
+              </thead>
+              <tbody id="traceBody"></tbody>
+            </table>
+          </div>
+        </details>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const SPLINE_CONTROL_POINTS = [0, 1, 8, 50, 125];
+    const SPLINE_BIAS = 7499;
+    const SPLINE_SCALE = 0.00020004; // 1 / (2 * SPLINE_BIAS)
+
+    const playerBody = document.getElementById("playerBody");
+    const traceBody = document.getElementById("traceBody");
+    const statusEl = document.getElementById("status");
+
+    const playerCountInput = document.getElementById("playerCount");
+    const minRatingInput = document.getElementById("minRating");
+    const maxRatingInput = document.getElementById("maxRating");
+
+    const vrModeInput = document.getElementById("vrMode");
+    const reverseModeInput = document.getElementById("reverseMode");
+    const darkModeInput = document.getElementById("darkMode");
+    const allDisconnectedInput = document.getElementById("allDisconnected");
+
+    const eventDayInput = document.getElementById("eventDay");
+    const itemRainInput = document.getElementById("itemRain");
+    const weekendInput = document.getElementById("weekend");
+    const battleBonusInput = document.getElementById("battleBonus");
+    const betaBuildInput = document.getElementById("betaBuild");
+
+    const baseMultEl = document.getElementById("baseMult");
+    const battleMultEl = document.getElementById("battleMult");
+    const totalMultEl = document.getElementById("totalMult");
+
+    const seedDefaultsBtn = document.getElementById("seedDefaults");
+    const autoPositionsBtn = document.getElementById("autoPositions");
+    const simulateBtn = document.getElementById("simulateBtn");
+
+    const vrHeader = document.getElementById("vrHeader");
+    const deltaHeader = document.getElementById("deltaHeader");
+    const newVrHeader = document.getElementById("newVrHeader");
+
+    const DISPLAY_SCALE = 100;
+    const DEFAULT_VR = 5000;
+
+    const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+    const fmt = (val, digits = 2) => {
+      if (!Number.isFinite(val)) return "--";
+      const fixed = val.toFixed(digits);
+      return fixed === "-0.00" ? "0.00" : fixed;
+    };
+
+    const fmtDisplay = (val) => {
+      if (!Number.isFinite(val)) return "--";
+      const scaled = Math.round(val * DISPLAY_SCALE);
+      return scaled === 0 ? "0" : scaled.toString();
+    };
+
+    const fmtSignedDisplay = (val) => {
+      if (!Number.isFinite(val)) return "--";
+      const scaled = Math.round(val * DISPLAY_SCALE);
+      if (scaled === 0) return "0";
+      return scaled > 0 ? `+${scaled}` : `${scaled}`;
+    };
+
+    const evaluateSpline = (x) => {
+      let result = 0.0;
+      for (let i = -2; i <= 6; i++) {
+        const idx = i < 0 ? 0 : i > 4 ? 4 : i;
+        let d = x - i;
+        if (d < 0.0) d = -d;
+
+        let w = 0.0;
+        if (d <= 1.0) {
+          w = (4.0 - 6.0 * d * d + 3.0 * d * d * d) / 6.0;
+        } else if (d < 2.0) {
+          const t = 2.0 - d;
+          w = (t * t * t) / 6.0;
+        }
+        result += w * SPLINE_CONTROL_POINTS[idx];
+      }
+      return result / 30.0;
+    };
+
+    const calcPosPoints = (self, opponent) => {
+      let sample = SPLINE_BIAS + (opponent - self) * 4.0;
+      sample = clamp(sample, 0.0, SPLINE_BIAS * 2);
+      return clamp(evaluateSpline(SPLINE_SCALE * sample), 0.02, 0.24);
+    };
+
+    const calcNegPoints = (self, opponent) => {
+      let sample = SPLINE_BIAS - (opponent - self) * 16.0;
+      sample = clamp(sample, 0.0, SPLINE_BIAS * 2);
+      return clamp(-evaluateSpline(SPLINE_SCALE * sample), -0.19, 0.0);
+    };
+
+    const getGainCap = (rating) => {
+      if (rating < 1500.0) return 1e6;
+      if (rating >= 9000.0) return 0.10;
+      const t = (rating - 1500.0) / 7500.0;
+      return 0.10 + 999.9 * (1.0 - t);
+    };
+
+    const getLossCap = (rating) => {
+      if (rating <= 150.0) return -0.5;
+      if (rating >= 500.0) return -2.09;
+      const t = (rating - 150.0) / 350.0;
+      return -0.5 + (-2.09 + 0.5) * t;
+    };
+
+    const truncToCentis = (val) => Math.trunc(val * 100.0) / 100.0;
+
+    const setStatus = (text, kind = "ok") => {
+      statusEl.textContent = text;
+      statusEl.dataset.kind = kind;
+    };
+
+    const updateHeaders = () => {
+      if (reverseModeInput.checked) {
+        vrHeader.textContent = "POST VR";
+        deltaHeader.textContent = "DELTA (INPUT)";
+        newVrHeader.textContent = "ORIGINAL VR";
+      } else {
+        vrHeader.textContent = "VR";
+        deltaHeader.textContent = "DELTA";
+        newVrHeader.textContent = "NEW VR";
+      }
+    };
+
+    const setMode = () => {
+      document.body.dataset.mode = reverseModeInput.checked ? "reverse" : "forward";
+      updateHeaders();
+      if (reverseModeInput.checked) {
+        playerBody.querySelectorAll(".detail-row").forEach((row) => {
+          row.dataset.open = "false";
+        });
+      }
+    };
+
+    const setTheme = (isDark) => {
+      document.body.dataset.theme = isDark ? "dark" : "light";
+      if (darkModeInput) darkModeInput.checked = isDark;
+      localStorage.setItem("vrcalc-theme", isDark ? "dark" : "light");
+    };
+
+    const getMultiplier = (playerCount) => {
+      let base = eventDayInput.checked ? 2.0 : 1.0;
+      if (itemRainInput.checked) base *= 1.25;
+      if (weekendInput.checked) base *= 1.25;
+
+      const battleBonus = battleBonusInput.checked && playerCount > 5
+        ? (playerCount - 5) * 0.166
+        : 0.0;
+
+      const total = betaBuildInput.checked
+        ? (base + battleBonus) * 1.15
+        : (base + battleBonus);
+
+      return { base, battleBonus, total };
+    };
+
+    const readRows = () => {
+      const rows = [];
+      playerBody.querySelectorAll("tr.player-row").forEach((row) => {
+        const vrInput = row.querySelector(".vr-input");
+        const deltaInput = row.querySelector(".delta-input");
+        const displayVr = parseFloat(vrInput.value);
+        const deltaRaw = deltaInput ? deltaInput.value.trim() : "";
+        const displayDelta = (deltaRaw === "-" || deltaRaw === "") ? 0 : (deltaInput ? parseFloat(deltaRaw) : NaN);
+        rows.push({
+          vrInput,
+          deltaInput,
+          displayVr,
+          displayDelta,
+          vr: Number.isFinite(displayVr) ? displayVr / DISPLAY_SCALE : NaN,
+          playerId: parseInt(row.dataset.playerId, 10) || 0
+        });
+      });
+      return rows;
+    };
+
+    const renderRows = (count, preserve = true) => {
+      const existing = preserve ? readRows() : [];
+      playerBody.innerHTML = "";
+      traceBody.innerHTML = "";
+
+      const usedIds = new Set(existing.map((row) => row.playerId));
+      const order = [];
+      existing.forEach((row) => {
+        if (order.length < count) order.push(row);
+      });
+      let nextId = 1;
+      while (order.length < count) {
+        while (usedIds.has(nextId)) nextId++;
+        order.push({ playerId: nextId, displayVr: DEFAULT_VR, displayDelta: 0 });
+        usedIds.add(nextId);
+        nextId++;
+      }
+
+      for (let i = 0; i < count; i++) {
+        const fallback = order[i];
+        const row = document.createElement("tr");
+        row.className = "player-row";
+        row.dataset.playerId = fallback.playerId;
+        row.innerHTML = `
+          <td class="num">P${fallback.playerId}</td>
+          <td><input class="vr-input" type="number" step="0.01" value="${fallback.displayVr}" /></td>
+          <td>
+            <div class="swap-controls">
+              <button class="swap-btn move-up" type="button">UP</button>
+              <button class="swap-btn move-down" type="button">DOWN</button>
+              <button class="swap-btn detail-toggle" type="button">DETAIL</button>
+            </div>
+          </td>
+          <td class="num">
+            <span class="delta-output">--</span>
+            <input class="delta-input" type="number" step="0.01" value="${fallback.displayDelta ?? 0}" />
+          </td>
+          <td class="num newvr">--</td>
+        `;
+        playerBody.appendChild(row);
+
+        const detailRow = document.createElement("tr");
+        detailRow.className = "detail-row";
+        detailRow.dataset.playerId = fallback.playerId;
+        detailRow.dataset.open = "false";
+        detailRow.innerHTML = `
+          <td colspan="5">
+            <div class="detail-panel">
+              <div class="detail-title">CONTRIBUTIONS</div>
+              <table class="detail-table">
+                <thead>
+                  <tr>
+                    <th>OPPONENT</th>
+                    <th>RESULT</th>
+                    <th>PAIR</th>
+                    <th>AFTER MULT</th>
+                  </tr>
+                </thead>
+                <tbody class="detail-body"></tbody>
+                <tfoot>
+                  <tr class="detail-total">
+                    <td>TOTAL</td>
+                    <td></td>
+                    <td class="detail-sum">--</td>
+                    <td class="detail-sum-mult">--</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </td>
+        `;
+        playerBody.appendChild(detailRow);
+      }
+
+      updateMoveButtons();
+    };
+
+    const updateMoveButtons = () => {
+      const rows = [...playerBody.querySelectorAll("tr.player-row")];
+      rows.forEach((row, idx) => {
+        const upBtn = row.querySelector(".move-up");
+        const downBtn = row.querySelector(".move-down");
+        if (upBtn) upBtn.disabled = idx === 0;
+        if (downBtn) downBtn.disabled = idx === rows.length - 1;
+      });
+    };
+
+    const calculate = () => {
+      const playerCount = clamp(parseInt(playerCountInput.value, 10) || 12, 2, 12);
+      playerCountInput.value = playerCount;
+
+      const minRatingDisplay = parseFloat(minRatingInput.value);
+      const maxRatingDisplay = parseFloat(maxRatingInput.value);
+      const minRating = Number.isFinite(minRatingDisplay) ? minRatingDisplay / DISPLAY_SCALE : NaN;
+      const maxRating = Number.isFinite(maxRatingDisplay) ? maxRatingDisplay / DISPLAY_SCALE : NaN;
+
+      const rows = readRows();
+      let hasError = false;
+
+      const reverseMode = reverseModeInput.checked;
+
+      rows.forEach(({ vrInput, deltaInput, displayVr, displayDelta }) => {
+        vrInput.classList.remove("invalid");
+        if (deltaInput) deltaInput.classList.remove("invalid");
+
+        if (!Number.isFinite(displayVr)) {
+          vrInput.classList.add("invalid");
+          hasError = true;
+        }
+
+        if (reverseMode && !Number.isFinite(displayDelta)) {
+          if (deltaInput) deltaInput.classList.add("invalid");
+          hasError = true;
+        }
+      });
+
+      if (!Number.isFinite(minRating) || !Number.isFinite(maxRating) || minRating >= maxRating) {
+        hasError = true;
+        minRatingInput.classList.add("invalid");
+        maxRatingInput.classList.add("invalid");
+      } else {
+        minRatingInput.classList.remove("invalid");
+        maxRatingInput.classList.remove("invalid");
+      }
+
+      if (hasError) {
+        setStatus("FIX INPUTS TO CALCULATE.", "error");
+        playerBody.querySelectorAll(".delta-output, .newvr").forEach((cell) => (cell.textContent = "--"));
+        traceBody.innerHTML = "";
+        return;
+      }
+
+      if (reverseMode) {
+        const { base, battleBonus, total } = getMultiplier(playerCount);
+        baseMultEl.textContent = fmt(base, 2);
+        battleMultEl.textContent = fmt(battleBonus, 2);
+        totalMultEl.textContent = fmt(total, 2);
+
+        traceBody.innerHTML = "";
+        const playerRows = [...playerBody.querySelectorAll("tr.player-row")];
+        playerRows.forEach((row) => {
+          const detailRow = row.nextElementSibling;
+          if (detailRow && detailRow.classList.contains("detail-row")) {
+            const detailBody = detailRow.querySelector(".detail-body");
+            const sumRawEl = detailRow.querySelector(".detail-sum");
+            const sumMultEl = detailRow.querySelector(".detail-sum-mult");
+            if (detailBody) detailBody.innerHTML = "";
+            if (sumRawEl) sumRawEl.textContent = "--";
+            if (sumMultEl) sumMultEl.textContent = "--";
+          }
+        });
+
+        for (let i = 0; i < playerCount; i++) {
+          const newRating = rows[i].vr;
+          const delta = rows[i].displayDelta / DISPLAY_SCALE;
+          const oldRating = truncToCentis(newRating - delta);
+
+          const row = playerRows[i];
+          if (row) {
+            row.querySelector(".delta-output").textContent = fmtSignedDisplay(delta);
+            row.querySelector(".newvr").textContent = fmtDisplay(oldRating);
+          }
+        }
+
+        setStatus("REVERSE CALCULATION COMPLETE.", "ok");
+        return;
+      }
+
+      const { base, battleBonus, total } = getMultiplier(playerCount);
+      baseMultEl.textContent = fmt(base, 2);
+      battleMultEl.textContent = fmt(battleBonus, 2);
+      totalMultEl.textContent = fmt(total, 2);
+
+      const pairSums = new Array(playerCount).fill(0.0);
+      const contribs = Array.from({ length: playerCount }, () => []);
+
+      for (let i = 0; i < playerCount; i++) {
+        for (let j = 0; j < playerCount; j++) {
+          if (i === j) continue;
+          const myPos = i + 1;
+          const oppPos = j + 1;
+          if (myPos < oppPos) {
+            const val = calcPosPoints(rows[i].vr, rows[j].vr);
+            pairSums[i] += val;
+            contribs[i][j] = { result: "WIN", value: val };
+          } else if (oppPos < myPos) {
+            const val = calcNegPoints(rows[i].vr, rows[j].vr);
+            pairSums[i] += val;
+            contribs[i][j] = { result: "LOSS", value: val };
+          }
+        }
+      }
+
+      traceBody.innerHTML = "";
+
+      for (let i = 0; i < playerCount; i++) {
+        const oldRating = rows[i].vr;
+        const lossCap = getLossCap(oldRating);
+        const gainCap = getGainCap(oldRating);
+
+        let delta = pairSums[i] * total;
+        const afterMult = delta;
+
+        delta = clamp(delta, lossCap, gainCap);
+        const afterCaps = delta;
+
+        let vrRule = "NONE";
+        if (vrModeInput.checked) {
+          if (allDisconnectedInput.checked) {
+            delta = playerCount >= 4 ? -0.01 : 0.0;
+            vrRule = playerCount >= 4 ? "ALL DISC (-0.01)" : "ALL DISC (0.00)";
+          } else if (delta >= -0.0101 && delta < 0.0) {
+            delta = 0.0;
+            vrRule = "TINY NEG -> 0";
+          }
+        }
+
+        let next = clamp(oldRating + delta, minRating, maxRating);
+        next = truncToCentis(next);
+        const finalDelta = next - oldRating;
+
+        const row = playerBody.querySelectorAll("tr.player-row")[i];
+        row.querySelector(".delta-output").textContent = fmtSignedDisplay(finalDelta);
+        row.querySelector(".newvr").textContent = fmtDisplay(next);
+
+        const traceRow = document.createElement("tr");
+        traceRow.innerHTML = `
+          <td class="num">P${rows[i].playerId}</td>
+          <td class="num">${fmt(pairSums[i], 4)}</td>
+          <td class="num">${fmt(afterMult, 4)}</td>
+          <td class="num">${fmt(afterCaps, 4)}</td>
+          <td>${vrRule}</td>
+          <td class="num">${fmtSignedDisplay(finalDelta)}</td>
+        `;
+        traceBody.appendChild(traceRow);
+      }
+
+      const playerRows = [...playerBody.querySelectorAll("tr.player-row")];
+      for (let i = 0; i < playerCount; i++) {
+        const row = playerRows[i];
+        const detailRow = row ? row.nextElementSibling : null;
+        if (!detailRow || !detailRow.classList.contains("detail-row")) continue;
+        const detailBody = detailRow.querySelector(".detail-body");
+        const sumRawEl = detailRow.querySelector(".detail-sum");
+        const sumMultEl = detailRow.querySelector(".detail-sum-mult");
+        if (!detailBody) continue;
+
+        detailBody.innerHTML = "";
+        let sumRaw = 0;
+        let sumMult = 0;
+        for (let j = 0; j < playerCount; j++) {
+          if (i === j) continue;
+          const info = contribs[i][j];
+          if (!info) continue;
+          const afterMultVal = info.value * total;
+          sumRaw += info.value;
+          sumMult += afterMultVal;
+
+          const detailEntry = document.createElement("tr");
+          detailEntry.innerHTML = `
+            <td class="num">P${rows[j].playerId}</td>
+            <td>${info.result}</td>
+            <td class="num">${fmtSignedDisplay(info.value)}</td>
+            <td class="num">${fmtSignedDisplay(afterMultVal)}</td>
+          `;
+          detailBody.appendChild(detailEntry);
+        }
+
+        if (sumRawEl) sumRawEl.textContent = fmtSignedDisplay(sumRaw);
+        if (sumMultEl) sumMultEl.textContent = fmtSignedDisplay(sumMult);
+      }
+
+      setStatus("CALCULATION COMPLETE.", "ok");
+    };
+
+    const seedDefaults = () => {
+      const playerCount = parseInt(playerCountInput.value, 10) || 12;
+      renderRows(playerCount, false);
+      calculate();
+    };
+
+    const autoPositions = () => {
+      const playerRows = [...playerBody.querySelectorAll("tr.player-row")];
+      const pairs = playerRows.map((row) => {
+        const detailRow = row.nextElementSibling && row.nextElementSibling.classList.contains("detail-row")
+          ? row.nextElementSibling
+          : null;
+        return {
+          id: parseInt(row.dataset.playerId, 10) || 0,
+          row,
+          detailRow
+        };
+      });
+      pairs.sort((a, b) => a.id - b.id);
+      pairs.forEach(({ row, detailRow }) => {
+        playerBody.appendChild(row);
+        if (detailRow) playerBody.appendChild(detailRow);
+      });
+      updateMoveButtons();
+      calculate();
+    };
+
+    playerCountInput.addEventListener("change", () => {
+      const count = clamp(parseInt(playerCountInput.value, 10) || 12, 2, 12);
+      playerCountInput.value = count;
+      renderRows(count, true);
+      calculate();
+    });
+
+    [
+      minRatingInput,
+      maxRatingInput,
+      vrModeInput,
+      allDisconnectedInput,
+      eventDayInput,
+      itemRainInput,
+      weekendInput,
+      battleBonusInput,
+      betaBuildInput
+    ].forEach((input) => input.addEventListener("input", calculate));
+
+    playerBody.addEventListener("input", (event) => {
+      if (event.target.matches("input")) calculate();
+    });
+
+    playerBody.addEventListener("click", (event) => {
+      const button = event.target.closest(".swap-btn");
+      if (!button) return;
+      const row = button.closest("tr");
+      if (!row) return;
+      const detailRow = row.nextElementSibling && row.nextElementSibling.classList.contains("detail-row")
+        ? row.nextElementSibling
+        : null;
+
+      if (button.classList.contains("detail-toggle")) {
+        if (detailRow) {
+          detailRow.dataset.open = detailRow.dataset.open === "true" ? "false" : "true";
+        }
+        return;
+      }
+
+      if (button.classList.contains("move-up")) {
+        let prev = row.previousElementSibling;
+        if (prev && prev.classList.contains("detail-row")) {
+          prev = prev.previousElementSibling;
+        }
+        if (prev) {
+          playerBody.insertBefore(row, prev);
+          if (detailRow) playerBody.insertBefore(detailRow, prev);
+        }
+      } else if (button.classList.contains("move-down")) {
+        const next = detailRow ? detailRow.nextElementSibling : row.nextElementSibling;
+        if (next) {
+          const after = next.nextElementSibling && next.nextElementSibling.classList.contains("detail-row")
+            ? next.nextElementSibling.nextElementSibling
+            : next.nextElementSibling;
+          if (after) {
+            playerBody.insertBefore(row, after);
+            if (detailRow) playerBody.insertBefore(detailRow, after);
+          } else {
+            playerBody.appendChild(row);
+            if (detailRow) playerBody.appendChild(detailRow);
+          }
+        }
+      }
+
+      updateMoveButtons();
+      calculate();
+    });
+
+    reverseModeInput.addEventListener("input", () => {
+      setMode();
+      calculate();
+    });
+
+    darkModeInput.addEventListener("input", () => {
+      setTheme(darkModeInput.checked);
+    });
+
+    seedDefaultsBtn.addEventListener("click", seedDefaults);
+    autoPositionsBtn.addEventListener("click", autoPositions);
+    simulateBtn.addEventListener("click", calculate);
+
+    const savedTheme = localStorage.getItem("vrcalc-theme");
+    if (savedTheme) {
+      setTheme(savedTheme === "dark");
+    } else {
+      setTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
+
+    setMode();
+    renderRows(parseInt(playerCountInput.value, 10), false);
+    calculate();
+  </script>
+</body>
+</html>
