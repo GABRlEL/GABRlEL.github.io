@@ -2051,7 +2051,7 @@ function licBase(lic) {
 }
 function ensureLoaded() {
   if (!content) {
-    alert("No rksys.dat loaded, nya.");
+    alert("No file loaded.");
     return false;
   }
   return true;
@@ -3070,7 +3070,7 @@ function buildSubTabs() {
 
 function renderCurrentTab() {
   if (!content) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
   // Global top-level tab: show RKGD settings
@@ -3112,7 +3112,7 @@ function renderCurrentTab() {
 
 function renderGlobalSettingsTab() {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
 
@@ -3333,7 +3333,7 @@ function renderGlobalSettingsTab() {
 
 function renderGlobalFileInfoTab() {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
 
@@ -3482,7 +3482,7 @@ function renderGlobalFileInfoTab() {
 
 function renderGlobalTtChampTab() {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
   if (currentFileMode === "rkp") {
@@ -3671,7 +3671,7 @@ function renderGlobalTtChampTab() {
 
 function renderGlobalCompChampTab() {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
   if (currentFileMode === "rkp") {
@@ -4513,7 +4513,7 @@ function formatRuleBytes(b0, b1, b2, b3) {
 
 function renderRulesTab(lic) {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
 
@@ -4731,7 +4731,7 @@ function renderRulesTab(lic) {
 
 function renderFriendsTab(lic) {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
 
@@ -6956,11 +6956,11 @@ function formatMiiHex(bytes) {
 
 function exportRkgSlot(offset, fileName) {
   if (!content) {
-    alert("No rksys.dat loaded, nya.");
+    alert("No file loaded.");
     return;
   }
   if (offset < 0 || offset + GHOST_SLOT_SIZE > content.length) {
-    alert("Ghost slot is out of bounds, nya.");
+    alert("Ghost slot is out of bounds.");
     return;
   }
 
@@ -6971,7 +6971,7 @@ function exportRkgSlot(offset, fileName) {
     content[offset + 3] === 0x44;
 
   if (!magicOk) {
-    if (!confirm("Slot does not start with RKGD magic; export raw 0x2800 bytes anyway, nya?")) {
+    if (!confirm("Slot does not start with RKGD magic; export raw 0x2800 bytes anyway?")) {
       return;
     }
   }
@@ -6990,7 +6990,7 @@ function exportRkgSlot(offset, fileName) {
 
 function exportMiiData(miiData, fileName) {
   if (!miiData || !miiData.length) {
-    alert("This ghost does not contain a Mii block, nya.");
+    alert("This ghost does not contain a Mii block.");
     return;
   }
 
@@ -7940,7 +7940,7 @@ function renderGhostsTab(lic, initialSlot) {
     tabContent.innerHTML = `
       <div class="group-box">
         <div class="group-title">Ghosts</div>
-        <div>Ghost data base offset for this license could not be determined, nya.</div>
+        <div>Ghost data base offset for this license could not be determined.</div>
       </div>`;
     return;
   }
@@ -8013,7 +8013,7 @@ function renderGhostsTab(lic, initialSlot) {
         </div>
         <div id="ghostDetailsPane" class="ghosts-details">
           <div style="font-size:11px; color: var(--text-muted);">
-            Click a track on the left to inspect, export, replace, or add ghosts, nya.
+            Click a track on the left to inspect, export, replace, or add ghosts.
           </div>
         </div>
       </div>
@@ -8121,7 +8121,7 @@ function renderGhostsTab(lic, initialSlot) {
             ${actions}
           </div>
           <div style="margin-top:4px; font-size:11px; color: var(--text-muted);">
-            No ghosts for this track on this license yet. Use the buttons above to add one, nya.
+            No ghosts for this track on this license yet. Use the buttons above to add one.
           </div>
         </div>
       `;
@@ -8241,7 +8241,7 @@ function renderGhostsTab(lic, initialSlot) {
                   ev.stopPropagation();
 
                   if (!window.FileReader) {
-                      alert("This browser cannot load files for replacement, nya.");
+                      alert("This browser cannot load files for replacement.");
                       return;
                   }
 
@@ -8264,7 +8264,7 @@ function renderGhostsTab(lic, initialSlot) {
                               alert(
                                   "Selected file is too small (" +
                                   data.length +
-                                  " bytes). Needs at least 0x88 bytes to be a valid RKG, nya."
+                                  " bytes). Needs at least 0x88 bytes to be a valid RKG."
                               );
                               return;
                           }
@@ -8279,7 +8279,7 @@ function renderGhostsTab(lic, initialSlot) {
                               return;
                           }
                           if (!(data[0] === 0x52 && data[1] === 0x4B && data[2] === 0x47 && data[3] === 0x44)) {
-                              if (!confirm("File does not start with RKGD magic. Import anyway, nya?")) {
+                              if (!confirm("File does not start with RKGD magic. Import anyway?")) {
                                   return;
                               }
                           }
@@ -8353,7 +8353,7 @@ function renderGhostsTab(lic, initialSlot) {
 
                   if (g.kind === "Personal best") {
                       const ok = confirm(
-                          "Delete the personal best ghost for this track on this license, nya?\n\n" +
+                          "Delete the personal best ghost for this track on this license?\n\n" +
                           "This will clear the PB slot and unset the PB flag."
                       );
                       if (!ok) return;
@@ -8373,7 +8373,7 @@ function renderGhostsTab(lic, initialSlot) {
 
                   if (g.kind === "Downloaded ghost" && typeof g.dlSlot === "number") {
                       const ok = confirm(
-                          "Delete this downloaded ghost (slot #" + (g.dlSlot + 1) + ") for this track, nya?\n\n" +
+                          "Delete this downloaded ghost (slot #" + (g.dlSlot + 1) + ") for this track?\n\n" +
                           "This will clear the downloaded ghost slot and unset its flag."
                       );
                       if (!ok) return;
@@ -8516,11 +8516,11 @@ function renderGhostsTab(lic, initialSlot) {
           const newId = parseGhostTypeIdInput(ghostTypeEditInput.value);
 
           if (newId == null) {
-            alert("Ghost ID must be a number (decimal) or hex like 0x01, nya.");
+            alert("Ghost ID must be a number (decimal) or hex like 0x01.");
             return;
           }
           if (newId < 0 || newId > 0x7F) {
-            alert("Ghost ID out of range. Valid range is 0..0x7F, nya.");
+            alert("Ghost ID out of range. Valid range is 0..0x7F.");
             return;
           }
 
@@ -8558,7 +8558,7 @@ function renderGhostsTab(lic, initialSlot) {
       if (miiExportBtn) {
         miiExportBtn.addEventListener("click", () => {
           if (!info.miiData || !info.miiData.length) {
-            alert("No Mii data in this ghost, nya.");
+            alert("No Mii data in this ghost.");
             return;
           }
           const miiBaseName = (info.miiName || "Mii").replace(/[^A-Za-z0-9]+/g, "_") || "Mii";
@@ -8572,7 +8572,7 @@ function renderGhostsTab(lic, initialSlot) {
       if (miiReplaceBtn) {
         miiReplaceBtn.addEventListener("click", () => {
           if (!window.FileReader) {
-            alert("This browser cannot load files for replacement, nya.");
+            alert("This browser cannot load files for replacement.");
             return;
           }
 
@@ -8594,7 +8594,7 @@ function renderGhostsTab(lic, initialSlot) {
                 alert(
                   "Selected file is too small (" +
                     buf.length +
-                    " bytes). Expected at least 0x4A bytes, nya."
+                    " bytes). Expected at least 0x4A bytes."
                 );
                 return;
               }
@@ -8646,7 +8646,7 @@ function renderGhostsTab(lic, initialSlot) {
     if (addPbBtn) {
       addPbBtn.addEventListener("click", () => {
         if (!window.FileReader) {
-          alert("This browser cannot load files for replacement, nya.");
+          alert("This browser cannot load files for replacement.");
           return;
         }
 
@@ -8669,7 +8669,7 @@ function renderGhostsTab(lic, initialSlot) {
                     alert(
                         "Selected file is too small (" +
                         data.length +
-                        " bytes). Needs at least 0x88 bytes to be a valid RKG, nya."
+                        " bytes). Needs at least 0x88 bytes to be a valid RKG."
                     );
                     return;
                 }
@@ -8684,7 +8684,7 @@ function renderGhostsTab(lic, initialSlot) {
                     return;
                 }
                 if (!(data[0] === 0x52 && data[1] === 0x4B && data[2] === 0x47 && data[3] === 0x44)) {
-                    if (!confirm("File does not start with RKGD magic. Import into PB slot anyway, nya?")) {
+                    if (!confirm("File does not start with RKGD magic. Import into PB slot anyway?")) {
                         return;
                     }
                 }
@@ -8755,12 +8755,12 @@ function renderGhostsTab(lic, initialSlot) {
       addDlBtn.addEventListener("click", () => {
         const freeSlot = findFreeDownloadedSlot();
         if (freeSlot < 0) {
-          alert("There are no free downloaded ghost slots on this license, nya.");
+          alert("There are no free downloaded ghost slots on this license.");
           return;
         }
 
         if (!window.FileReader) {
-          alert("This browser cannot load files for replacement, nya.");
+          alert("This browser cannot load files for replacement.");
           return;
         }
 
@@ -8783,7 +8783,7 @@ function renderGhostsTab(lic, initialSlot) {
                     alert(
                         "Selected file is too small (" +
                         data.length +
-                        " bytes). Needs at least 0x88 bytes to be a valid RKG, nya."
+                        " bytes). Needs at least 0x88 bytes to be a valid RKG."
                     );
                     return;
                 }
@@ -8798,7 +8798,7 @@ function renderGhostsTab(lic, initialSlot) {
                     return;
                 }
                 if (!(data[0] === 0x52 && data[1] === 0x4B && data[2] === 0x47 && data[3] === 0x44)) {
-                    if (!confirm("File does not start with RKGD magic. Import as downloaded ghost anyway, nya?")) {
+                    if (!confirm("File does not start with RKGD magic. Import as downloaded ghost anyway?")) {
                         return;
                     }
                 }
@@ -8838,7 +8838,7 @@ function renderGhostsTab(lic, initialSlot) {
 
                 const freeSlot = findFreeDownloadedSlot();
                 if (freeSlot < 0) {
-                    alert("There are no free downloaded ghost slots on this license, nya.");
+                    alert("There are no free downloaded ghost slots on this license.");
                     return;
                 }
 
@@ -8904,7 +8904,7 @@ function renderGhostsTab(lic, initialSlot) {
 
 function renderTimeTrialTab(lic, rankOverride) {
   if (!ensureLoaded()) {
-    tabContent.textContent = "Load a rksys.dat first, nya.";
+    tabContent.textContent = "Load a rksys.dat or .rkp file first.";
     return;
   }
 
