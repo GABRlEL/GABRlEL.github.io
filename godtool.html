@@ -1890,16 +1890,46 @@ function md5Bytes(input) {
   return out;
 }
 
-function pidToFriendCode(pid) {
+const DEFAULT_FC_SALT = new Uint8Array([
+  "J".charCodeAt(0),
+  "C".charCodeAt(0),
+  "M".charCodeAt(0),
+  "R".charCodeAt(0)
+]);
+
+function getDwcGameIdBytesForLicense(lic) {
+  if (!content) return null;
+  const base = licBase(lic) + DWC_OFFSET;
+  if (base + 0x28 > content.length) return null;
+  return content.slice(base + 0x24, base + 0x28);
+}
+
+function gameIdBytesToFcSalt(gameIdBytes) {
+  if (!gameIdBytes || gameIdBytes.length !== 4) return null;
+  return new Uint8Array([
+    gameIdBytes[3],
+    gameIdBytes[2],
+    gameIdBytes[1],
+    gameIdBytes[0]
+  ]);
+}
+
+function getFriendCodeSaltBytesForLicense(lic) {
+  const gameIdBytes = getDwcGameIdBytesForLicense(lic);
+  return gameIdBytesToFcSalt(gameIdBytes) || DEFAULT_FC_SALT;
+}
+
+function pidToFriendCode(pid, saltBytes) {
+  const salt = (saltBytes && saltBytes.length === 4) ? saltBytes : DEFAULT_FC_SALT;
   const buf = new Uint8Array(8);
   buf[0] = pid & 0xFF;
   buf[1] = (pid >>> 8) & 0xFF;
   buf[2] = (pid >>> 16) & 0xFF;
   buf[3] = (pid >>> 24) & 0xFF;
-  buf[4] = "J".charCodeAt(0);
-  buf[5] = "C".charCodeAt(0);
-  buf[6] = "M".charCodeAt(0);
-  buf[7] = "R".charCodeAt(0);
+  buf[4] = salt[0];
+  buf[5] = salt[1];
+  buf[6] = salt[2];
+  buf[7] = salt[3];
   const md = md5Bytes(buf);
   const csum = (md[0] >>> 1) & 0x7F;
   const fc64 = (BigInt(csum) << 32n) | BigInt(pid >>> 0);
@@ -3951,7 +3981,7 @@ function renderDwcTab(lic) {
   const pid = view.getUint32(base + 0x1C, false) >>> 0;
   let friendCode = "";
   try {
-    friendCode = pidToFriendCode(pid);
+    friendCode = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic));
   } catch (e) {
     friendCode = "(error)";
   }
@@ -4021,7 +4051,7 @@ function renderDwcTab(lic) {
       }
 
       let fc = "";
-      try { fc = pidToFriendCode(pid); } catch (e) { fc = ""; }
+      try { fc = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic)); } catch (e) { fc = ""; }
       if (!fc) {
         if (resultEl) resultEl.textContent = "Failed to compute friend code.";
         return;
@@ -4920,7 +4950,7 @@ function renderFriendsTab(lic) {
 
     let fc = "—";
     if (pid !== 0) {
-      try { fc = pidToFriendCode(pid); } catch(e) { fc = "(error)"; }
+      try { fc = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic)); } catch(e) { fc = "(error)"; }
     }
     const countryName = RKG_COUNTRY_NAMES[country] || "Unknown";
 
@@ -5033,7 +5063,7 @@ function renderFriendsTab(lic) {
       const pid = /^[+-]?\d+$/.test(raw) ? Number(raw) : NaN;
       let fc = "—";
       if (Number.isFinite(pid) && pid !== 0) {
-        try { fc = pidToFriendCode(pid >>> 0); } catch(e) { fc = "(error)"; }
+        try { fc = pidToFriendCode(pid >>> 0, getFriendCodeSaltBytesForLicense(lic)); } catch(e) { fc = "(error)"; }
       }
       fcSpan.textContent = fc;
       if (rwfcSpan) {
@@ -5241,7 +5271,7 @@ function renderFriendsTab(lic) {
         }
 
         let fc = "";
-        try { fc = pidToFriendCode(pid >>> 0); } catch (e) { fc = ""; }
+        try { fc = pidToFriendCode(pid >>> 0, getFriendCodeSaltBytesForLicense(lic)); } catch (e) { fc = ""; }
         const digits = fc.replace(/\D/g, "");
         row.dataset.fcDigits = digits;
         if (!digits) {
@@ -5998,7 +6028,7 @@ Remaining needed: ${RR_MIN_VS_MATCHES - totalVs}`);
       }
 
       let fc = "";
-      try { fc = pidToFriendCode(pid); } catch(e) { fc = ""; }
+      try { fc = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic)); } catch(e) { fc = ""; }
       if (!fc) {
         alert("Failed to compute friend code from PID.");
         return;
