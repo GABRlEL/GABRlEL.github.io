@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Godtool (Web) • v1.0</title>
+<title>Godtool (Web) • v1.1</title>
 <style>
   :root {
     --bg-main: #101014;
@@ -146,6 +146,7 @@ header .group-label {
     width: 70px;
   }
   .dwc-field,
+  .dwc-salt-field,
   .fileinfo-field,
   .friends-field,
   .penalty-field,
@@ -796,7 +797,7 @@ button.ghost-export-btn {
 <body>
 <header>
   <div class="row">
-    <span class="logo">Godtool (Web) • v1.0</span>
+    <span class="logo">Godtool (Web) • v1.1</span>
     <input type="file" id="fileInput" accept=".dat,.ikw,.rkp">
     <button id="downloadBtn" disabled>Download DAT</button>
     <span id="status">No file loaded</span>
@@ -2433,7 +2434,13 @@ async function withUnsavedGuard(onOk) {
     return false;
   }
   if (choice === "apply" && typeof currentDirtyTab.applyFn === "function") {
-    currentDirtyTab.applyFn();
+    const res = currentDirtyTab.applyFn();
+    if (res && typeof res.then === "function") {
+      await res;
+    }
+    if (currentDirtyTab && currentDirtyTab.dirty) {
+      return false;
+    }
   } else if (choice === "discard") {
     clearDirtyTab(true);
   }
@@ -3838,11 +3845,95 @@ function renderGlobalCompChampTab() {
 }
 
 
+function formatGameIdSalt(bytes) {
+  if (!bytes || bytes.length < 4) return "????";
+  let allZero = true;
+  let printable = true;
+  let ascii = "";
+  for (let i = 0; i < 4; i++) {
+    const b = bytes[i];
+    if (b !== 0) allZero = false;
+    if (b < 0x20 || b > 0x7E) printable = false;
+    ascii += String.fromCharCode(b);
+  }
+  if (allZero) return "0000";
+  if (printable) return ascii;
+  let hex = "";
+  for (let i = 0; i < 4; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex.toUpperCase();
+}
+
+function parseGameIdSaltInput(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  if (s === "0000") return new Uint8Array([0, 0, 0, 0]);
+  if (/^0x[0-9a-fA-F]{8}$/.test(s)) {
+    const hex = s.slice(2);
+    const out = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+      out[i] = parseInt(hex.substr(i * 2, 2), 16) & 0xFF;
+    }
+    return out;
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(s)) {
+    const out = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+      out[i] = parseInt(s.substr(i * 2, 2), 16) & 0xFF;
+    }
+    return out;
+  }
+  if (s.length === 4) {
+    const out = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+      const code = s.charCodeAt(i);
+      if (code < 0x20 || code > 0x7E) return null;
+      out[i] = code & 0xFF;
+    }
+    return out;
+  }
+  return null;
+}
+
+function gameIdSaltFormatLabel(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^0x[0-9a-fA-F]{8}$/.test(s) || /^[0-9a-fA-F]{8}$/.test(s) || s === "0000") {
+    return "(Hex)";
+  }
+  if (s.length === 4) {
+    let printable = true;
+    for (let i = 0; i < 4; i++) {
+      const code = s.charCodeAt(i);
+      if (code < 0x20 || code > 0x7E) {
+        printable = false;
+        break;
+      }
+    }
+    if (printable) return "(ASCII)";
+  }
+  const parsed = parseGameIdSaltInput(s);
+  if (parsed && s.length === 4) return "(ASCII)";
+  if (parsed) return "(Hex)";
+  return "";
+}
+
 function renderDwcTab(lic) {
   const base = licBase(lic) + DWC_OFFSET;
+  const gameIdBytes = content.slice(base + 0x24, base + 0x28);
+  const gameIdText = formatGameIdSalt(gameIdBytes);
+  const gameIdFormat = gameIdSaltFormatLabel(gameIdText);
   let html = `<div class="group-box">
     <div class="group-title">DWC User Data</div>
     <div class="grid-2col">`;
+  html += `
+      <label>Game ID salt</label>
+      <span class="dwc-input-wrap" id="dwcGameIdSaltWrap">
+        <input type="text" class="small-input dwc-salt-field" id="dwcGameIdSalt" value="${gameIdText}" maxlength="8">
+        <span id="dwcGameIdSaltFormat" style="font-size:11px; color: var(--text-muted);">${gameIdFormat}</span>
+      </span>
+  `;
   for (const [label, off] of DWC_FIELDS) {
     const val = view.getUint32(base + off, false) >>> 0;
     html += `
@@ -3892,6 +3983,15 @@ function renderDwcTab(lic) {
       markDwcWarnings(lic);
     });
   });
+  const gameIdInput = document.getElementById("dwcGameIdSalt");
+  if (gameIdInput) {
+    gameIdInput.addEventListener("input", () => {
+      const fmtEl = document.getElementById("dwcGameIdSaltFormat");
+      if (fmtEl) fmtEl.textContent = gameIdSaltFormatLabel(gameIdInput.value);
+      markDirtyNow();
+      markDwcWarnings(lic);
+    });
+  }
 
   markDwcWarnings(lic);
 
@@ -4021,6 +4121,15 @@ function renderDwcTab(lic) {
   document.getElementById("dwcApplyBtn").onclick = () => {
     if (!ensureLoaded()) return;
     const inputs = tabContent.querySelectorAll(".dwc-field");
+    const gameIdInput = document.getElementById("dwcGameIdSalt");
+    let gameIdBytes = null;
+    if (gameIdInput) {
+      gameIdBytes = parseGameIdSaltInput(gameIdInput.value);
+      if (!gameIdBytes) {
+        alert("Game ID salt must be 4 ASCII characters or 8 hex digits.");
+        return;
+      }
+    }
 
     // First pass: validate all
     for (const inp of inputs) {
@@ -4046,6 +4155,9 @@ function renderDwcTab(lic) {
       if (!res.ok) return;
       const v = res.value >>> 0;
       view.setUint32(base + off, v, false);
+    }
+    if (gameIdBytes) {
+      content.set(gameIdBytes, base + 0x24);
     }
 
     const crc = reversedWordsCRC32(base, DWC_DATA_LEN);
@@ -4212,6 +4324,34 @@ function markDwcWarnings(currentLic) {
   const getCurrentValue = (off) => getValueForLicense(currentLic, off);
 
   const currentEmpty = isDwcEmptyLicense(currentLic);
+
+  if (!currentEmpty) {
+    const gameIdWrap = document.getElementById("dwcGameIdSaltWrap");
+    let gameIdBytes = null;
+    const gameIdInput = document.getElementById("dwcGameIdSalt");
+    if (gameIdInput) {
+      const parsed = parseGameIdSaltInput(gameIdInput.value);
+      gameIdBytes = parsed ? parsed : new Uint8Array(0);
+    } else {
+      gameIdBytes = content.slice(
+        licBase(currentLic) + DWC_OFFSET + 0x24,
+        licBase(currentLic) + DWC_OFFSET + 0x28
+      );
+    }
+    const isRmcj =
+      gameIdBytes.length === 4 &&
+      gameIdBytes[0] === 0x52 &&
+      gameIdBytes[1] === 0x4D &&
+      gameIdBytes[2] === 0x43 &&
+      gameIdBytes[3] === 0x4A;
+    if (!isRmcj) {
+      addDwcWarning(
+        gameIdWrap,
+        "warn-red",
+        "The game salt for Mario Kart Wii's friend code calculation is RMCJ. Other values indicate that the save file has been tampered with and friend codes may not work or display properly."
+      );
+    }
+  }
 
   // Authentic User ID #2 across all licenses (ignore empty licenses)
   const auth2Values = [];
