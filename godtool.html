@@ -4995,10 +4995,43 @@ function renderFriendsTab(lic) {
   const rows = [];
   for (let i=0; i<NUM_FRIENDS; i++) {
     const ptr = base + i*FRIEND_STRIDE;
+    const pid     = view.getUint32(ptr + 0x04, false) >>> 0;
+    const flag    = view.getUint16(ptr + 0x10, false);
+    const losses  = view.getUint16(ptr + 0x12, false);
+    const wins    = view.getUint16(ptr + 0x14, false);
+    const raceR   = view.getUint16(ptr + 0x16, false);
+    const battleR = view.getUint16(ptr + 0x18, false);
+    const country = content[ptr + 0x68] >>> 0;
+    const region  = content[ptr + 0x69] >>> 0;
+    const globeX  = view.getUint16(ptr + 0x6C, false);
+    const globeY  = view.getUint16(ptr + 0x6E, false);
+    const key0    = view.getUint32(ptr + 0x00, false) >>> 0;
+    const wordA   = view.getUint32(ptr + 0x08, false) >>> 0;
+    const wordB   = view.getUint32(ptr + 0x0C, false) >>> 0;
+    const secPtr  = secBase + i * FRIEND_SECONDARY_STRIDE;
+    const secCtrl = (secPtr + 0x02 < content.length) ? (content[secPtr + 0x02] >>> 0) : 0;
+    const baseState = flag & 0x03;
     const rosterIndex = content[ptr + 0x66] >>> 0;
-    rows.push({ slot: i, rosterIndex });
+    const isEmpty = (
+      pid === 0 &&
+      baseState === 0 &&
+      key0 === 0 &&
+      wordA === 0 &&
+      wordB === 0 &&
+      losses === 0 &&
+      wins === 0 &&
+      raceR === 0 &&
+      battleR === 0 &&
+      country === 0 &&
+      region === 0 &&
+      globeX === 0 &&
+      globeY === 0 &&
+      secCtrl === 0
+    );
+    rows.push({ slot: i, rosterIndex, isEmpty });
   }
   rows.sort((a, b) => {
+    if (a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
     const diff = (a.rosterIndex | 0) - (b.rosterIndex | 0);
     return diff !== 0 ? diff : (a.slot - b.slot);
   });
@@ -5061,7 +5094,7 @@ function renderFriendsTab(lic) {
     const countryName = RKG_COUNTRY_NAMES[country] || "Unknown";
 
     html += `
-      <tr data-friend-slot="${slot}">
+      <tr data-friend-slot="${slot}" data-initial-empty="${rows[rowIdx].isEmpty ? "1" : "0"}" data-empty-state="${rows[rowIdx].isEmpty ? "1" : "0"}">
         <td>
           <button type="button" class="friends-move-up-btn" data-slot="${slot}" ${rowIdx === 0 ? "disabled" : ""}>↑</button>
           <button type="button" class="friends-move-down-btn" data-slot="${slot}" ${rowIdx === rows.length - 1 ? "disabled" : ""}>↓</button>
@@ -5206,6 +5239,26 @@ function renderFriendsTab(lic) {
     return Number.isFinite(val) ? val : 0;
   }
 
+  function isFriendRowEmpty(row) {
+    if (!row) return true;
+    if (row.dataset.deleted === "1") return true;
+    if (row.dataset.initialEmpty !== "1") return false;
+    const addedChk = row.querySelector(".friends-added");
+    if (addedChk && addedChk.checked) return false;
+    const inputs = row.querySelectorAll(".friends-field");
+    for (const inp of inputs) {
+      if (inp.dataset.off === "102") continue;
+      const raw = String(inp.value ?? "").trim();
+      if (raw === "") continue;
+      if (/^[+-]?\d+$/.test(raw)) {
+        if (Number(raw) !== 0) return false;
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function updateFriendMoveButtons() {
     const tbody = tabContent.querySelector(".friends-table tbody");
     if (!tbody) return;
@@ -5213,8 +5266,16 @@ function renderFriendsTab(lic) {
     rows.forEach((row, idx) => {
       const up = row.querySelector(".friends-move-up-btn");
       const down = row.querySelector(".friends-move-down-btn");
-      if (up) up.disabled = idx === 0;
-      if (down) down.disabled = idx === rows.length - 1;
+      const empty = isFriendRowEmpty(row);
+      if (empty) {
+        if (up) up.disabled = true;
+        if (down) down.disabled = true;
+        return;
+      }
+      const prev = row.previousElementSibling;
+      const next = row.nextElementSibling;
+      if (up) up.disabled = !prev || isFriendRowEmpty(prev);
+      if (down) down.disabled = !next || isFriendRowEmpty(next);
     });
   }
 
@@ -5222,7 +5283,16 @@ function renderFriendsTab(lic) {
     const tbody = tabContent.querySelector(".friends-table tbody");
     if (!tbody) return;
     const rows = Array.from(tbody.querySelectorAll("tr[data-friend-slot]"));
+    const empties = new Map();
+    rows.forEach(row => {
+      const empty = isFriendRowEmpty(row);
+      row.dataset.emptyState = empty ? "1" : "0";
+      empties.set(row, empty);
+    });
     rows.sort((a, b) => {
+      const aEmpty = empties.get(a) === true;
+      const bEmpty = empties.get(b) === true;
+      if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
       const diff = getRosterIndexValue(a) - getRosterIndexValue(b);
       if (diff !== 0) return diff;
       const aSlot = parseInt(a.dataset.friendSlot, 10);
@@ -5247,6 +5317,14 @@ function renderFriendsTab(lic) {
         if (rosterSpan) rosterSpan.textContent = inp.value;
         reorderFriendRowsByRosterIndex();
       }
+      if (row) {
+        const newEmpty = isFriendRowEmpty(row);
+        const oldEmpty = row.dataset.emptyState === "1";
+        if (newEmpty !== oldEmpty) {
+          row.dataset.emptyState = newEmpty ? "1" : "0";
+          reorderFriendRowsByRosterIndex();
+        }
+      }
     });
   });
   const addedChecks = tabContent.querySelectorAll(".friends-added");
@@ -5255,6 +5333,15 @@ function renderFriendsTab(lic) {
       const orig = chk.dataset.addedOriginal === "1";
       chk.dataset.addedTouched = (chk.checked === orig) ? "0" : "1";
       markDirtyNow();
+      const row = chk.closest("tr");
+      if (row) {
+        const newEmpty = isFriendRowEmpty(row);
+        const oldEmpty = row.dataset.emptyState === "1";
+        if (newEmpty !== oldEmpty) {
+          row.dataset.emptyState = newEmpty ? "1" : "0";
+          reorderFriendRowsByRosterIndex();
+        }
+      }
     });
   });
 
@@ -5308,8 +5395,9 @@ function renderFriendsTab(lic) {
     btn.addEventListener("click", () => {
       const row = btn.closest("tr");
       if (!row) return;
+      if (isFriendRowEmpty(row)) return;
       const prev = row.previousElementSibling;
-      if (!prev) return;
+      if (!prev || isFriendRowEmpty(prev)) return;
       const curInput = row.querySelector('.friends-field[data-off="102"]');
       const prevInput = prev.querySelector('.friends-field[data-off="102"]');
       if (!curInput || !prevInput) return;
@@ -5327,8 +5415,9 @@ function renderFriendsTab(lic) {
     btn.addEventListener("click", () => {
       const row = btn.closest("tr");
       if (!row) return;
+      if (isFriendRowEmpty(row)) return;
       const next = row.nextElementSibling;
-      if (!next) return;
+      if (!next || isFriendRowEmpty(next)) return;
       const curInput = row.querySelector('.friends-field[data-off="102"]');
       const nextInput = next.querySelector('.friends-field[data-off="102"]');
       if (!curInput || !nextInput) return;
@@ -5364,6 +5453,10 @@ function renderFriendsTab(lic) {
       });
       updateFriendRowDerived(row);
       markDirtyNow();
+      if (row) {
+        row.dataset.emptyState = "1";
+        reorderFriendRowsByRosterIndex();
+      }
     });
   });
 
