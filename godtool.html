@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Godtool (Web) • v1.1</title>
+<title>Godtool (Web) • v1.2</title>
 <style>
   :root {
     --bg-main: #101014;
@@ -797,7 +797,7 @@ button.ghost-export-btn {
 <body>
 <header>
   <div class="row">
-    <span class="logo">Godtool (Web) • v1.1</span>
+    <span class="logo">Godtool (Web) • v1.2</span>
     <input type="file" id="fileInput" accept=".dat,.ikw,.rkp">
     <button id="downloadBtn" disabled>Download DAT</button>
     <span id="status">No file loaded</span>
@@ -808,6 +808,7 @@ button.ghost-export-btn {
     <button id="importLicenseBtn" disabled>Import .rkp</button>
     <span class="toolbar-sep"></span>
     <button id="copyLicenseBtn"   disabled>Copy</button>
+    <button id="swapLicenseBtn"   disabled>Swap</button>
     <button id="deleteLicenseBtn" disabled>Delete</button>
     <button id="blankLicenseBtn"  disabled>Blank</button>
   </div>
@@ -1328,23 +1329,33 @@ const RULES_BATTLE_WINS = [
 ];
 
 const FRIEND_FIELDS = [
-  ["Unknown1",      0x00, "i"],
+  ["FriendKeyHi",   0x00, "i"],
   ["ProfileID",     0x04, "I"],
-  ["Unknown2",      0x08, "i"],
-  ["UnknownBytes1", 0x0C, "4s"],
-  ["Enabled",          0x10, "H"],
+  ["FriendInfoA",   0x08, "i"],
+  ["FriendInfoB",   0x0C, "I"],
+  ["BaseSlotState", 0x10, "H"],
   ["Losses",        0x12, "H"],
   ["Wins",          0x14, "H"],
   ["RaceRating",    0x16, "H"],
   ["BattleRating",  0x18, "H"],
   ["MiiData",       0x1A, "74s"],
-  ["UnknownBytes2", 0x64, "4s"],
+  ["MiiTail",       0x64, "2s"],
+  ["RosterIndex",   0x66, "B"],
+  ["GameRegion",    0x67, "B"],
   ["CountryID",     0x68, "B"],
   ["RegionID",      0x69, "B"],
-  ["Unknown3",      0x6A, "H"],
+  ["CityID",        0x6A, "H"],
   ["GlobeX",        0x6C, "H"],
   ["GlobeY",        0x6E, "H"],
-  ["Unknown4",      0x70, "336s"]
+  ["PackedGhostComp", 0x70, "336s"]
+];
+
+const FRIEND_FIELDS_SECONDARY = [
+  ["SecWord0High", 0x00, "H"],
+  ["SecCtrl",      0x02, "B"],
+  ["SecWord0Low",  0x03, "B"],
+  ["SecWord1",     0x04, "I"],
+  ["SecWord2",     0x08, "I"]
 ];
 
 const RECORD_OFFSETS = [
@@ -2644,7 +2655,7 @@ downloadBtn.onclick = () => {
 function enableButtons(enabled) {
   const ids = [
     "downloadBtn","exportLicenseBtn","importLicenseBtn","copyLicenseBtn",
-    "deleteLicenseBtn","blankLicenseBtn","recomputeCrcsBtn","showCrcBtn",
+    "swapLicenseBtn","deleteLicenseBtn","blankLicenseBtn","recomputeCrcsBtn","showCrcBtn",
     "completeNormalBtn","completeExpertBtn","staffGhostsBtn",
     "exportFriendsBtn","importFriendsBtn","exportAllMiisBtn",
     "regionApplyBtn"
@@ -2664,6 +2675,7 @@ function enableButtons(enabled) {
       "exportLicenseBtn",
       "importLicenseBtn",
       "copyLicenseBtn",
+      "swapLicenseBtn",
       "deleteLicenseBtn",
       "blankLicenseBtn"
     ];
@@ -2748,6 +2760,26 @@ document.getElementById("copyLicenseBtn").onclick = async () => {
     hasDownloaded = false;
     statusEl.textContent = `Copied license ${src+1} → ${dst+1}`;
     buildLicenseTabs();
+  });
+};
+
+document.getElementById("swapLicenseBtn").onclick = async () => {
+  withUnsavedGuard(async () => {
+    if (!ensureLoaded()) return;
+    const src = await showLicenseSelect("Swap which license (source)?", currentLicense + 1);
+    if (src == null || src < 0 || src > 3) return;
+    const dst = await showLicenseSelect(`Swap license ${src + 1} with which slot?`, src + 1);
+    if (dst == null || dst < 0 || dst > 3) return;
+    if (dst === src) return;
+    const a = licBase(src);
+    const b = licBase(dst);
+    const tmp = content.slice(a, a + LICENSE_SIZE);
+    content.set(content.slice(b, b + LICENSE_SIZE), a);
+    content.set(tmp, b);
+    hasDownloaded = false;
+    statusEl.textContent = `Swapped license ${src + 1} ↔ ${dst + 1}`;
+    buildLicenseTabs();
+    renderCurrentTab();
   });
 };
 
@@ -2890,13 +2922,30 @@ document.getElementById("exportFriendsBtn").onclick = () => {
   if (!ensureLoaded()) return;
   const lic = currentLicense;
   const base = licBase(lic) + FRIEND_MAIN_OFFSET;
-  const header = ["Slot"].concat(FRIEND_FIELDS.map(f => f[0]));
+  const secBase = licBase(lic) + FRIEND_SECONDARY_OFFSET;
+  const header = ["Slot"]
+    .concat(FRIEND_FIELDS.map(f => f[0]))
+    .concat(FRIEND_FIELDS_SECONDARY.map(f => f[0]));
   const rows = [header.join(",")];
   for (let i=0; i<NUM_FRIENDS; i++) {
     const ptr = base + i*FRIEND_STRIDE;
+    const secPtr = secBase + i*FRIEND_SECONDARY_STRIDE;
     const row = [String(i+1)];
     for (const [name, off, fmt] of FRIEND_FIELDS) {
       const fieldOffset = ptr + off;
+      if (fmt.endsWith("s")) {
+        const size = sizeOfFmt(fmt);
+        const bytes = content.slice(fieldOffset, fieldOffset+size);
+        let hex = "";
+        for (const b of bytes) hex += b.toString(16).padStart(2,"0");
+        row.push(hex.toUpperCase());
+      } else {
+        const val = readByType(fieldOffset, fmt);
+        row.push(String(val));
+      }
+    }
+    for (const [name, off, fmt] of FRIEND_FIELDS_SECONDARY) {
+      const fieldOffset = secPtr + off;
       if (fmt.endsWith("s")) {
         const size = sizeOfFmt(fmt);
         const bytes = content.slice(fieldOffset, fieldOffset+size);
@@ -2958,18 +3007,25 @@ friendsCsvInput.addEventListener("change", ev => {
         return;
       }
       const colIndex = {};
+      const colIndexSec = {};
       for (const [name] of FRIEND_FIELDS) {
         const ix = header.indexOf(name);
         if (ix >= 0) colIndex[name] = ix;
       }
+      for (const [name] of FRIEND_FIELDS_SECONDARY) {
+        const ix = header.indexOf(name);
+        if (ix >= 0) colIndexSec[name] = ix;
+      }
       const lic = currentLicense;
       const base = licBase(lic) + FRIEND_MAIN_OFFSET;
+      const secBase = licBase(lic) + FRIEND_SECONDARY_OFFSET;
       for (let li=1; li<lines.length; li++) {
         const row = lines[li].split(",");
         if (row.length <= idxSlot) continue;
         const slot = parseInt(row[idxSlot], 10);
         if (!Number.isInteger(slot) || slot < 1 || slot > NUM_FRIENDS) continue;
         const ptr = base + (slot-1)*FRIEND_STRIDE;
+        const secPtr = secBase + (slot-1)*FRIEND_SECONDARY_STRIDE;
         for (const [name, off, fmt] of FRIEND_FIELDS) {
           const col = colIndex[name];
           if (col === undefined || col >= row.length) continue;
@@ -2990,6 +3046,28 @@ friendsCsvInput.addEventListener("change", ev => {
             const n = Number(valStr);
             if (!Number.isFinite(n)) continue;
             writeByType(ptr+off, fmt, n);
+          }
+        }
+        for (const [name, off, fmt] of FRIEND_FIELDS_SECONDARY) {
+          const col = colIndexSec[name];
+          if (col === undefined || col >= row.length) continue;
+          const valStr = row[col].trim();
+          if (fmt.endsWith("s")) {
+            const size = sizeOfFmt(fmt);
+            if (!valStr) continue;
+            const hex = valStr;
+            const bytes = new Uint8Array(size);
+            for (let i=0; i<size; i++) {
+              const hx = hex.substr(i*2,2);
+              if (hx.length < 2) break;
+              bytes[i] = parseInt(hx,16) & 0xFF;
+            }
+            content.set(bytes, secPtr+off);
+          } else {
+            if (!valStr) continue;
+            const n = Number(valStr);
+            if (!Number.isFinite(n)) continue;
+            writeByType(secPtr+off, fmt, n);
           }
         }
       }
@@ -4907,12 +4985,23 @@ function renderFriendsTab(lic) {
 
   const showRwfc = !disablePackFeatures;
   const base = licBase(lic) + FRIEND_MAIN_OFFSET;
+  const secBase = licBase(lic) + FRIEND_SECONDARY_OFFSET;
   const countryOptions = Object.keys(RKG_COUNTRY_NAMES || {})
     .map(k => parseInt(k, 10))
     .filter(n => Number.isFinite(n))
     .sort((a, b) => a - b)
     .map(code => `<option value="${code}">${code} - ${RKG_COUNTRY_NAMES[code]}</option>`)
     .join("");
+  const rows = [];
+  for (let i=0; i<NUM_FRIENDS; i++) {
+    const ptr = base + i*FRIEND_STRIDE;
+    const rosterIndex = content[ptr + 0x66] >>> 0;
+    rows.push({ slot: i, rosterIndex });
+  }
+  rows.sort((a, b) => {
+    const diff = (a.rosterIndex | 0) - (b.rosterIndex | 0);
+    return diff !== 0 ? diff : (a.slot - b.slot);
+  });
   let html = `
     <div class="group-box">
       <div class="group-title">Registered Friends</div>
@@ -4920,9 +5009,10 @@ function renderFriendsTab(lic) {
         <table class="simple friends-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th>Move</th>
+              <th>Roster Index</th>
               <th>Profile ID / Friend Code</th>
-              <th>Flag</th>
+              <th>Added</th>
               <th>Losses</th>
               <th>Wins</th>
               <th>Race R</th>
@@ -4932,11 +5022,14 @@ function renderFriendsTab(lic) {
               <th>GlobeX</th>
               <th>GlobeY</th>
               <th>Actions</th>
+              <th>Save Index</th>
             </tr>
           </thead>
           <tbody>`;
-  for (let i=0; i<NUM_FRIENDS; i++) {
-    const ptr = base + i*FRIEND_STRIDE;
+  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    const slot = rows[rowIdx].slot;
+    const rosterIndex = rows[rowIdx].rosterIndex;
+    const ptr = base + slot*FRIEND_STRIDE;
     const pid     = view.getUint32(ptr + 0x04, false) >>> 0;
     const flag    = view.getUint16(ptr + 0x10, false);
     const losses  = view.getUint16(ptr + 0x12, false);
@@ -4947,6 +5040,19 @@ function renderFriendsTab(lic) {
     const region  = content[ptr + 0x69] >>> 0;
     const globeX  = view.getUint16(ptr + 0x6C, false);
     const globeY  = view.getUint16(ptr + 0x6E, false);
+    const secPtr  = secBase + slot * FRIEND_SECONDARY_STRIDE;
+    const secCtrl = (secPtr + 0x02 < content.length) ? (content[secPtr + 0x02] >>> 0) : 0;
+    const baseState = flag & 0x03;
+    let addedResolved = false;
+    if (secCtrl === 0x38) {
+      addedResolved = true;
+    } else if (secCtrl === 0x18) {
+      addedResolved = false;
+    } else if (baseState === 0x03) {
+      addedResolved = true;
+    } else if (baseState === 0x01) {
+      addedResolved = false;
+    }
 
     let fc = "—";
     if (pid !== 0) {
@@ -4955,53 +5061,64 @@ function renderFriendsTab(lic) {
     const countryName = RKG_COUNTRY_NAMES[country] || "Unknown";
 
     html += `
-      <tr data-friend-slot="${i}">
-        <td>${i+1}</td>
+      <tr data-friend-slot="${slot}">
+        <td>
+          <button type="button" class="friends-move-up-btn" data-slot="${slot}" ${rowIdx === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" class="friends-move-down-btn" data-slot="${slot}" ${rowIdx === rows.length - 1 ? "disabled" : ""}>↓</button>
+        </td>
+        <td>
+          <span class="friends-roster">${rosterIndex}</span>
+          <input type="hidden" class="friends-field"
+                 data-slot="${slot}" data-off="102" data-type="B"
+                 data-min="0" data-max="255" data-label="Roster Index"
+                 value="${rosterIndex}">
+        </td>
         <td>
           <span class="dwc-input-wrap">
             <input type="text" class="small-input friends-field"
-                   data-slot="${i}" data-off="4" data-type="I"
+                   data-slot="${slot}" data-off="4" data-type="I"
                    data-min="0" data-max="4294967295" data-label="Profile ID"
                    value="${pid}">
             <span class="friends-fc" style="color: var(--text-muted); font-size:11px;">${fc}</span>
-            <button type="button" class="copy-btn friends-copyfc-btn" data-slot="${i}">Copy</button>
+            <button type="button" class="copy-btn friends-copyfc-btn" data-slot="${slot}">Copy</button>
             ${showRwfc ? `<span class="friends-rwfc">—</span>` : ""}
           </span>
         </td>
         <td>
-          <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="16" data-type="H"
-                 data-min="0" data-max="65535" data-label="Flag"
-                 value="${flag}">
+          <input type="checkbox" class="friends-added"
+                 data-slot="${slot}"
+                 data-added-original="${addedResolved ? "1" : "0"}"
+                 data-added-touched="0"
+                 ${addedResolved ? "checked" : ""}>
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="18" data-type="H"
+                 data-slot="${slot}" data-off="18" data-type="H"
                  data-min="0" data-max="65535" data-label="Losses"
                  value="${losses}">
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="20" data-type="H"
+                 data-slot="${slot}" data-off="20" data-type="H"
                  data-min="0" data-max="65535" data-label="Wins"
                  value="${wins}">
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="22" data-type="H"
+                 data-slot="${slot}" data-off="22" data-type="H"
                  data-min="0" data-max="65535" data-label="Race Rating"
                  value="${raceR}">
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="24" data-type="H"
+                 data-slot="${slot}" data-off="24" data-type="H"
                  data-min="0" data-max="65535" data-label="Battle Rating"
                  value="${battleR}">
         </td>
         <td>
           <span class="dwc-input-wrap">
             <input type="text" class="tiny-input friends-field"
-                   data-slot="${i}" data-off="104" data-type="B"
+                   data-slot="${slot}" data-off="104" data-type="B"
                    data-min="0" data-max="255" data-label="Country ID"
                    value="${country}" list="friendsCountryList">
             <span class="friends-country-name" style="color: var(--text-muted); font-size:11px;">${countryName}</span>
@@ -5009,26 +5126,27 @@ function renderFriendsTab(lic) {
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="105" data-type="B"
+                 data-slot="${slot}" data-off="105" data-type="B"
                  data-min="0" data-max="255" data-label="Region ID"
                  value="${region}">
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="108" data-type="H"
+                 data-slot="${slot}" data-off="108" data-type="H"
                  data-min="0" data-max="65535" data-label="GlobeX"
                  value="${globeX}">
         </td>
         <td>
           <input type="text" class="tiny-input friends-field"
-                 data-slot="${i}" data-off="110" data-type="H"
+                 data-slot="${slot}" data-off="110" data-type="H"
                  data-min="0" data-max="65535" data-label="GlobeY"
                  value="${globeY}">
         </td>
         <td>
-          <button type="button" class="friends-exportmii-btn" data-slot="${i}">Export Mii</button>
-          <button type="button" class="friends-delete-btn" data-slot="${i}">Delete</button>
+          <button type="button" class="friends-exportmii-btn" data-slot="${slot}">Export Mii</button>
+          <button type="button" class="friends-delete-btn" data-slot="${slot}">Delete</button>
         </td>
+        <td>${slot + 1}</td>
       </tr>`;
   }
   html += `
@@ -5081,6 +5199,40 @@ function renderFriendsTab(lic) {
     }
   }
 
+  function getRosterIndexValue(row) {
+    const input = row ? row.querySelector('.friends-field[data-off="102"]') : null;
+    const raw = input ? String(input.value).trim() : "";
+    const val = /^[+-]?\d+$/.test(raw) ? Number(raw) : NaN;
+    return Number.isFinite(val) ? val : 0;
+  }
+
+  function updateFriendMoveButtons() {
+    const tbody = tabContent.querySelector(".friends-table tbody");
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll("tr[data-friend-slot]"));
+    rows.forEach((row, idx) => {
+      const up = row.querySelector(".friends-move-up-btn");
+      const down = row.querySelector(".friends-move-down-btn");
+      if (up) up.disabled = idx === 0;
+      if (down) down.disabled = idx === rows.length - 1;
+    });
+  }
+
+  function reorderFriendRowsByRosterIndex() {
+    const tbody = tabContent.querySelector(".friends-table tbody");
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll("tr[data-friend-slot]"));
+    rows.sort((a, b) => {
+      const diff = getRosterIndexValue(a) - getRosterIndexValue(b);
+      if (diff !== 0) return diff;
+      const aSlot = parseInt(a.dataset.friendSlot, 10);
+      const bSlot = parseInt(b.dataset.friendSlot, 10);
+      return (aSlot | 0) - (bSlot | 0);
+    });
+    rows.forEach(row => tbody.appendChild(row));
+    updateFriendMoveButtons();
+  }
+
   const inputs = tabContent.querySelectorAll(".friends-field");
   inputs.forEach(inp => {
     inp.addEventListener("input", () => {
@@ -5089,6 +5241,19 @@ function renderFriendsTab(lic) {
         delete row.dataset.deleted;
       }
       updateFriendRowDerived(row);
+      markDirtyNow();
+      if (inp.dataset.off === "102") {
+        const rosterSpan = row ? row.querySelector(".friends-roster") : null;
+        if (rosterSpan) rosterSpan.textContent = inp.value;
+        reorderFriendRowsByRosterIndex();
+      }
+    });
+  });
+  const addedChecks = tabContent.querySelectorAll(".friends-added");
+  addedChecks.forEach(chk => {
+    chk.addEventListener("change", () => {
+      const orig = chk.dataset.addedOriginal === "1";
+      chk.dataset.addedTouched = (chk.checked === orig) ? "0" : "1";
       markDirtyNow();
     });
   });
@@ -5106,6 +5271,8 @@ function renderFriendsTab(lic) {
       copyTextToClipboard(fcText, "Friend code copied.");
     });
   });
+
+  updateFriendMoveButtons();
 
   const miiButtons = tabContent.querySelectorAll(".friends-exportmii-btn");
   miiButtons.forEach(btn => {
@@ -5136,6 +5303,44 @@ function renderFriendsTab(lic) {
     });
   });
 
+  const moveUpButtons = tabContent.querySelectorAll(".friends-move-up-btn");
+  moveUpButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest("tr");
+      if (!row) return;
+      const prev = row.previousElementSibling;
+      if (!prev) return;
+      const curInput = row.querySelector('.friends-field[data-off="102"]');
+      const prevInput = prev.querySelector('.friends-field[data-off="102"]');
+      if (!curInput || !prevInput) return;
+      const tmp = curInput.value;
+      curInput.value = prevInput.value;
+      prevInput.value = tmp;
+      curInput.dispatchEvent(new Event("input", { bubbles: true }));
+      prevInput.dispatchEvent(new Event("input", { bubbles: true }));
+      reorderFriendRowsByRosterIndex();
+    });
+  });
+
+  const moveDownButtons = tabContent.querySelectorAll(".friends-move-down-btn");
+  moveDownButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest("tr");
+      if (!row) return;
+      const next = row.nextElementSibling;
+      if (!next) return;
+      const curInput = row.querySelector('.friends-field[data-off="102"]');
+      const nextInput = next.querySelector('.friends-field[data-off="102"]');
+      if (!curInput || !nextInput) return;
+      const tmp = curInput.value;
+      curInput.value = nextInput.value;
+      nextInput.value = tmp;
+      curInput.dispatchEvent(new Event("input", { bubbles: true }));
+      nextInput.dispatchEvent(new Event("input", { bubbles: true }));
+      reorderFriendRowsByRosterIndex();
+    });
+  });
+
   const delButtons = tabContent.querySelectorAll(".friends-delete-btn");
   delButtons.forEach(btn => {
     btn.addEventListener("click", () => {
@@ -5148,6 +5353,11 @@ function renderFriendsTab(lic) {
       if (!ok) return;
       const row = btn.closest("tr");
       if (row) row.dataset.deleted = "1";
+      const addedChk = row ? row.querySelector(".friends-added") : null;
+      if (addedChk) {
+        addedChk.checked = false;
+        addedChk.dataset.addedTouched = "1";
+      }
       const rowInputs = row ? row.querySelectorAll(".friends-field") : [];
       rowInputs.forEach(inp => {
         inp.value = "0";
@@ -5172,6 +5382,7 @@ function renderFriendsTab(lic) {
         }
       });
       const commits = [];
+      const addedChanges = [];
 
       for (const inp of inputs) {
         const min = parseInt(inp.dataset.min, 10);
@@ -5192,10 +5403,40 @@ function renderFriendsTab(lic) {
         });
       }
 
+      const addedChecks = tabContent.querySelectorAll(".friends-added");
+      addedChecks.forEach(chk => {
+        const touched = chk.dataset.addedTouched === "1";
+        if (!touched) return;
+        const slot = parseInt(chk.dataset.slot, 10);
+        if (!Number.isFinite(slot)) return;
+        addedChanges.push({ slot, checked: chk.checked });
+      });
+
       for (const c of commits) {
         if (deletedSlots.has(c.slot)) continue;
         const ptr = base2 + c.slot * FRIEND_STRIDE;
         writeByType(ptr + c.off, c.type, c.value);
+      }
+
+      for (const change of addedChanges) {
+        if (deletedSlots.has(change.slot)) continue;
+        const ptr = base2 + change.slot * FRIEND_STRIDE;
+        const secPtr = secBase + change.slot * FRIEND_SECONDARY_STRIDE;
+        if (ptr + FRIEND_STRIDE > content.length) continue;
+        let curFlag = view.getUint16(ptr + 0x10, false);
+        let newFlag = curFlag;
+        let newCtrl = (secPtr + 0x02 < content.length) ? content[secPtr + 0x02] : 0;
+        if (change.checked) {
+          newFlag = (curFlag & ~0x03) | 0x03;
+          newCtrl = 0x38;
+        } else {
+          newFlag = (curFlag & ~0x03) | 0x01;
+          newCtrl = 0x18;
+        }
+        view.setUint16(ptr + 0x10, newFlag, false);
+        if (secPtr + 0x02 < content.length) {
+          content[secPtr + 0x02] = newCtrl & 0xFF;
+        }
       }
 
       for (const slot of deletedSlots) {
