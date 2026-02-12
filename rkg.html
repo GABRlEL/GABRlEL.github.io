@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>RKG Web • v1.0</title>
+<title>RKG Web • v1.1</title>
 <style>
   :root {
     --bg: #0f1220;
@@ -639,7 +639,7 @@
 <body>
   <header>
     <div class="title">
-      <span class="title-main">RKG Web • v1.0</span>
+      <span class="title-main">RKG Web • v1.1</span>
       <span id="status" class="title-status">No file loaded.</span>
       <span id="dirtyBadge" style="display:none;">Edited</span>
     </div>
@@ -4904,6 +4904,8 @@ const ctrlTrickRight = document.getElementById("ctrlTrickRight");
 
 let fileBytes = null;
 let fileName = null;
+let antiCheat200ccAuto = true;
+let antiCheat200ccKey = null;
 let isDirty = false;
 let fileSha1Hex = null;
 let currentInfo = null;
@@ -6881,6 +6883,11 @@ function render(info) {
   }
   updateItemSpamFilterLabel();
   lastAntiCheat = null;
+  const antiCheatKey = (fileName || "") + ":" + (fileBytes ? fileBytes.length : 0);
+  if (antiCheat200ccKey !== antiCheatKey) {
+    antiCheat200ccKey = antiCheatKey;
+    antiCheat200ccAuto = true;
+  }
   if (ckgdFetchStatus) {
     const fetchKey = (fileName || "") + ":" + (fileBytes ? fileBytes.length : 0);
     if (ckgdFetchKey !== fetchKey) {
@@ -7032,7 +7039,10 @@ function render(info) {
       ccValue.style.display = has200cc ? "block" : "none";
       if (has200cc) ccValue.textContent = "200cc";
     }
-    if (antiCheat200cc) antiCheat200cc.checked = has200cc;
+    if (antiCheat200cc && antiCheat200ccAuto) {
+      antiCheat200cc.checked = has200cc;
+      antiCheat200ccAuto = false;
+    }
     inputPlayBtn.disabled = false;
     inputFrameSlider.disabled = false;
     inputFrameNumber.disabled = false;
@@ -7468,6 +7478,7 @@ if (ckgdFetchBtn) {
 
 if (antiCheat200cc) {
   antiCheat200cc.addEventListener("change", () => {
+    antiCheat200ccAuto = false;
     if (fileBytes) {
       render(parseRkg(fileBytes));
     }
