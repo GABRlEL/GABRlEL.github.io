@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>RKG Web • v1.2</title>
+<title>RKG Web • v1.2.1</title>
 <style>
   :root {
     --bg: #0f1220;
@@ -697,7 +697,7 @@
 <body>
   <header>
     <div class="title">
-      <span class="title-main">RKG Web • v1.2</span>
+      <span class="title-main">RKG Web • v1.2.1</span>
       <span id="status" class="title-status">No file loaded.</span>
       <span id="dirtyBadge" style="display:none;">Edited</span>
     </div>
@@ -859,13 +859,13 @@
         <div class="edit-pair-row">
           <div class="input-inline">
             <label for="countrySelect">Country</label>
-            <input id="countrySelect" type="text" list="countryList" value="0x00">
+            <input id="countrySelect" type="text" list="countryList" value="0xFF">
             <datalist id="countryList"></datalist>
             <button id="countryApplyBtn" disabled>Apply</button>
           </div>
           <div class="input-inline">
             <label for="stateInput">State</label>
-            <input id="stateInput" type="text" list="stateList" value="0x00">
+            <input id="stateInput" type="text" list="stateList" value="0xFF">
             <datalist id="stateList"></datalist>
             <button id="stateApplyBtn" disabled>Apply</button>
           </div>
@@ -5870,11 +5870,35 @@ function vehicleLabel(id) {
 function countryLabel(code) {
   if (code == null) return "Unknown";
   const c = code & 0xFF;
-  if (c === 0xFF) return "Hidden / Not set (0xFF)";
-  if (c === 0x00) return "Not set (0x00)";
+  if (c === 0xFF) return "Not set (0xFF)";
+  if (c === 0x00) return "Invalid / reserved (0x00)";
   const name = RKG_COUNTRY_NAMES[c];
   if (name) return name + " (" + formatHex(c, 2) + ")";
   return "Unknown country (" + formatHex(c, 2) + ")";
+}
+
+function isValidCountryCode(code) {
+  if (code == null || !Number.isInteger(code) || code < 0 || code > 0xFF) return false;
+  const c = code & 0xFF;
+  if (c === 0xFF) return true;
+  return c >= 0x01 && c <= 0xFE;
+}
+
+function isValidStateCodeForCountry(countryCode, stateCode) {
+  if (!isValidCountryCode(countryCode) ||
+    stateCode == null ||
+    !Number.isInteger(stateCode) ||
+    stateCode < 0 ||
+    stateCode > 0xFF) {
+    return false;
+  }
+  const country = countryCode & 0xFF;
+  const state = stateCode & 0xFF;
+  if (state === 0x00) return false;
+  if (country === 0xFF) return state === 0xFF;
+  if (state === 0xFF) return true;
+  const perCountry = RKG_SUBREGION_NAMES[country];
+  return !!(perCountry && perCountry[state]);
 }
 
 const MII_FAVORITE_COLORS = [
@@ -7149,14 +7173,15 @@ function updateTrackIdList() {
 
 function updateCountrySelect(currentCode) {
   if (!countrySelect || !countryList) return;
-  const entries = Object.entries(RKG_COUNTRY_NAMES).map(([code, name]) => ({
-    code: parseInt(code, 10),
-    name,
-  }));
-  entries.push({ code: 0x00, name: "Not set" });
+  const entries = Object.entries(RKG_COUNTRY_NAMES)
+    .map(([code, name]) => ({
+      code: parseInt(code, 10),
+      name: String(name),
+    }))
+    .filter((entry) => !Number.isNaN(entry.code) && isValidCountryCode(entry.code));
   entries.sort((a, b) => a.name.localeCompare(b.name));
   const options = entries.map((e) => {
-    const label = e.code === 0xFF ? "Hidden / Not set" : e.name;
+    const label = e.code === 0xFF ? "Not set" : e.name;
     const hex = "0x" + e.code.toString(16).toUpperCase().padStart(2, "0");
     return `<option value="${hex}">${escapeHtml(label)} (${hex})</option>`;
   });
@@ -7171,22 +7196,24 @@ function updateCountrySelect(currentCode) {
 function updateStateList(countryCode) {
   if (!stateList) return;
   const normalized = countryCode == null ? null : (countryCode & 0xFF);
-  const stateMap = (normalized == null) ? null : RKG_SUBREGION_NAMES[normalized];
+  const stateMap = (normalized == null || normalized === 0xFF) ? null : RKG_SUBREGION_NAMES[normalized];
   const entries = [];
-  entries.push({ code: 0x00, name: "Not set" });
+  entries.push({ code: 0xFF, name: "Not set" });
   if (stateMap) {
     for (const [codeStr, name] of Object.entries(stateMap)) {
       const code = parseInt(codeStr, 10);
-      if (Number.isNaN(code) || code < 0 || code > 0xFF) continue;
+      if (Number.isNaN(code) || code <= 0 || code >= 0xFF) continue;
       entries.push({ code, name: String(name) });
     }
     entries.sort((a, b) => {
-      if (a.code === 0x00) return -1;
-      if (b.code === 0x00) return 1;
+      if (a.code === 0xFF) return -1;
+      if (b.code === 0xFF) return 1;
       return a.code - b.code;
     });
   }
-  entries.push({ code: 0xFF, name: "Hidden" });
+  if (normalized === 0xFF) {
+    entries.length = 1;
+  }
   const options = entries.map((entry) => {
     const hex = "0x" + entry.code.toString(16).toUpperCase().padStart(2, "0");
     return `<option value="${hex}">${escapeHtml(entry.name)} (${hex})</option>`;
@@ -7304,8 +7331,8 @@ function buildSummaryJson() {
 function formatCountryName(code) {
   if (code == null) return "Unknown";
   const c = code & 0xFF;
-  if (c === 0xFF) return "Hidden / Not set";
-  if (c === 0x00) return "Not set";
+  if (c === 0xFF) return "Not set";
+  if (c === 0x00) return "Invalid / reserved (0x00)";
   const name = RKG_COUNTRY_NAMES[c];
   return name || "Unknown";
 }
@@ -7323,16 +7350,19 @@ function sanitizeFileName(value, fallback) {
 function formatStateName(countryCode, stateCode) {
   if (stateCode == null) return "Unknown";
   const state = stateCode & 0xFF;
-  if (state === 0xFF) return "Hidden";
-  if (state === 0x00) return "Not set";
+  if (state === 0xFF) return "Not set (0xFF)";
+  if (state === 0x00) return "Invalid / reserved (0x00)";
   const country = countryCode == null ? null : (countryCode & 0xFF);
+  if (country === 0xFF) {
+    return "Invalid for country Not set (" + formatHex(state, 2) + ")";
+  }
   if (country != null) {
     const perCountry = RKG_SUBREGION_NAMES[country];
     if (perCountry && perCountry[state]) {
       return perCountry[state] + " (" + formatHex(state, 2) + ")";
     }
   }
-  return formatHex(state, 2);
+  return "Unknown state (" + formatHex(state, 2) + ")";
 }
 
 function escapeMarkdownInline(value) {
@@ -7452,6 +7482,153 @@ function addCtgpIntersectionWarning(analysis, info) {
   analysis.warning.push("CTGP suspicious intersection flag(s): " + details.summary + ".");
 }
 
+function collectInstantFinishSplitWarnings(info) {
+  const warnings = [];
+  if (!info || info.error || !Array.isArray(info.laps)) return warnings;
+  const count = Math.min(Math.max(info.lapCount | 0, 0), info.laps.length);
+  const flagged = [];
+  for (let i = 0; i < count; i++) {
+    const lap = info.laps[i];
+    if (!lap) continue;
+    if ((lap.minutes | 0) === 99 && (lap.seconds | 0) === 59 && (lap.millis | 0) === 999) {
+      flagged.push(i + 1);
+    }
+  }
+  if (flagged.length) {
+    warnings.push("Instant Finish code detected (lap split 99:59.999 at lap " + flagged.join(", ") + ").");
+  }
+  return warnings;
+}
+
+function addInstantFinishSplitWarnings(analysis, info) {
+  if (!analysis) return;
+  const warnings = collectInstantFinishSplitWarnings(info);
+  for (const warning of warnings) {
+    analysis.warning.push(warning);
+  }
+}
+
+function collectHeaderValidationWarnings(info) {
+  const warnings = [];
+  if (!info || info.error) return warnings;
+
+  const driftRaw = info.driftType;
+  if (driftRaw !== 0 && driftRaw !== 1) {
+    const value = Number.isFinite(driftRaw) ? formatHex(driftRaw & 0xFF, 2) : "??";
+    warnings.push("Invalid drift type in header (" + value + ").");
+  }
+  // Bit 0 of info2 is reserved in known RKG layouts and should stay clear.
+  if (Number.isInteger(info.info2) && ((info.info2 & 0x0001) !== 0)) {
+    warnings.push("Invalid drift type in header (reserved encoding bit set).");
+  }
+
+  const controllerRaw = info.controllerId;
+  const controllerOk = Number.isInteger(controllerRaw) && controllerRaw >= 0 && controllerRaw <= 0x03;
+  if (!controllerOk) {
+    const value = Number.isFinite(controllerRaw) ? formatHex(controllerRaw & 0xFF, 2) : "??";
+    warnings.push("Invalid controller ID in header (" + value + ").");
+  }
+
+  const countryRaw = info.countryCode;
+  if (!isValidCountryCode(countryRaw)) {
+    const value = Number.isFinite(countryRaw) ? formatHex(countryRaw & 0xFF, 2) : "??";
+    warnings.push("Invalid country ID in header (" + value + ").");
+  }
+
+  const stateRaw = info.stateCode;
+  if (!isValidStateCodeForCountry(countryRaw, stateRaw)) {
+    const countryValue = Number.isFinite(countryRaw) ? formatHex(countryRaw & 0xFF, 2) : "??";
+    const stateValue = Number.isFinite(stateRaw) ? formatHex(stateRaw & 0xFF, 2) : "??";
+    warnings.push("Invalid state ID in header (" + stateValue + " for country " + countryValue + ").");
+  }
+
+  return warnings;
+}
+
+function isKnownTrackSlotId(trackId) {
+  if (trackId == null || !Number.isInteger(trackId)) return false;
+  const v = trackId & 0x3F;
+  return TRACK_BY_ID.has(v);
+}
+
+function isKnownGhostTypeId(ghostType) {
+  if (ghostType == null || !Number.isInteger(ghostType)) return false;
+  const v = ghostType & 0x7F;
+  if (v >= 0x07 && v <= 0x24) return true;
+  switch (v) {
+    case 0x01:
+    case 0x02:
+    case 0x03:
+    case 0x04:
+    case 0x05:
+    case 0x06:
+    case 0x25:
+    case 0x26:
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isKnownCharacterId(characterId) {
+  if (characterId == null || !Number.isInteger(characterId)) return false;
+  const v = characterId & 0x3F;
+  return Object.prototype.hasOwnProperty.call(RKG_CHAR_NAMES, v);
+}
+
+function isKnownVehicleId(vehicleId) {
+  if (vehicleId == null || !Number.isInteger(vehicleId)) return false;
+  const v = vehicleId & 0x3F;
+  return Object.prototype.hasOwnProperty.call(RKG_VEHICLE_NAMES, v);
+}
+
+function collectHeaderKnownValueWarnings(info) {
+  const warnings = [];
+  if (!info || info.error) return warnings;
+
+  const trackRaw = info.trackId;
+  if (!isKnownTrackSlotId(trackRaw)) {
+    const value = Number.isFinite(trackRaw) ? formatHex(trackRaw & 0x3F, 2) : "??";
+    warnings.push("Unknown Track Slot ID in header (" + value + ").");
+  }
+
+  const ghostTypeRaw = info.ghostType;
+  if (!isKnownGhostTypeId(ghostTypeRaw)) {
+    const value = Number.isFinite(ghostTypeRaw) ? formatHex(ghostTypeRaw & 0x7F, 2) : "??";
+    warnings.push("Unknown Ghost ID in header (" + value + ").");
+  }
+
+  const characterRaw = info.characterId;
+  if (!isKnownCharacterId(characterRaw)) {
+    const value = Number.isFinite(characterRaw) ? formatHex(characterRaw & 0x3F, 2) : "??";
+    warnings.push("Invalid character ID in header (" + value + ").");
+  }
+
+  const vehicleRaw = info.vehicleId;
+  if (!isKnownVehicleId(vehicleRaw)) {
+    const value = Number.isFinite(vehicleRaw) ? formatHex(vehicleRaw & 0x3F, 2) : "??";
+    warnings.push("Invalid vehicle ID in header (" + value + ").");
+  }
+
+  return warnings;
+}
+
+function addHeaderValidationWarnings(analysis, info) {
+  if (!analysis) return;
+  const warnings = collectHeaderValidationWarnings(info);
+  for (const warning of warnings) {
+    analysis.warning.push(warning);
+  }
+}
+
+function addHeaderKnownValueWarnings(analysis, info) {
+  if (!analysis) return;
+  const warnings = collectHeaderKnownValueWarnings(info);
+  for (const warning of warnings) {
+    analysis.warning.push(warning);
+  }
+}
+
 function computeAntiCheatSnapshot(use200cc) {
   if (!currentInfo || currentInfo.error) {
     return { use200cc: !!use200cc, thresholds: getAntiCheatThresholds(!!use200cc), error: "No ghost loaded." };
@@ -7464,6 +7641,9 @@ function computeAntiCheatSnapshot(use200cc) {
     if (inputError.toLowerCase().includes("truncated")) {
       warnList.push("Input error: " + inputError);
     }
+    warnList.push(...collectInstantFinishSplitWarnings(info));
+    warnList.push(...collectHeaderValidationWarnings(info));
+    warnList.push(...collectHeaderKnownValueWarnings(info));
     return {
       use200cc: !!use200cc,
       thresholds,
@@ -7476,6 +7656,9 @@ function computeAntiCheatSnapshot(use200cc) {
   const analysis = analyzeInputs(info.inputs, info.controllerId, thresholds);
   addCtgpPauseSuspicious(analysis, info);
   addCtgpIntersectionWarning(analysis, info);
+  addInstantFinishSplitWarnings(analysis, info);
+  addHeaderValidationWarnings(analysis, info);
+  addHeaderKnownValueWarnings(analysis, info);
   if (!isDirty) {
     const baseCrc = getCtgpBaseCrcInfo(info, fileBytes);
     if (baseCrc && baseCrc.mismatch) {
@@ -7813,12 +7996,21 @@ async function runBulkCheatCheck(files) {
       }
       const inputs = info.inputs;
       if (!inputs || inputs.error) {
-        rows.push({ name, mii, warning: ["Input error"], suspicious: [], status: inputs && inputs.error ? inputs.error : "No input data" });
+        const warning = [
+          "Input error",
+          ...collectInstantFinishSplitWarnings(info),
+          ...collectHeaderValidationWarnings(info),
+          ...collectHeaderKnownValueWarnings(info),
+        ];
+        rows.push({ name, mii, warning, suspicious: [], status: inputs && inputs.error ? inputs.error : "No input data" });
         continue;
       }
       const analysis = analyzeInputs(inputs, info.controllerId, thresholds);
       addCtgpPauseSuspicious(analysis, info);
       addCtgpIntersectionWarning(analysis, info);
+      addInstantFinishSplitWarnings(analysis, info);
+      addHeaderValidationWarnings(analysis, info);
+      addHeaderKnownValueWarnings(analysis, info);
       const warning = Array.isArray(analysis.warning) ? analysis.warning.slice() : [];
       const suspicious = Array.isArray(analysis.suspicious) ? analysis.suspicious.slice() : [];
       const baseCrc = getCtgpBaseCrcInfo(info, bytes);
@@ -8116,11 +8308,9 @@ function updateGhostTypeList() {
 function updateControllerSelectOptions() {
   if (!controllerSelect) return;
   const options = [];
-  for (let i = 0; i <= 0x0F; i++) {
+  for (let i = 0; i <= 0x03; i++) {
     const hex = formatHex(i, 2);
-    let label = controllerLabel(i);
-    if (i > 3) label = "Unknown";
-    label += " (" + hex + ")";
+    const label = controllerLabel(i) + " (" + hex + ")";
     options.push(`<option value="${i}">${escapeHtml(label)}</option>`);
   }
   controllerSelect.innerHTML = options.join("");
@@ -9524,6 +9714,9 @@ function render(info) {
     const analysis = analyzeInputs(inputs, info.controllerId, thresholds);
     addCtgpPauseSuspicious(analysis, info);
     addCtgpIntersectionWarning(analysis, info);
+    addInstantFinishSplitWarnings(analysis, info);
+    addHeaderValidationWarnings(analysis, info);
+    addHeaderKnownValueWarnings(analysis, info);
     if (!isDirty) {
       const baseCrc = getCtgpBaseCrcInfo(info, fileBytes);
       if (baseCrc && baseCrc.mismatch) {
@@ -9655,6 +9848,9 @@ function render(info) {
     if (inputError && inputError.toLowerCase().includes("truncated")) {
       warnList.push("Input error: " + inputError);
     }
+    warnList.push(...collectInstantFinishSplitWarnings(info));
+    warnList.push(...collectHeaderValidationWarnings(info));
+    warnList.push(...collectHeaderKnownValueWarnings(info));
     document.getElementById("antiCheatSuspicious").textContent = "—";
     document.getElementById("antiCheatWarning").innerHTML =
       warnList.length ? formatIssueList(warnList) : "—";
@@ -9688,7 +9884,10 @@ function render(info) {
   trackIdInput.value = trackIdHex;
   ghostTypeInput.value = "0x" + (info.ghostType & 0x7F).toString(16).toUpperCase().padStart(2, "0");
   driftSelect.value = String(info.driftType ? 1 : 0);
-  controllerSelect.value = String(info.controllerId & 0x0F);
+  const safeControllerId = ((info.controllerId | 0) >= 0 && (info.controllerId | 0) <= 0x03)
+    ? (info.controllerId | 0)
+    : 0;
+  controllerSelect.value = String(safeControllerId);
   if (info.year && info.month && info.day) {
     const y = String(info.year).padStart(4, "0");
     const m = String(info.month).padStart(2, "0");
@@ -10153,16 +10352,19 @@ function readEditInputValues(options) {
     return { error: "Drift must be 0 (Manual) or 1 (Automatic)." };
   }
   const controllerId = parseInt(controllerSelect.value, 10);
-  if (Number.isNaN(controllerId) || controllerId < 0 || controllerId > 0x0F) {
-    return { error: "Controller must be 0..0x0F." };
+  if (Number.isNaN(controllerId) || controllerId < 0 || controllerId > 0x03) {
+    return { error: "Controller must be 0..0x03." };
   }
   const countryCode = parseGhostTypeIdInput(countrySelect.value);
-  if (countryCode == null || countryCode < 0 || countryCode > 0xFF) {
-    return { error: "Country must be 0..0xFF." };
+  if (!isValidCountryCode(countryCode)) {
+    return { error: "Country must be 0x01..0xFE or 0xFF (Not set)." };
   }
   const stateCode = parseGhostTypeIdInput(stateInput.value);
-  if (stateCode == null || stateCode < 0 || stateCode > 0xFF) {
-    return { error: "State must be 0..0xFF." };
+  if (!isValidStateCodeForCountry(countryCode, stateCode)) {
+    if ((countryCode & 0xFF) === 0xFF) {
+      return { error: "When country is 0xFF (Not set), state must also be 0xFF." };
+    }
+    return { error: "State must be 0x01..valid range for country, or 0xFF (Not set)." };
   }
 
   let dateParts = null;
@@ -10397,8 +10599,8 @@ driftApplyBtn.addEventListener("click", () => {
 controllerApplyBtn.addEventListener("click", () => {
   if (!fileBytes) return;
   const raw = parseInt(controllerSelect.value, 10);
-  if (Number.isNaN(raw) || raw < 0 || raw > 0x0F) {
-    setStatus("Controller must be 0..0x0F.", "bad");
+  if (Number.isNaN(raw) || raw < 0 || raw > 0x03) {
+    setStatus("Controller must be 0..0x03.", "bad");
     return;
   }
   const dv = new DataView(fileBytes.buffer, fileBytes.byteOffset, fileBytes.byteLength);
@@ -10453,22 +10655,35 @@ dateApplyBtn.addEventListener("click", () => {
 countryApplyBtn.addEventListener("click", () => {
   if (!fileBytes) return;
   const newCode = parseGhostTypeIdInput(countrySelect.value);
-  if (newCode == null || newCode < 0 || newCode > 0xFF) {
-    setStatus("Country must be 0..0xFF.", "bad");
+  if (!isValidCountryCode(newCode)) {
+    setStatus("Country must be 0x01..0xFE or 0xFF (Not set).", "bad");
     return;
   }
   const dv = new DataView(fileBytes.buffer, fileBytes.byteOffset, fileBytes.byteLength);
   dv.setUint8(0x34, newCode & 0xFF);
+  let statusMessage = "Country updated.";
+  const currentState = dv.getUint8(0x35);
+  if ((newCode & 0xFF) === 0xFF) {
+    if (currentState !== 0xFF) statusMessage = "Country updated. State set to 0xFF (Not set).";
+    dv.setUint8(0x35, 0xFF);
+  } else if (!isValidStateCodeForCountry(newCode, currentState)) {
+    dv.setUint8(0x35, 0xFF);
+    statusMessage = "Country updated. State reset to 0xFF (Not set).";
+  }
   writeCrc32();
   setDirty(true);
   render(parseRkg(fileBytes));
-  setStatus("Country updated.", "warn");
+  setStatus(statusMessage, "warn");
 });
 
 if (countrySelect) {
   const refreshStateSuggestions = () => {
     const parsed = parseGhostTypeIdInput(countrySelect.value);
-    updateStateList(parsed == null ? null : parsed);
+    const countryCode = isValidCountryCode(parsed) ? parsed : null;
+    updateStateList(countryCode);
+    if (countryCode === 0xFF && stateInput) {
+      stateInput.value = "0xFF";
+    }
   };
   countrySelect.addEventListener("input", refreshStateSuggestions);
   countrySelect.addEventListener("change", refreshStateSuggestions);
@@ -10476,9 +10691,18 @@ if (countrySelect) {
 
 stateApplyBtn.addEventListener("click", () => {
   if (!fileBytes) return;
+  const countryCode = parseGhostTypeIdInput(countrySelect.value);
+  if (!isValidCountryCode(countryCode)) {
+    setStatus("Country must be 0x01..0xFE or 0xFF (Not set).", "bad");
+    return;
+  }
   const newCode = parseGhostTypeIdInput(stateInput.value);
-  if (newCode == null || newCode < 0 || newCode > 0xFF) {
-    setStatus("State must be 0..0xFF.", "bad");
+  if (!isValidStateCodeForCountry(countryCode, newCode)) {
+    if ((countryCode & 0xFF) === 0xFF) {
+      setStatus("When country is 0xFF (Not set), state must also be 0xFF.", "bad");
+    } else {
+      setStatus("State must be 0x01..valid range for country, or 0xFF (Not set).", "bad");
+    }
     return;
   }
   const dv = new DataView(fileBytes.buffer, fileBytes.byteOffset, fileBytes.byteLength);
