@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gabs Multi BIN Editor</title>
+  <title>Gabs Multi BIN Editor v1.1</title>
   <style>
     :root {
       --bg: #0b0d10; --panel: #12151a; --muted: #2a3039; --text: #e9eef7; --sub: #b2bfd6;
@@ -41,6 +41,7 @@
     .kcl-table{width:100%;border-collapse:collapse;font-size:12px}
     .kcl-table th,.kcl-table td{border:1px solid var(--muted);padding:6px;text-align:center}
     footer{color:var(--sub);font-size:12px;margin-top:12px}
+    .load-drop-active{border-color:var(--accent)!important;background:#171d28}
   
 /* kartDriverDispParam specific layout fixes */
 
@@ -58,7 +59,7 @@
 <body>
   <header>
     <div class="wrap">
-      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • v1 • Tool created by ChatGPT 5 Thinking and Gemini 2.5 Pro</span></h1>
+      <h1>Gabs Multi BIN Editor<span class="tag">Client-side • v1.1 • Tool created by ChatGPT 5 Thinking, 5.3 Codex Extra-High and Gemini 2.5 Pro</span></h1>
       <div class="tabs">
         <button class="tab-btn active" data-tab="load">Load</button>
         <button class="tab-btn" data-tab="kart" disabled>kartParam.bin</button>
@@ -123,7 +124,7 @@
             <h3>Open a kartPartsDispParam.bin</h3>
             <div class="grid">
               <input type="file" id="kartPartsFileInput" accept=".bin" />
-              <div id="kartPartsDropArea" class="panel" style="padding:10px">Drop a <strong>kartPartsDispParam.bin</strong> here.</div>
+              <div id="kartPartsDropArea" class="panel" style="padding:10px">Drop a <strong>kartPartsDispParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="kartPartsFileInfo">No file loaded</span>
                 <span class="pill" id="kartPartsCount"></span>
@@ -135,7 +136,7 @@
             <h3>Open a miiDispParam.bin</h3>
             <div class="grid">
               <input type="file" id="miiFileInput" accept=".bin" />
-              <div id="miiDropArea" class="panel" style="padding:10px">Drop a <strong>miiDispParam.bin</strong> here.</div>
+              <div id="miiDropArea" class="panel" style="padding:10px">Drop a <strong>miiDispParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="miiFileInfo">No file loaded</span>
                 <span class="pill" id="miiCount"></span>
@@ -159,9 +160,7 @@
             <h3>Open a kartDriverDispParam.bin</h3>
             <div class="grid">
               <input type="file" id="kartDriverDispFileInput" accept=".bin" />
-              <div id="kartDriverDispDropArea" class="panel" style="padding:10px">
-                Drop a <strong>kartDriverDispParam.bin</strong> here.
-              </div>
+              <div id="kartDriverDispDropArea" class="panel" style="padding:10px">Drop a <strong>kartDriverDispParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="kartDriverDispFileInfo">No file loaded</span>
                 <span class="pill" id="kartDriverDispCounts"></span>
@@ -170,10 +169,10 @@
               </div>
             </div>
           </section><section class="panel">
-            <h3>Open an ItemSlot.bin <i>(or .slt, untested!)</i></h3>
+            <h3>Open an ItemSlot.bin (.slt also accepted)</h3>
             <div class="grid">
               <input type="file" id="itemSlotFileInput" accept=".bin,.slt" />
-              <div id="itemSlotDropArea" class="panel" style="padding:10px">Drop an <strong>ItemSlot.bin</strong> here.</div>
+              <div id="itemSlotDropArea" class="panel" style="padding:10px">Drop an <strong>ItemSlot.bin</strong> (or <strong>.slt</strong>) here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="itemSlotFileInfo">No file loaded</span>
                 <span class="pill" id="itemSlotTableCount"></span>
@@ -185,7 +184,7 @@
             <h3>Open a DriverIKParam.bin</h3>
             <div class="grid">
               <input type="file" id="driverIkFileInput" accept=".bin" />
-              <div id="driverIkDropArea" class="panel" style="padding:10px">Drop a <strong>DriverIKParam.bin</strong> here.</div>
+              <div id="driverIkDropArea" class="panel" style="padding:10px">Drop a <strong>DriverIKParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="driverIkFileInfo">No file loaded</span>
                 <span class="pill" id="driverIkInfo"></span>
@@ -197,7 +196,7 @@
             <h3>Open a kartAIActionParam.bin</h3>
             <div class="grid">
               <input type="file" id="kartAiFileInput" accept=".bin" />
-              <div id="kartAiDropArea" class="panel" style="padding:10px">Drop a <strong>kartAIActionParam.bin</strong> here.</div>
+              <div id="kartAiDropArea" class="panel" style="padding:10px">Drop a <strong>kartAIActionParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="kartAiFileInfo">No file loaded</span>
                 <span class="pill" id="kartAiInfo"></span>
@@ -209,7 +208,7 @@
             <h3>Open a kartAISpdParam.bin</h3>
             <div class="grid">
               <input type="file" id="kartAiSpdFileInput" accept=".bin" />
-              <div id="kartAiSpdDropArea" class="panel" style="padding:10px">Drop a <strong>kartAISpdParam.bin</strong> here.</div>
+              <div id="kartAiSpdDropArea" class="panel" style="padding:10px">Drop a <strong>kartAISpdParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="kartAiSpdFileInfo">No file loaded</span>
                 <span class="pill" id="kartAiSpdInfo"></span>
@@ -221,7 +220,7 @@
             <h3>Open a kartCameraParam.bin</h3>
             <div class="grid">
               <input type="file" id="kartCamFileInput" accept=".bin" />
-              <div id="kartCamDropArea" class="panel" style="padding:10px">Drop a <strong>kartCameraParam.bin</strong> here.</div>
+              <div id="kartCamDropArea" class="panel" style="padding:10px">Drop a <strong>kartCameraParam.bin</strong> here or use the picker above.</div>
               <div class="toolbar">
                 <span class="pill" id="kartCamFileInfo">No file loaded</span>
                 <span class="pill" id="kartCamInfo"></span>
@@ -299,7 +298,7 @@
                 <div class="row"><label>T2</label><input type="number" step="any" id="f_accT2"></div>
                 <div class="row"><label>T3</label><input type="number" step="any" id="f_accT3"></div>
               </div>
-              <div class="pill">T0 is 0 and T4=A3 (implicit)</div>
+              <div class="pill">T0 is 0; A4=A3 and T4=T3 (implicit)</div>
             </section>
 
             <section class="panel">
@@ -343,7 +342,7 @@
                 <div class="row"><label>Trailing Items Z Distance</label><input type="number" step="any" id="f_itemZDist"></div>
                 <div class="row"><label>Max normal acceleration</label><input type="number" step="any" id="f_maxAccel"></div>
                 <div class="row"><label>Mega Mushroom scale</label><input type="number" step="any" id="f_megaScale"></div>
-                <div class="row"><label>Wheelbase (rear↔front tires)</label><input type="number" step="any" id="f_wheelbase"></div>
+                <div class="row"><label>Vehicle scale when shocked</label><input type="number" step="any" id="f_shockedScale"></div>
               </div>
             </section>
           </div>
@@ -564,7 +563,6 @@
               <div class="row"><label>Vehicles</label><input id="kddp_metaVehicles" type="number" disabled></div>
               <div class="row"><label>Characters</label><input id="kddp_metaChars" type="number" disabled></div>
               <div class="row"><label>Header bytes</label><input id="kddp_metaHeader" type="number" disabled></div>
-              <div class="row"><label>Unknown @0x00</label><input id="kddp_metaUnknown0" type="number" disabled></div>
             </div>
           </section>
         </div>
@@ -879,6 +877,17 @@
     const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
     const byId = (id) => document.getElementById(id);
     const hex2 = (n)=> '0x'+Number(n).toString(16).padStart(2,'0').toUpperCase();
+    function u8ToBase64(u8){
+      let s = '';
+      for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+      return btoa(s);
+    }
+    function base64ToU8(b64){
+      const s = atob(String(b64 || ''));
+      const out = new Uint8Array(s.length);
+      for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+      return out;
+    }
 
     // ===== Endian helpers =====
     const u32 = (dv,o)=>dv.getUint32(o,false), i32=(dv,o)=>dv.getInt32(o,false), f32=(dv,o)=>dv.getFloat32(o,false);
@@ -946,22 +955,26 @@ const TRACK_CODE_NUM = [
     ];
     const BIKE_IDENT = VEH_IDENT.slice(18);
     const CHAR_IDENT = [
-      {desc:'Mario', code:'ma'}, {desc:'Baby Peach', code:'bp'}, {desc:'Waluigi', code:'wlg'}, {desc:'Bowser', code:'kpa'},
-      {desc:'Baby Daisy', code:'bd'}, {desc:'Dry Bones', code:'ka'}, {desc:'Bowser Jr.', code:'kpajr'}, {desc:'Daisy', code:'ds'},
-      {desc:'Yoshi', code:'yo'}, {desc:'Luigi', code:'lg'}, {desc:'Toad', code:'kno'}, {desc:'Donkey Kong', code:'dk'},
-      {desc:'Wario', code:'wr'}, {desc:'Baby Mario', code:'bm'}, {desc:'Koopa Troopa', code:'nk'}, {desc:'Toadette', code:'kne'},
-      {desc:'King Boo', code:'bkb'}, {desc:'Baby Luigi', code:'bl'}, {desc:'Birdo', code:'ca'}, {desc:'Diddy Kong', code:'dd'},
-      {desc:'Funky Kong', code:'fk'}, {desc:'Peach', code:'pc'}, {desc:'Rosalina', code:'rs'}, {desc:'Dry Bowser', code:'bka'},
-      {desc:'Mii Outfit A (S)', code:'mii_a_s'}, {desc:'Mii Outfit A (M)', code:'mii_a_m'}, {desc:'Mii Outfit A (L)', code:'mii_a_l'},
-      {desc:'Mii Outfit B (S)', code:'mii_b_s'}, {desc:'Mii Outfit B (M)', code:'mii_b_m'}, {desc:'Mii Outfit B (L)', code:'mii_b_l'},
-      {desc:'Mii Outfit C (S)', code:'mii_c_s'}, {desc:'Mii Outfit C (M)', code:'mii_c_m'}, {desc:'Mii Outfit C (L)', code:'mii_c_l'},
-      // The following are placeholders as the game has 48 slots but only 36 are used by default
-      {desc:'(Unused)', code:'unused_36'},{desc:'(Unused)', code:'unused_37'},{desc:'(Unused)', code:'unused_38'},
-      {desc:'(Unused)', code:'unused_39'},{desc:'(Unused)', code:'unused_40'},{desc:'(Unused)', code:'unused_41'},
-      {desc:'(Unused)', code:'unused_42'},{desc:'(Unused)', code:'unused_43'},{desc:'(Unused)', code:'unused_44'},
-      {desc:'(Unused)', code:'unused_45'},{desc:'(Unused)', code:'unused_46'},{desc:'(Unused)', code:'unused_47'},
+      {desc:'Mario', code:'mr'}, {desc:'Baby Peach', code:'bpc'}, {desc:'Waluigi', code:'wl'}, {desc:'Bowser', code:'kp'},
+      {desc:'Baby Daisy', code:'bds'}, {desc:'Dry Bones', code:'ka'}, {desc:'Baby Mario', code:'bmr'}, {desc:'Luigi', code:'lg'},
+      {desc:'Toad', code:'ko'}, {desc:'Donkey Kong', code:'dk'}, {desc:'Yoshi', code:'ys'}, {desc:'Wario', code:'wr'},
+      {desc:'Baby Luigi', code:'blg'}, {desc:'Toadette', code:'kk'}, {desc:'Koopa Troopa', code:'nk'}, {desc:'Daisy', code:'ds'},
+      {desc:'Peach', code:'pc'}, {desc:'Birdo', code:'ca'}, {desc:'Diddy Kong', code:'dd'}, {desc:'King Boo', code:'kt'},
+      {desc:'Bowser Jr.', code:'jr'}, {desc:'Dry Bowser', code:'bk'}, {desc:'Funky Kong', code:'fk'}, {desc:'Rosalina', code:'rs'},
+      {desc:'Small Mii Outfit A (Male)', code:'sa_mii_m'}, {desc:'Small Mii Outfit A (Female)', code:'sa_mii_f'},
+      {desc:'Small Mii Outfit B (Male)', code:'sb_mii_m'}, {desc:'Small Mii Outfit B (Female)', code:'sb_mii_f'},
+      {desc:'Small Mii Outfit C (Male)', code:'sc_mii_m'}, {desc:'Small Mii Outfit C (Female)', code:'sc_mii_f'},
+      {desc:'Medium Mii Outfit A (Male)', code:'ma_mii_m'}, {desc:'Medium Mii Outfit A (Female)', code:'ma_mii_f'},
+      {desc:'Medium Mii Outfit B (Male)', code:'mb_mii_m'}, {desc:'Medium Mii Outfit B (Female)', code:'mb_mii_f'},
+      {desc:'Medium Mii Outfit C (Male)', code:'mc_mii_m'}, {desc:'Medium Mii Outfit C (Female)', code:'mc_mii_f'},
+      {desc:'Large Mii Outfit A (Male)', code:'la_mii_m'}, {desc:'Large Mii Outfit A (Female)', code:'la_mii_f'},
+      {desc:'Large Mii Outfit B (Male)', code:'lb_mii_m'}, {desc:'Large Mii Outfit B (Female)', code:'lb_mii_f'},
+      {desc:'Large Mii Outfit C (Male)', code:'lc_mii_m'}, {desc:'Large Mii Outfit C (Female)', code:'lc_mii_f'},
+      {desc:'Medium Mii', code:'m_mii'}, {desc:'Small Mii', code:'s_mii'}, {desc:'Large Mii', code:'l_mii'},
+      {desc:'Peach (Character/Vehicle Selection)', code:'pc_menu'},
+      {desc:'Daisy (Character/Vehicle Selection)', code:'ds_menu'},
+      {desc:'Rosalina (Character/Vehicle Selection)', code:'rs_menu'},
     ];
-
     // ===== State =====
     const state = {
       miiFileBuf:null, miiFilename:null, miiModel:null, currentMiiIndex:0, miiDirty:false,
@@ -1003,6 +1016,7 @@ const TRACK_CODE_NUM = [
     const setKartPartsEnabled = (en)=> {$('.tab-btn[data-tab="kartparts"]').disabled = !en;};
     const setMiiEnabled = (en)=> {$('.tab-btn[data-tab="mii"]').disabled = !en;};
     const setDriverDispEnabled = (en)=> {$('.tab-btn[data-tab="driverdisp"]').disabled = !en;};
+    const setKartDriverDispEnabled = (en)=> {$('.tab-btn[data-tab="kartdriverdisp"]').disabled = !en;};
     const setItemSlotEnabled = (en)=> {$('.tab-btn[data-tab="itemslot"]').disabled = !en;};
     const setDriverIkEnabled = (en)=> {$('.tab-btn[data-tab="driverik"]').disabled = !en;};
     const setKartAiEnabled = (en)=> {$('.tab-btn[data-tab="kartai"]').disabled = !en;};
@@ -1023,7 +1037,7 @@ const TRACK_CODE_NUM = [
       v.kclSpeed=Array.from({length:32},(_,i)=> f32(dv,base+0x70+i*4));
       v.kclRot=Array.from({length:32},(_,i)=> f32(dv,base+0xF0+i*4));
       v.itemZRadius=f32(dv,base+0x170); v.itemXRadius=f32(dv,base+0x174); v.itemYDist=f32(dv,base+0x178);
-      v.itemZDist=f32(dv,base+0x17C); v.maxAccel=f32(dv,base+0x180); v.megaScale=f32(dv,base+0x184); v.wheelbase=f32(dv,base+0x188);
+      v.itemZDist=f32(dv,base+0x17C); v.maxAccel=f32(dv,base+0x180); v.megaScale=f32(dv,base+0x184); v.shockedScale=f32(dv,base+0x188);
       return v;
     }
     function writeKartSection(dv,base,v){
@@ -1038,7 +1052,7 @@ const TRACK_CODE_NUM = [
       for(let i=0;i<32;i++) wF32(dv,base+0x70+i*4,+v.kclSpeed[i]);
       for(let i=0;i<32;i++) wF32(dv,base+0xF0+i*4,+v.kclRot[i]);
       wF32(dv,base+0x170,+v.itemZRadius); wF32(dv,base+0x174,+v.itemXRadius); wF32(dv,base+0x178,+v.itemYDist);
-      wF32(dv,base+0x17C,+v.itemZDist); wF32(dv,base+0x180,+v.maxAccel); wF32(dv,base+0x184,+v.megaScale); wF32(dv,base+0x188,+v.wheelbase);
+      wF32(dv,base+0x17C,+v.itemZDist); wF32(dv,base+0x180,+v.maxAccel); wF32(dv,base+0x184,+v.megaScale); wF32(dv,base+0x188,+(v.shockedScale ?? v.wheelbase));
     }
     function readBikePartsSection(dv, base) {
       const v = {};
@@ -1087,30 +1101,20 @@ wF32(dv, base + 0x0C, +v.coinZ);
 }
 
     
-    // ===== kartDriverDispParam (vehicles x characters, 56-byte entries) =====
+    // ===== kartDriverDispParam (8-byte header, vehicles x characters, 56-byte entries) =====
     function parseKartDriverDispParam(buf) {
       const dv = new DataView(buf);
       const size = buf.byteLength;
-
-      const h0 = i32(dv, 0);
-      const h4 = i32(dv, 4);
-      const h8 = i32(dv, 8);
-
+      if (size < 8) throw new Error('File too small');
       const entrySize = 56;
-
-      const aOk = (size - 8) >= 0 && (size - 8) % entrySize === 0 && (8 + entrySize * (h0|0) * (h4|0) === size);
-      const bOk = (size - 12) >= 0 && (size - 12) % entrySize === 0 && (12 + entrySize * (h4|0) * (h8|0) === size);
-
-      let headerBytes, vehicles, chars, unknown0 = 0, off;
-
-      if (aOk && !bOk) { headerBytes = 8; vehicles = h0|0; chars = h4|0; off = 8; }
-      else if (bOk && !aOk) { headerBytes = 12; unknown0 = h0|0; vehicles = h4|0; chars = h8|0; off = 12; }
-      else if (bOk && aOk) { headerBytes = 8; vehicles = h0|0; chars = h4|0; off = 8; unknown0 = 0; }
-      else {
-        headerBytes = 12; vehicles = Math.max(1, h4|0); chars = Math.max(1, h8|0); unknown0 = h0|0; off = 12;
-        const expected = headerBytes + entrySize * vehicles * chars;
-        if (expected !== size) throw new Error(`Size mismatch: expected ${expected}, got ${size}`);
-      }
+      const vehicles = i32(dv, 0) | 0;
+      const chars = i32(dv, 4) | 0;
+      if (vehicles < 1) throw new Error(`Invalid vehicle count: ${vehicles}`);
+      if (chars < 1) throw new Error(`Invalid character count: ${chars}`);
+      const headerBytes = 8;
+      const off = 8;
+      const expected = headerBytes + entrySize * vehicles * chars;
+      if (expected !== size) throw new Error(`Size mismatch: expected ${expected}, got ${size}`);
 
       const entries = [];
       for (let v = 0; v < vehicles; v++) {
@@ -1125,25 +1129,19 @@ wF32(dv, base + 0x0C, +v.coinZ);
         }
         entries.push(row);
       }
-      return { headerBytes, unknown0, vehicles, chars, entries };
+      return { vehicles, chars, entries };
     }
 
     function serializeKartDriverDispParam(model) {
       const vehicles = model.vehicles|0;
       const chars = model.chars|0;
-      const headerBytes = model.headerBytes === 12 ? 12 : 8;
+      const headerBytes = 8;
       const entrySize = 56;
       const buf = new ArrayBuffer(headerBytes + entrySize * vehicles * chars);
       const dv = new DataView(buf);
 
-      if (headerBytes === 8) {
-        wI32(dv, 0, vehicles);
-        wI32(dv, 4, chars);
-      } else {
-        wI32(dv, 0, model.unknown0);
-        wI32(dv, 4, vehicles);
-        wI32(dv, 8, chars);
-      }
+      wI32(dv, 0, vehicles);
+      wI32(dv, 4, chars);
 
       let off = headerBytes;
       for (let v = 0; v < vehicles; v++) {
@@ -1174,7 +1172,7 @@ wF32(dv, base + 0x0C, +v.coinZ);
     }
     function parseBikePartsParam(buf){
 const dv = new DataView(buf);
-const n = u32(dv, 0);
+const n = i32(dv, 0);
 const expected = 4 + n * BIKE_PARTS_SECTION_SIZE;
 if (buf.byteLength !== expected) {
   throw new Error(`Size mismatch: expected ${expected}, got ${buf.byteLength}`);
@@ -1198,7 +1196,7 @@ return { count: n, bikes };
 const n = (model && model.bikes ? model.bikes.length : 0) | 0;
 const buf = new ArrayBuffer(4 + n * BIKE_PARTS_SECTION_SIZE);
 const dv = new DataView(buf);
-wU32(dv, 0, n);
+wI32(dv, 0, n);
 let off = 4;
 for (let i = 0; i < n; i++) {
   const section = new Uint8Array(buf, off, BIKE_PARTS_SECTION_SIZE);
@@ -1214,9 +1212,9 @@ for (let i = 0; i < n; i++) {
 }
 return buf;
 }
-    function parseDriverDispParam(buf){
+function parseDriverDispParam(buf){
 const dv = new DataView(buf);
-const n = u32(dv, 0);
+const n = i32(dv, 0);
 const expected = 4 + n * DRIVER_DISP_SECTION_SIZE;
 if (buf.byteLength !== expected) {
   throw new Error(`Size mismatch: expected ${expected}, got ${buf.byteLength}`);
@@ -1235,11 +1233,11 @@ for (let i = 0; i < n; i++) {
 try { Object.defineProperty(drivers, "_rawFile", { value: new Uint8Array(buf), enumerable: false, writable: true }); } catch {}
 return { count: n, drivers };
 }
-    function serializeDriverDispParam(model){
+function serializeDriverDispParam(model){
 const n = (model && model.drivers ? model.drivers.length : 0) | 0;
 const buf = new ArrayBuffer(4 + n * DRIVER_DISP_SECTION_SIZE);
 const dv = new DataView(buf);
-wU32(dv, 0, n);
+wI32(dv, 0, n);
 let off = 4;
 for (let i = 0; i < n; i++) {
   const pre = model.drivers[i] && model.drivers[i]._prefix8;
@@ -1274,11 +1272,25 @@ return buf;
         }
         tables.push({ cols, rows, data });
       }
-      const trailingBytes = buf.byteLength - offset; if (trailingBytes !== 0) console.warn(`Parsed ${offset} bytes, but file is ${buf.byteLength} bytes. Trailing data exists.`); return { tableCount, tables, trailingBytes: Math.max(0, trailingBytes) };
+      const trailingBytes = buf.byteLength - offset;
+      if (trailingBytes !== 0) console.warn(`Parsed ${offset} bytes, but file is ${buf.byteLength} bytes. Trailing data exists.`);
+      const model = { tableCount, tables, trailingBytes: Math.max(0, trailingBytes) };
+      if (trailingBytes > 0) {
+        try {
+          Object.defineProperty(model, "_trailing", {
+            value: new Uint8Array(buf.slice(offset)),
+            enumerable: false,
+            writable: true
+          });
+        } catch {}
+      }
+      return model;
     }
     function serializeItemSlot(model) {
+      const trailing = (model && model._trailing && model._trailing.length) ? model._trailing : null;
       let totalSize = 1;
       model.tables.forEach(t => { totalSize += 2 + t.cols * t.rows; });
+      if (trailing) totalSize += trailing.length;
       const buf = new ArrayBuffer(totalSize);
       const dv = new DataView(buf);
       dv.setUint8(0, model.tables.length);
@@ -1294,13 +1306,16 @@ return buf;
           }
         }
       });
+      if (trailing) {
+        new Uint8Array(buf, offset, trailing.length).set(trailing);
+      }
       return buf;
     }
     function parseDriverIkParam(buf) {
       const dv = new DataView(buf);
-      const entriesPerCombo = u32(dv, 0);
-      const vehicleCount = u32(dv, 4);
-      const charCount = u32(dv, 8);
+      const entriesPerCombo = i32(dv, 0);
+      const vehicleCount = i32(dv, 4);
+      const charCount = i32(dv, 8);
 
       const expectedSize = 12 + 256 + (entriesPerCombo * vehicleCount * charCount);
       if (buf.byteLength !== expectedSize) {
@@ -1331,9 +1346,9 @@ return buf;
       const buf = new ArrayBuffer(bufSize);
       const dv = new DataView(buf);
 
-      wU32(dv, 0, entriesPerCombo);
-      wU32(dv, 4, vehicleCount);
-      wU32(dv, 8, charCount);
+      wI32(dv, 0, entriesPerCombo);
+      wI32(dv, 4, vehicleCount);
+      wI32(dv, 8, charCount);
 
       for (let i = 0; i < 64; i++) {
         wF32(dv, 12 + i * 4, globalParams[i]);
@@ -1507,7 +1522,7 @@ return buf;
       set('f_driftTightM',v.driftTightM); set('f_driftTightA',v.driftTightA); set('f_driftReact',v.driftReact);
       set('f_outsideAngle',v.outsideAngle); set('f_outsideDec',v.outsideDec); set('f_mtFrames',v.mtFrames);
       set('f_itemZRadius',v.itemZRadius); set('f_itemXRadius',v.itemXRadius); set('f_itemYDist',v.itemYDist); set('f_itemZDist',v.itemZDist);
-      set('f_maxAccel',v.maxAccel); set('f_megaScale',v.megaScale); set('f_wheelbase',v.wheelbase);
+      set('f_maxAccel',v.maxAccel); set('f_megaScale',v.megaScale); set('f_shockedScale',v.shockedScale ?? v.wheelbase);
       buildKclTable('kclSpeedTable', v.kclSpeed, (i,val)=>{v.kclSpeed[i]=val; state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits';});
       buildKclTable('kclRotTable', v.kclRot, (i,val)=>{v.kclRot[i]=val; state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits';});
     }
@@ -1520,7 +1535,7 @@ return buf;
         f_handTightM:['handTightM','f'], f_handTightA:['handTightA','f'], f_handReact:['handReact','f'],
         f_driftTightM:['driftTightM','f'], f_driftTightA:['driftTightA','f'], f_driftReact:['driftReact','f'],
         f_outsideAngle:['outsideAngle','f'], f_outsideDec:['outsideDec','f'], f_mtFrames:['mtFrames','i'],
-        f_itemZRadius:['itemZRadius','f'], f_itemXRadius:['itemXRadius','f'], f_itemYDist:['itemYDist','f'], f_itemZDist:['itemZDist','f'], f_maxAccel:['maxAccel','f'], f_megaScale:['megaScale','f'], f_wheelbase:['wheelbase','f'],
+        f_itemZRadius:['itemZRadius','f'], f_itemXRadius:['itemXRadius','f'], f_itemYDist:['itemYDist','f'], f_itemZDist:['itemZDist','f'], f_maxAccel:['maxAccel','f'], f_megaScale:['megaScale','f'], f_shockedScale:['shockedScale','f'],
       };
       Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.model.vehicles[state.currentIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.dirty=true; byId('dirtyFlag').textContent='Unsaved edits'; });});
       byId('prevVeh').addEventListener('click',()=>{state.currentIndex=Math.max(0,state.currentIndex-1); renderEditor();});
@@ -1529,15 +1544,48 @@ return buf;
       byId('exportBin').addEventListener('click',()=>{ const out=serializeKartParam(state.model); const name=(state.filename?.replace(/\.bin$/i,'')||'kartParam')+'-edited.bin'; downloadBlob(out, name);
 byId('status').textContent='Exported '+name; state.dirty=false; byId('dirtyFlag').textContent='No edits'; });
       byId('exportJson').addEventListener('click',()=>{ const json=JSON.stringify({format:'kartParam',version:1,model:state.model},null,2); const name=(state.filename?.replace(/\.bin$/i,'')||'kartParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); });
-      byId('importJsonInput').addEventListener('change',e=>{ const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ try{ const j=JSON.parse(t); if(j.format!=='kartParam') throw new Error('Wrong format'); state.model=j.model; renderEditor(); byId('status').textContent='Imported JSON'; state.dirty=true; }catch(err){ alert('JSON import failed: '+err.message);} }); });
     }
     function renderEditor(){ renderVehList(); renderVehMeta(); byId('vehIndex').value=String(state.currentIndex); fillKartInputs(); }
 
     // ===== Render (driver) =====
-    function renderCharList(){ const list=byId('charList'); list.innerHTML=''; state.driverModel.drivers.forEach((_,i)=>{ const b=document.createElement('button'); const info=CHAR_IDENT[i]; b.textContent=info? `${hex2(i)} ${info.desc}`:`${hex2(i)} Driver ${i}`; if(info) b.title=info.code; if(i===state.currentCharIndex) b.classList.add('active'); b.addEventListener('click',()=>{state.currentCharIndex=i; renderDriverEditor();}); list.appendChild(b); }); }
-    function renderCharMeta(){ const idx=state.currentCharIndex; const info=CHAR_IDENT[idx]; const name=info?info.desc:`Driver ${idx}`; const code=info?info.code:'n/a'; byId('charMeta').textContent=`${hex2(idx)} ${name} • ${code}`; }
+    // Display order only; underlying data index mapping remains unchanged.
+    const DRIVER_PARAM_DISPLAY_ORDER = [
+      6, 12, 1, 4, 8, 13, 14, 5, 24,
+      0, 7, 16, 15, 10, 17, 18, 20, 25,
+      11, 2, 9, 3, 19, 23, 22, 21, 26,
+    ];
+    function getDriverParamDisplayOrder(n){
+      const order = DRIVER_PARAM_DISPLAY_ORDER.filter(i => i >= 0 && i < n);
+      const used = new Set(order);
+      for (let i = 0; i < n; i++) if (!used.has(i)) order.push(i);
+      return order;
+    }
+    function getDriverParamLabelInfo(i){
+      const info = CHAR_IDENT[i];
+      if (!info) return null;
+      if (i === 24) return { desc: 'Small Mii', code: info.code };
+      if (i === 25) return { desc: 'Medium Mii', code: info.code };
+      if (i === 26) return { desc: 'Large Mii', code: info.code };
+      return info;
+    }
+    function renderCharList(){
+      const list=byId('charList');
+      list.innerHTML='';
+      const n = state.driverModel.drivers.length;
+      const order = getDriverParamDisplayOrder(n);
+      order.forEach(i=>{
+        const b=document.createElement('button');
+        const info=getDriverParamLabelInfo(i);
+        b.textContent=info? `${hex2(i)} ${info.desc}`:`${hex2(i)} Driver ${i}`;
+        if(info) b.title=info.code;
+        if(i===state.currentCharIndex) b.classList.add('active');
+        b.addEventListener('click',()=>{state.currentCharIndex=i; renderDriverEditor();});
+        list.appendChild(b);
+      });
+    }
+    function renderCharMeta(){ const idx=state.currentCharIndex; const info=getDriverParamLabelInfo(idx); const name=info?info.desc:`Driver ${idx}`; const code=info?info.code:'n/a'; byId('charMeta').textContent=`${hex2(idx)} ${name} • ${code}`; }
     function fillDriverInputs(){ const v=state.driverModel.drivers[state.currentCharIndex]; const set=(id,val)=>{const el=byId(id); if(el) el.value=String(val)}; set('df_weight',v.weight); set('df_speed',v.speed); set('df_speedTurn',v.speedTurn); set('df_mtFrames',v.mtFrames); set('df_accA0',v.accA0); set('df_accA1',v.accA1); set('df_accA2',v.accA2); set('df_accA3',v.accA3); set('df_accT1',v.accT1); set('df_accT2',v.accT2); set('df_accT3',v.accT3); set('df_handTightM',v.handTightM); set('df_handTightA',v.handTightA); set('df_handReact',v.handReact); set('df_driftTightM',v.driftTightM); set('df_driftTightA',v.driftTightA); set('df_driftReact',v.driftReact); buildKclTable('charKclSpeedTable', v.kclSpeed, (i,val)=>{v.kclSpeed[i]=val; state.driverDirty=true; byId('charDirty').textContent='Unsaved edits';}); buildKclTable('charKclRotTable', v.kclRot, (i,val)=>{v.kclRot[i]=val; state.driverDirty=true; byId('charDirty').textContent='Unsaved edits';}); }
-    function bindDriverInputs(){ const map={ df_weight:['weight','f'], df_speed:['speed','f'], df_speedTurn:['speedTurn','f'], df_mtFrames:['mtFrames','i'], df_accA0:['accA0','f'], df_accA1:['accA1','f'], df_accA2:['accA2','f'], df_accA3:['accA3','f'], df_accT1:['accT1','f'], df_accT2:['accT2','f'], df_accT3:['accT3','f'], df_handTightM:['handTightM','f'], df_handTightA:['handTightA','f'], df_handReact:['handReact','f'], df_driftTightM:['driftTightM','f'], df_driftTightA:['driftTightA','f'], df_driftReact:['driftReact','f'] }; Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.driverModel.drivers[state.currentCharIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.driverDirty=true; byId('charDirty').textContent='Unsaved edits'; });}); byId('prevChar').addEventListener('click',()=>{state.currentCharIndex=Math.max(0,state.currentCharIndex-1); renderDriverEditor();}); byId('nextChar').addEventListener('click',()=>{state.currentCharIndex=Math.min(state.driverModel.drivers.length-1,state.currentCharIndex+1); renderDriverEditor();}); byId('charIndex').addEventListener('change',()=>{ const i=Math.max(0,Math.min(state.driverModel.drivers.length-1, parseInt(byId('charIndex').value||'0',10))); state.currentCharIndex=i; renderDriverEditor(); }); byId('exportDriverBin').addEventListener('click',()=>{ const out=serializeDriverParam(state.driverModel); const name=(state.driverFilename?.replace(/\.bin$/i,'')||'driverParam')+'-edited.bin'; downloadBlob(out, name);
+    function bindDriverInputs(){ const map={ df_weight:['weight','f'], df_speed:['speed','f'], df_speedTurn:['speedTurn','f'], df_mtFrames:['mtFrames','i'], df_accA0:['accA0','f'], df_accA1:['accA1','f'], df_accA2:['accA2','f'], df_accA3:['accA3','f'], df_accT1:['accT1','f'], df_accT2:['accT2','f'], df_accT3:['accT3','f'], df_handTightM:['handTightM','f'], df_handTightA:['handTightA','f'], df_handReact:['handReact','f'], df_driftTightM:['driftTightM','f'], df_driftTightA:['driftTightA','f'], df_driftReact:['driftReact','f'] }; Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.driverModel.drivers[state.currentCharIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.driverDirty=true; byId('charDirty').textContent='Unsaved edits'; });}); const stepDriver=(dir)=>{ const n=state.driverModel.drivers.length; const order=getDriverParamDisplayOrder(n); const pos=order.indexOf(state.currentCharIndex); if(pos===-1){ state.currentCharIndex=Math.max(0,Math.min(n-1,state.currentCharIndex+dir)); } else { const nextPos=Math.max(0,Math.min(order.length-1,pos+dir)); state.currentCharIndex=order[nextPos]; } renderDriverEditor(); }; byId('prevChar').addEventListener('click',()=>{stepDriver(-1);}); byId('nextChar').addEventListener('click',()=>{stepDriver(1);}); byId('charIndex').addEventListener('change',()=>{ const i=Math.max(0,Math.min(state.driverModel.drivers.length-1, parseInt(byId('charIndex').value||'0',10))); state.currentCharIndex=i; renderDriverEditor(); }); byId('exportDriverBin').addEventListener('click',()=>{ const out=serializeDriverParam(state.driverModel); const name=(state.driverFilename?.replace(/\.bin$/i,'')||'driverParam')+'-edited.bin'; downloadBlob(out, name);
 byId('driverStatus').textContent='Exported '+name; state.driverDirty=false; byId('charDirty').textContent='No edits'; }); byId('exportDriverJson').addEventListener('click',()=>{ const json=JSON.stringify({format:'driverParam',version:1,model:state.driverModel},null,2); const name=(state.driverFilename?.replace(/\.bin$/i,'')||'driverParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); });
     }
     function renderDriverEditor(){ renderCharList(); renderCharMeta(); byId('charIndex').value=String(state.currentCharIndex); fillDriverInputs(); }
@@ -1548,8 +1596,7 @@ byId('driverStatus').textContent='Exported '+name; state.driverDirty=false; byId
     function fillBikeInputs(){ const v=state.bikeModel.bikes[state.currentBikeIndex]; const set=(id,val)=>{const el=byId(id); if(el) el.value=String(val)}; set('bp_camDist',v.camDist); set('bp_tireFwd',v.tireFwd); set('bp_tireBwd',v.tireBwd); set('bp_handleX',v.handleX); set('bp_handleY',v.handleY); set('bp_handleZ',v.handleZ); set('bp_handleRotX',v.handleRotX); set('bp_handleRotY',v.handleRotY); set('bp_handleRotZ',v.handleRotZ); set('bp_exh1Num',v.exh1Num); set('bp_exh1X',v.exh1X); set('bp_exh1Y',v.exh1Y); set('bp_exh1Z',v.exh1Z); set('bp_exh1RotX',v.exh1RotX); set('bp_exh1RotY',v.exh1RotY); set('bp_exh2Num',v.exh2Num); set('bp_exh2X',v.exh2X); set('bp_exh2Y',v.exh2Y); set('bp_exh2Z',v.exh2Z); set('bp_exh2RotX',v.exh2RotX); set('bp_exh2RotY',v.exh2RotY); set('bp_iceSizeX',v.iceSizeX); set('bp_iceSizeY',v.iceSizeY); set('bp_iceSizeZ',v.iceSizeZ); set('bp_icePosX',v.icePosX); set('bp_icePosY',v.icePosY); set('bp_icePosZ',v.icePosZ); set('bp_balloonsY',v.balloonsY); set('bp_balloonsZ',v.balloonsZ); }
     function bindBikeInputs(){ const map={ bp_camDist:['camDist','f'], bp_tireFwd:['tireFwd','f'], bp_tireBwd:['tireBwd','f'], bp_handleX:['handleX','f'], bp_handleY:['handleY','f'], bp_handleZ:['handleZ','f'], bp_handleRotX:['handleRotX','f'], bp_handleRotY:['handleRotY','f'], bp_handleRotZ:['handleRotZ','f'], bp_exh1Num:['exh1Num','i'], bp_exh1X:['exh1X','f'], bp_exh1Y:['exh1Y','f'], bp_exh1Z:['exh1Z','f'], bp_exh1RotX:['exh1RotX','f'], bp_exh1RotY:['exh1RotY','f'], bp_exh2Num:['exh2Num','i'], bp_exh2X:['exh2X','f'], bp_exh2Y:['exh2Y','f'], bp_exh2Z:['exh2Z','f'], bp_exh2RotX:['exh2RotX','f'], bp_exh2RotY:['exh2RotY','f'], bp_iceSizeX:['iceSizeX','f'], bp_iceSizeY:['iceSizeY','f'], bp_iceSizeZ:['iceSizeZ','f'], bp_icePosX:['icePosX','f'], bp_icePosY:['icePosY','f'], bp_icePosZ:['icePosZ','f'], bp_balloonsY:['balloonsY','f'], bp_balloonsZ:['balloonsZ','f'], }; Object.entries(map).forEach(([id,[key,t]])=>{ const el=byId(id); if(!el) return; el.addEventListener('input',()=>{ const v=state.bikeModel.bikes[state.currentBikeIndex]; v[key]= t==='i'? parseInt(el.value||'0',10): parseFloat(el.value||'0'); state.bikeDirty=true; byId('bikeDirty').textContent='Unsaved edits'; });}); byId('prevBike').addEventListener('click',()=>{state.currentBikeIndex=Math.max(0,state.currentBikeIndex-1); renderBikeEditor();}); byId('nextBike').addEventListener('click',()=>{state.currentBikeIndex=Math.min(state.bikeModel.bikes.length-1,state.currentBikeIndex+1); renderBikeEditor();}); byId('bikeIndex').addEventListener('change',()=>{ const i=Math.max(0,Math.min(state.bikeModel.bikes.length-1, parseInt(byId('bikeIndex').value||'0',10))); state.currentBikeIndex=i; renderBikeEditor(); }); byId('exportBikeBin').addEventListener('click',()=>{ const out=serializeBikePartsParam(state.bikeModel); const name=(state.bikeFilename?.replace(/\.bin$/i,'')||'bikePartsDispParam')+'-edited.bin'; downloadBlob(out, name);
 byId('bikeStatus').textContent='Exported '+name; state.bikeDirty=false; byId('bikeDirty').textContent='No edits'; });
-      byId('exportBikeJson').addEventListener('click',()=>{ const json=JSON.stringify({format:'bikePartsDispParam',version:1,model:state.bikeModel},null,2); const name=(state.bikeFilename?.replace(/\.bin$/i,'')||'bikePartsDispParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); });
-      byId('importBikeJsonInput').addEventListener('change',e=>{ const f=e.target.files?.[0]; if(!f) return; f.text().then(t=>{ try{ const j=JSON.parse(t); if(j.format!=='bikePartsDispParam') throw new Error('Wrong format'); state.bikeModel=j.model; renderBikeEditor(); byId('bikeStatus').textContent='Imported JSON'; state.bikeDirty=true; }catch(err){ alert('JSON import failed: '+err.message);} }); });
+      byId('exportBikeJson').addEventListener('click',()=>{ const model=state.bikeModel||{count:0,bikes:[]}; const bikes=(model.bikes||[]); const outModel={ count: bikes.length|0, bikes: bikes.map(b=>{ const o={...b}; if(b&&b._raw&&b._raw.length===BIKE_PARTS_SECTION_SIZE) o._rawB64=u8ToBase64(b._raw); return o; }) }; const json=JSON.stringify({format:'bikePartsDispParam',version:1,model:outModel},null,2); const name=(state.bikeFilename?.replace(/\.bin$/i,'')||'bikePartsDispParam')+'.json'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([json],{type:'application/json'})); a.download=name; a.click(); });
     }
     function renderBikeEditor(){ renderBikeList(); renderBikeMeta(); byId('bikeIndex').value=String(state.currentBikeIndex); fillBikeInputs(); }
 
@@ -1951,11 +1998,20 @@ byId('kartAiStatus').textContent = 'Exported ' + name;
             const j = JSON.parse(t);
             if (j.format !== 'kartAiActionParam') throw new Error('Wrong format');
             state.kartAiModel = j.model;
+            state.kartAiFileBuf = null;
+            state.kartAiFilename = 'kartAIActionParam';
             state.currentKartAiDifficulty = 0;
             state.currentKartAiPlayer = 0;
-            renderKartAiEditor();
-            byId('kartAiStatus').textContent = 'Imported JSON';
             state.kartAiDirty = true;
+            renderKartAiEditor();
+            const diffCount = Array.isArray(state.kartAiModel?.difficulties) ? state.kartAiModel.difficulties.length : 0;
+            const playerCount = (diffCount > 0 && Array.isArray(state.kartAiModel.difficulties[0])) ? state.kartAiModel.difficulties[0].length : 0;
+            byId('kartAiFileInfo').textContent = 'Imported JSON';
+            byId('kartAiInfo').textContent = `${diffCount} difficulties, ${playerCount} players`;
+            byId('kartAiByteSize').textContent = 'n/a (JSON)';
+            byId('kartAiValidation').textContent = '✓ Parsed JSON';
+            byId('kartAiStatus').textContent = 'Imported JSON';
+            byId('kartAiDirty').textContent = 'Unsaved edits';
           } catch (err) {
             alert('JSON import failed: ' + err.message);
           }
@@ -2080,12 +2136,20 @@ byId('kartAiSpdStatus').textContent = 'Exported ' + name;
             const j = JSON.parse(t);
             if (j.format !== 'kartAiSpdParam') throw new Error('Wrong format');
             state.kartAiSpdModel = j.model;
+            state.kartAiSpdFileBuf = null;
+            state.kartAiSpdFilename = 'kartAISpdParam';
             state.currentKartAiSpdSection = 0;
             state.currentKartAiSpdTrack = 0;
             state.currentKartAiSpdMode = 0;
-            renderKartAiSpdEditor();
-            byId('kartAiSpdStatus').textContent = 'Imported JSON';
             state.kartAiSpdDirty = true;
+            renderKartAiSpdEditor();
+            const entryCount = Array.isArray(state.kartAiSpdModel?.entries) ? state.kartAiSpdModel.entries.length : 0;
+            byId('kartAiSpdFileInfo').textContent = 'Imported JSON';
+            byId('kartAiSpdInfo').textContent = `${entryCount} entries`;
+            byId('kartAiSpdByteSize').textContent = 'n/a (JSON)';
+            byId('kartAiSpdValidation').textContent = '✓ Parsed JSON';
+            byId('kartAiSpdStatus').textContent = 'Imported JSON';
+            byId('kartAiSpdDirty').textContent = 'Unsaved edits';
           } catch (err) {
             alert('JSON import failed: ' + err.message);
           }
@@ -2172,33 +2236,247 @@ byId('kartCamStatus').textContent = 'Exported ' + name;
     }
 
     // ===== File loading & drag/drop =====
-    function onKartLoaded(buf, name){ try{ const model=parseKartParam(buf); state.fileBuf=buf; state.filename=name; state.model=model; state.currentIndex=0; setKartEnabled(true); /* showTab('kart'); */ renderEditor(); byId('fileInfo').textContent=name; byId('vehCount').textContent=model.count+' vehicles'; byId('byteSize').textContent=buf.byteLength+' bytes'; byId('validation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('validation').textContent='✖ '+err.message; alert('Failed to parse kartParam: '+err.message);} }
-    function onDriverLoaded(buf, name){ try{ const model=parseDriverParam(buf); state.driverFileBuf=buf; state.driverFilename=name; state.driverModel=model; state.currentCharIndex=0; setDriverEnabled(true); /* showTab('driver'); */ renderDriverEditor(); byId('charFileInfo').textContent=name; byId('charCount').textContent=model.count+' drivers'; byId('charByteSize').textContent=buf.byteLength+' bytes'; byId('charValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('charValidation').textContent='✖ '+err.message; alert('Failed to parse driverParam: '+err.message);} }
-    function onBikeLoaded(buf, name){ try{ const model=parseBikePartsParam(buf); state.bikeFileBuf=buf; state.bikeFilename=name; state.bikeModel=model; state.currentBikeIndex=0; setBikeEnabled(true); /* showTab('bike'); */ renderBikeEditor(); byId('bikeFileInfo').textContent=name; byId('bikeCount').textContent=model.count+' bikes'; byId('bikeByteSize').textContent=buf.byteLength+' bytes'; byId('bikeValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('bikeValidation').textContent='✖ '+err.message; alert('Failed to parse bikePartsDispParam: '+err.message);} }
-    function onDriverDispLoaded(buf, name){ try{ const model=parseDriverDispParam(buf); state.driverDispFileBuf=buf; state.driverDispFilename=name; state.driverDispModel=model; state.currentDriverDispIndex=0; setDriverDispEnabled(true); /* showTab('driverdisp'); */ renderDriverDispEditor(); byId('driverDispFileInfo').textContent=name; byId('driverDispCount').textContent=model.count+' drivers'; byId('driverDispByteSize').textContent=buf.byteLength+' bytes'; byId('driverDispValidation').textContent='✓ Parsed'; }catch(err){ console.error(err); byId('driverDispValidation').textContent='✖ '+err.message; alert('Failed to parse driverDispParam: '+err.message);} }
-    function onItemSlotLoaded(buf, name) { try { const model = parseItemSlot(buf); state.itemSlotFileBuf = buf; state.itemSlotFilename = name; state.itemSlotModel = model; state.currentItemSlotTableIndex = 0; setItemSlotEnabled(true); /* showTab('itemslot'); */ renderItemSlotEditor(); byId('itemSlotFileInfo').textContent = name; byId('itemSlotTableCount').textContent = model.tableCount + ' tables'; byId('itemSlotByteSize').textContent = buf.byteLength + ' bytes'; byId('itemSlotValidation').textContent = (model.trailingBytes && model.trailingBytes > 0) ? (`⚠ Trailing ${model.trailingBytes} bytes`) : '✓ Parsed'; } catch (err) { console.error(err); byId('itemSlotValidation').textContent = '✖ ' + err.message; alert('Failed to parse ItemSlot: ' + err.message); } }
-    function onDriverIkLoaded(buf, name) { try { const model = parseDriverIkParam(buf); state.driverIkFileBuf = buf; state.driverIkFilename = name; state.driverIkModel = model; state.currentDriverIkVehicle = 0; state.currentDriverIkChar = 0; setDriverIkEnabled(true); /* showTab('driverik'); */ renderDriverIkEditor(); byId('driverIkFileInfo').textContent = name; byId('driverIkInfo').textContent = `${model.vehicleCount} veh, ${model.charCount} char`; byId('driverIkByteSize').textContent = buf.byteLength + ' bytes'; byId('driverIkValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('driverIkValidation').textContent = '✖ ' + err.message; alert('Failed to parse DriverIKParam: ' + err.message); } }
-    function onKartAiLoaded(buf, name) { try { const model = parseKartAiParam(buf); state.kartAiFileBuf = buf; state.kartAiFilename = name; state.kartAiModel = model; state.currentKartAiDifficulty = 0; state.currentKartAiPlayer = 0; setKartAiEnabled(true); /* showTab('kartai'); */ renderKartAiEditor(); byId('kartAiFileInfo').textContent = name; byId('kartAiInfo').textContent = `3 difficulties, 12 players`; byId('kartAiByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAIActionParam: ' + err.message); } }
-    function onKartAiSpdLoaded(buf, name) { try { const model = parseKartAiSpdParam(buf); state.kartAiSpdFileBuf = buf; state.kartAiSpdFilename = name; state.kartAiSpdModel = model; state.currentKartAiSpdSection = 0; state.currentKartAiSpdTrack = 0; state.currentKartAiSpdMode = 0; setKartAiSpdEnabled(true); /* showTab('kartaispd'); */ renderKartAiSpdEditor(); byId('kartAiSpdFileInfo').textContent = name; byId('kartAiSpdInfo').textContent = `${model.entries.length} entries`; byId('kartAiSpdByteSize').textContent = buf.byteLength + ' bytes'; byId('kartAiSpdValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartAiSpdValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartAISpdParam: ' + err.message); } }
-    function onKartCamLoaded(buf, name) { try { const model = parseKartCameraParam(buf); state.kartCamFileBuf = buf; state.kartCamFilename = name; state.kartCamModel = model; state.currentKartCamEntry = 0; state.currentKartCamCamera = 0; setKartCamEnabled(true); /* showTab('kartcam'); */ renderKartCamEditor(); byId('kartCamFileInfo').textContent = name; byId('kartCamInfo').textContent = `${model.entries.length} entries`; byId('kartCamByteSize').textContent = buf.byteLength + ' bytes'; byId('kartCamValidation').textContent = '✓ Parsed'; } catch (err) { console.error(err); byId('kartCamValidation').textContent = '✖ ' + err.message; alert('Failed to parse kartCameraParam: ' + err.message); } }
-    byId('fileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
-    byId('driverFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
-    byId('bikeFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
-    byId('driverDispFileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; f.arrayBuffer().then(buf=> onDriverDispLoaded(buf,f.name)); });
-    byId('itemSlotFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onItemSlotLoaded(buf, f.name)); });
-    byId('driverIkFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
-    byId('kartAiFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
-    byId('kartAiSpdFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
-    byId('kartCamFileInput').addEventListener('change', e => { const f = e.target.files?.[0]; if (!f) return; f.arrayBuffer().then(buf => onKartCamLoaded(buf, f.name)); });
-    const dropK = byId('dropArea'); ['dragover','dragenter'].forEach(ev=> dropK.addEventListener(ev, e=>{ e.preventDefault(); })); dropK.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onKartLoaded(buf,f.name)); });
-    const dropD = byId('driverDropArea'); ['dragover','dragenter'].forEach(ev=> dropD.addEventListener(ev, e=>{ e.preventDefault(); })); dropD.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onDriverLoaded(buf,f.name)); });
-    const dropB = byId('bikeDropArea'); ['dragover','dragenter'].forEach(ev=> dropB.addEventListener(ev, e=>{ e.preventDefault(); })); dropB.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onBikeLoaded(buf,f.name)); });
-    const dropDD = byId('driverDispDropArea'); ['dragover','dragenter'].forEach(ev=> dropDD.addEventListener(ev, e=>{ e.preventDefault(); })); dropDD.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) f.arrayBuffer().then(buf=> onDriverDispLoaded(buf,f.name)); });
-    const dropIS = byId('itemSlotDropArea'); ['dragover', 'dragenter'].forEach(ev => dropIS.addEventListener(ev, e => { e.preventDefault(); })); dropIS.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onItemSlotLoaded(buf, f.name)); });
-    const dropDIK = byId('driverIkDropArea'); ['dragover', 'dragenter'].forEach(ev => dropDIK.addEventListener(ev, e => { e.preventDefault(); })); dropDIK.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onDriverIkLoaded(buf, f.name)); });
-    const dropKAI = byId('kartAiDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAI.addEventListener(ev, e => { e.preventDefault(); })); dropKAI.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiLoaded(buf, f.name)); });
-    const dropKAISPD = byId('kartAiSpdDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKAISPD.addEventListener(ev, e => { e.preventDefault(); })); dropKAISPD.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartAiSpdLoaded(buf, f.name)); });
-    const dropKCAM = byId('kartCamDropArea'); ['dragover', 'dragenter'].forEach(ev => dropKCAM.addEventListener(ev, e => { e.preventDefault(); })); dropKCAM.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) f.arrayBuffer().then(buf => onKartCamLoaded(buf, f.name)); });
+    function setLoadPills(ids, fileName, infoText, byteLength, validationText) {
+      const set = (id, v) => { const el = byId(id); if (el) el.textContent = v; };
+      set(ids.fileId, fileName || 'Loaded');
+      set(ids.infoId, infoText || '');
+      set(ids.sizeId, String(byteLength) + ' bytes');
+      set(ids.validationId, validationText || '✓ Parsed');
+    }
+    function setLoadError(ids, err) {
+      const msg = (err && err.message) ? err.message : String(err);
+      const set = (id, v) => { const el = byId(id); if (el) el.textContent = v; };
+      // On hard parse failure, clear summary pills to avoid stale values.
+      set(ids.infoId, '');
+      set(ids.sizeId, '');
+      set(ids.validationId, '✖ ' + msg);
+    }
+    function toBaseFilename(name, fallback) {
+      const s = String(name || '').trim();
+      if (!s) return fallback;
+      return s.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '');
+    }
+
+    function onKartLoaded(buf, name) {
+      const ids = { fileId: 'fileInfo', infoId: 'vehCount', sizeId: 'byteSize', validationId: 'validation' };
+      try {
+        const model = parseKartParam(buf);
+        state.fileBuf = buf;
+        state.filename = toBaseFilename(name, 'kartParam');
+        state.model = model;
+        state.currentIndex = 0;
+        setKartEnabled(true);
+        /* showTab('kart'); */
+        renderEditor();
+        setLoadPills(ids, name, model.count + ' vehicles', buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse kartParam: ' + err.message);
+      }
+    }
+    function onDriverLoaded(buf, name) {
+      const ids = { fileId: 'charFileInfo', infoId: 'charCount', sizeId: 'charByteSize', validationId: 'charValidation' };
+      try {
+        const model = parseDriverParam(buf);
+        state.driverFileBuf = buf;
+        state.driverFilename = toBaseFilename(name, 'driverParam');
+        state.driverModel = model;
+        state.currentCharIndex = (getDriverParamDisplayOrder(model.drivers.length)[0] ?? 0);
+        setDriverEnabled(true);
+        /* showTab('driver'); */
+        renderDriverEditor();
+        setLoadPills(ids, name, model.count + ' drivers', buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse driverParam: ' + err.message);
+      }
+    }
+    function onBikeLoaded(buf, name) {
+      const ids = { fileId: 'bikeFileInfo', infoId: 'bikeCount', sizeId: 'bikeByteSize', validationId: 'bikeValidation' };
+      try {
+        const model = parseBikePartsParam(buf);
+        state.bikeFileBuf = buf;
+        state.bikeFilename = toBaseFilename(name, 'bikePartsDispParam');
+        state.bikeModel = model;
+        state.currentBikeIndex = 0;
+        setBikeEnabled(true);
+        /* showTab('bike'); */
+        renderBikeEditor();
+        setLoadPills(ids, name, model.count + ' bikes', buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse bikePartsDispParam: ' + err.message);
+      }
+    }
+    function onDriverDispLoaded(buf, name) {
+      const ids = { fileId: 'driverDispFileInfo', infoId: 'driverDispCount', sizeId: 'driverDispByteSize', validationId: 'driverDispValidation' };
+      try {
+        const model = parseDriverDispParam(buf);
+        state.driverDispFileBuf = buf;
+        state.driverDispFilename = toBaseFilename(name, 'driverDispParam');
+        state.driverDispModel = model;
+        state.currentDriverDispIndex = 0;
+        setDriverDispEnabled(true);
+        /* showTab('driverdisp'); */
+        renderDriverDispEditor();
+        setLoadPills(ids, name, model.count + ' drivers', buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse driverDispParam: ' + err.message);
+      }
+    }
+    function onItemSlotLoaded(buf, name) {
+      const ids = { fileId: 'itemSlotFileInfo', infoId: 'itemSlotTableCount', sizeId: 'itemSlotByteSize', validationId: 'itemSlotValidation' };
+      try {
+        const model = parseItemSlot(buf);
+        state.itemSlotFileBuf = buf;
+        state.itemSlotFilename = toBaseFilename(name, 'ItemSlot');
+        state.itemSlotModel = model;
+        state.currentItemSlotTableIndex = 0;
+        setItemSlotEnabled(true);
+        /* showTab('itemslot'); */
+        renderItemSlotEditor();
+        const validation = (model.trailingBytes && model.trailingBytes > 0) ? (`⚠ Trailing ${model.trailingBytes} bytes`) : '✓ Parsed';
+        setLoadPills(ids, name, model.tableCount + ' tables', buf.byteLength, validation);
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse ItemSlot: ' + err.message);
+      }
+    }
+    function onDriverIkLoaded(buf, name) {
+      const ids = { fileId: 'driverIkFileInfo', infoId: 'driverIkInfo', sizeId: 'driverIkByteSize', validationId: 'driverIkValidation' };
+      try {
+        const model = parseDriverIkParam(buf);
+        state.driverIkFileBuf = buf;
+        state.driverIkFilename = toBaseFilename(name, 'DriverIKParam');
+        state.driverIkModel = model;
+        state.currentDriverIkVehicle = 0;
+        state.currentDriverIkChar = 0;
+        setDriverIkEnabled(true);
+        /* showTab('driverik'); */
+        renderDriverIkEditor();
+        setLoadPills(ids, name, `${model.vehicleCount} veh, ${model.charCount} char`, buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse DriverIKParam: ' + err.message);
+      }
+    }
+    function onKartAiLoaded(buf, name) {
+      const ids = { fileId: 'kartAiFileInfo', infoId: 'kartAiInfo', sizeId: 'kartAiByteSize', validationId: 'kartAiValidation' };
+      try {
+        const model = parseKartAiParam(buf);
+        state.kartAiFileBuf = buf;
+        state.kartAiFilename = toBaseFilename(name, 'kartAIActionParam');
+        state.kartAiModel = model;
+        state.currentKartAiDifficulty = 0;
+        state.currentKartAiPlayer = 0;
+        setKartAiEnabled(true);
+        /* showTab('kartai'); */
+        renderKartAiEditor();
+        setLoadPills(ids, name, '3 difficulties, 12 players', buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse kartAIActionParam: ' + err.message);
+      }
+    }
+    function onKartAiSpdLoaded(buf, name) {
+      const ids = { fileId: 'kartAiSpdFileInfo', infoId: 'kartAiSpdInfo', sizeId: 'kartAiSpdByteSize', validationId: 'kartAiSpdValidation' };
+      try {
+        const model = parseKartAiSpdParam(buf);
+        state.kartAiSpdFileBuf = buf;
+        state.kartAiSpdFilename = toBaseFilename(name, 'kartAISpdParam');
+        state.kartAiSpdModel = model;
+        state.currentKartAiSpdSection = 0;
+        state.currentKartAiSpdTrack = 0;
+        state.currentKartAiSpdMode = 0;
+        setKartAiSpdEnabled(true);
+        /* showTab('kartaispd'); */
+        renderKartAiSpdEditor();
+        setLoadPills(ids, name, `${model.entries.length} entries`, buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse kartAISpdParam: ' + err.message);
+      }
+    }
+    function onKartCamLoaded(buf, name) {
+      const ids = { fileId: 'kartCamFileInfo', infoId: 'kartCamInfo', sizeId: 'kartCamByteSize', validationId: 'kartCamValidation' };
+      try {
+        const model = parseKartCameraParam(buf);
+        state.kartCamFileBuf = buf;
+        state.kartCamFilename = toBaseFilename(name, 'kartCameraParam');
+        state.kartCamModel = model;
+        state.currentKartCamEntry = 0;
+        state.currentKartCamCamera = 0;
+        setKartCamEnabled(true);
+        /* showTab('kartcam'); */
+        renderKartCamEditor();
+        setLoadPills(ids, name, `${model.entries.length} entries`, buf.byteLength, '✓ Parsed');
+      } catch (err) {
+        console.error(err);
+        setLoadError(ids, err);
+        alert('Failed to parse kartCameraParam: ' + err.message);
+      }
+    }
+    function bindLoadInputAndDrop(inputId, dropId, onLoad) {
+      const loadFile = (f) => {
+        if (!f) return;
+        f.arrayBuffer().then(buf => onLoad(buf, f.name));
+      };
+
+      const input = byId(inputId);
+      if (input) {
+        input.addEventListener('change', (e) => {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          loadFile(f);
+          // Allow selecting the same file twice in a row.
+          e.target.value = '';
+        });
+      }
+
+      const drop = byId(dropId);
+      if (drop) {
+        const onDragIn = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          drop.classList.add('load-drop-active');
+        };
+        const onDragOut = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          drop.classList.remove('load-drop-active');
+        };
+        ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, onDragIn));
+        ['dragleave', 'dragend'].forEach(ev => drop.addEventListener(ev, onDragOut));
+        drop.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          drop.classList.remove('load-drop-active');
+          loadFile(e.dataTransfer?.files?.[0]);
+        });
+      }
+    }
+
+    bindLoadInputAndDrop('fileInput', 'dropArea', onKartLoaded);
+    bindLoadInputAndDrop('driverFileInput', 'driverDropArea', onDriverLoaded);
+    bindLoadInputAndDrop('bikeFileInput', 'bikeDropArea', onBikeLoaded);
+    bindLoadInputAndDrop('driverDispFileInput', 'driverDispDropArea', onDriverDispLoaded);
+    bindLoadInputAndDrop('kartDriverDispFileInput', 'kartDriverDispDropArea', onKartDriverDispLoaded);
+    bindLoadInputAndDrop('itemSlotFileInput', 'itemSlotDropArea', onItemSlotLoaded);
+    bindLoadInputAndDrop('driverIkFileInput', 'driverIkDropArea', onDriverIkLoaded);
+    bindLoadInputAndDrop('kartAiFileInput', 'kartAiDropArea', onKartAiLoaded);
+    bindLoadInputAndDrop('kartAiSpdFileInput', 'kartAiSpdDropArea', onKartAiSpdLoaded);
+    bindLoadInputAndDrop('kartCamFileInput', 'kartCamDropArea', onKartCamLoaded);
+    bindLoadInputAndDrop('kartPartsFileInput', 'kartPartsDropArea', handleKartPartsBuf);
+    bindLoadInputAndDrop('miiFileInput', 'miiDropArea', handleMiiBuf);
     // ===== Theme =====
     byId('themeSelect').addEventListener('change',()=>{
       const v=byId('themeSelect').value; if(v==='light'){ document.documentElement.style.setProperty('--bg','#f5f7fb'); document.documentElement.style.setProperty('--panel','#ffffff'); document.documentElement.style.setProperty('--text','#0b0d10'); document.documentElement.style.setProperty('--sub','#3b4a66'); document.documentElement.style.setProperty('--muted','#dfe6f1'); } else { document.documentElement.style.removeProperty('--bg'); document.documentElement.style.removeProperty('--panel'); document.documentElement.style.removeProperty('--text'); document.documentElement.style.removeProperty('--sub'); document.documentElement.style.removeProperty('--muted'); }
@@ -2257,8 +2535,7 @@ function updateKartDriverDispEditor() {
       for (let i=0;i<12;i++){ const el=byId('kddp_b'+i); if(el) el.value = (e.bones && e.bones[i]!=null? String(e.bones[i]) : ''); }
       byId('kddp_metaVehicles').value = m.vehicles;
       byId('kddp_metaChars').value = m.chars;
-      byId('kddp_metaHeader').value = m.headerBytes;
-      byId('kddp_metaUnknown0').value = m.unknown0|0;
+      byId('kddp_metaHeader').value = 8;
       byId('kartDriverDispDirty').textContent = state.kartDriverDispDirty ? 'Dirty' : 'No edits';
     }
 
@@ -2305,7 +2582,7 @@ state.kartDriverDispDirty = false; updateKartDriverDispEditor();
 
       byId('exportKartDriverDispJson').addEventListener('click', ()=>{
         const m = state.kartDriverDispModel; if (!m) return;
-        const json = JSON.stringify({format:'kartDriverDispParam', headerBytes:m.headerBytes, unknown0:m.unknown0, vehicles:m.vehicles, chars:m.chars, entries:m.entries}, null, 2);
+        const json = JSON.stringify({format:'kartDriverDispParam', vehicles:m.vehicles, chars:m.chars, entries:m.entries}, null, 2);
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));
         a.download = 'kartDriverDispParam.json';
@@ -2314,40 +2591,27 @@ state.kartDriverDispDirty = false; updateKartDriverDispEditor();
 
       
 
-      byId('kartDriverDispFileInput').addEventListener('change', (ev)=>{
-        const f = ev.target.files[0]; if (!f) return;
-        f.arrayBuffer().then(buf=> onKartDriverDispLoaded(buf, f.name));
-      });
-      const drop = byId('kartDriverDispDropArea');
-      ['dragover','dragenter'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.style.opacity = '0.8'; }));
-      ['dragleave','dragend','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.style.opacity = '1'; }));
-      drop.addEventListener('drop', e=>{
-        const f = e.dataTransfer.files[0]; if (!f) return;
-        f.arrayBuffer().then(buf=> onKartDriverDispLoaded(buf, f.name));
-      });
     }
 
     function onKartDriverDispLoaded(buf, name) {
+      const ids = { fileId: 'kartDriverDispFileInfo', infoId: 'kartDriverDispCounts', sizeId: 'kartDriverDispByteSize', validationId: 'kartDriverDispValidation' };
       try {
         const model = parseKartDriverDispParam(buf);
         state.kartDriverDispFileBuf = buf;
-        state.kartDriverDispFilename = name;
+        state.kartDriverDispFilename = toBaseFilename(name, 'kartDriverDispParam');
         state.kartDriverDispModel = model;
         state.currentKartDriverDispVehicle = 0;
         state.currentKartDriverDispChar = 0;
         state.kartDriverDispDirty = false;
-        byId('kartDriverDispFileInfo').textContent = name || 'Loaded';
-        byId('kartDriverDispByteSize').textContent = buf.byteLength + ' bytes';
-        byId('kartDriverDispCounts').textContent = (model.vehicles + ' vehicles × ' + model.chars + ' chars');
-        byId('kartDriverDispValidation').textContent = '✓ Parsed';
-        document.querySelector('.tab-btn[data-tab="kartdriverdisp"]').disabled = false;
+        setLoadPills(ids, name, (model.vehicles + ' vehicles × ' + model.chars + ' chars'), buf.byteLength, '✓ Parsed');
+        setKartDriverDispEnabled(true);
         refreshKartDriverDispSelectors();
         updateKartDriverDispEditor();
         /* showTab('kartdriverdisp'); */
         byId('kartDriverDispStatus').textContent = 'Ready.';
       } catch (err) {
         console.error(err);
-        byId('kartDriverDispValidation').textContent = '✖ ' + err.message;
+        setLoadError(ids, err);
         alert('Failed to parse kartDriverDispParam: ' + err.message);
       }
     }
@@ -2565,39 +2829,22 @@ var imp = byId('importKartPartsJsonInput'); if (imp) imp.addEventListener('chang
 
 // Load handlers
 function handleKartPartsBuf(buf, filename){
+  const ids = { fileId: 'kartPartsFileInfo', infoId: 'kartPartsCount', sizeId: 'kartPartsByteSize', validationId: 'kartPartsValidation' };
   try{
     const model = parseKartPartsDispParam(buf);
     state.kartPartsFileBuf = buf;
-    state.kartPartsFilename = (filename||'kartPartsDispParam').replace(/\.[^.]+$/,'');
+    state.kartPartsFilename = toBaseFilename(filename, 'kartPartsDispParam');
     state.kartPartsModel = model;
     state.currentKartPartsIndex = 0;
-    if (typeof setKartPartsEnabled === 'function') setKartPartsEnabled(true);
-    var inf = byId('kartPartsFileInfo'); if (inf) inf.textContent = filename||'Loaded';
-    var cnt = byId('kartPartsCount'); if (cnt) cnt.textContent = model.count+' karts';
-    var bs = byId('kartPartsByteSize'); if (bs) bs.textContent = (buf.byteLength)+' bytes';
-    var ok = byId('kartPartsValidation'); if (ok) ok.textContent = 'OK';
+    setKartPartsEnabled(true);
+    setLoadPills(ids, filename, model.count+' karts', buf.byteLength, '✓ Parsed');
     renderKartPartsEditor();
   }catch(err){
-    var ok = byId('kartPartsValidation'); if (ok) ok.textContent = 'Error: '+err.message;
+    console.error(err);
+    setLoadError(ids, err);
+    alert('Failed to parse kartPartsDispParam: ' + err.message);
   }
 }
-var inEl = byId('kartPartsFileInput'); if (inEl) inEl.addEventListener('change',(e)=>{
-  const f = e.target.files && e.target.files[0]; if (!f) return;
-  f.arrayBuffer().then(buf=> handleKartPartsBuf(buf, f.name));
-});
-
-(function(){
-  var el = byId('kartPartsDropArea'); if (!el) return;
-  el.addEventListener('dragover', function(ev){ ev.preventDefault(); el.style.borderColor = 'var(--accent)'; });
-  el.addEventListener('dragleave', function(){ el.style.borderColor = 'var(--muted)'; });
-  el.addEventListener('drop', function(ev){
-    ev.preventDefault(); el.style.borderColor = 'var(--muted)';
-    var f = ev.dataTransfer.files && ev.dataTransfer.files[0];
-    if (f) f.arrayBuffer().then(function(buf){ handleKartPartsBuf(buf, f.name); });
-  });
-})();
-
-
 // ===== miiDispParam =====
 const MII_ENTRY_SIZE = 0x0C; // 3 floats per entry
 
@@ -2616,7 +2863,7 @@ const MII_DESC = [
 function parseMiiDispParam(buf){
   const dv = new DataView(buf);
   if (dv.byteLength < 4) throw new Error('File too small');
-  const count = i32(dv,0);
+  const count = u32(dv,0);
   const expect = 4 + count * MII_ENTRY_SIZE;
   if (dv.byteLength !== expect) throw new Error('Size mismatch: got '+dv.byteLength+' expected '+expect);
   const entries = [];
@@ -2635,7 +2882,7 @@ function writeMiiDispParam(model){
   const count = model.count|0;
   const buf = new ArrayBuffer(4 + count * MII_ENTRY_SIZE);
   const dv = new DataView(buf);
-  wI32(dv,0,count);
+  wU32(dv,0,count);
   for (let i=0;i<count;i++){
     const base = 4 + i*MII_ENTRY_SIZE;
     const e = model.entries[i] || {};
@@ -2743,6 +2990,7 @@ byId('importMiiJsonInput') && byId('importMiiJsonInput').addEventListener('chang
 
 // Load handlers
 function handleMiiBuf(buf, filename){
+  const ids = { fileId: 'miiFileInfo', infoId: 'miiCount', sizeId: 'miiByteSize', validationId: 'miiValidation' };
   try{
       {
         const scope = document.querySelector('.tab:not(.hidden)') || document.body;
@@ -2752,35 +3000,18 @@ function handleMiiBuf(buf, filename){
 
     const model = parseMiiDispParam(buf);
     state.miiFileBuf = buf;
-    state.miiFilename = (filename||'miiDispParam').replace(/\\.[^.]+$/,'');
+    state.miiFilename = toBaseFilename(filename, 'miiDispParam');
     state.miiModel = model;
     state.currentMiiIndex = 0;
-    if (typeof setMiiEnabled === 'function') setMiiEnabled(true);
-    const inf = byId('miiFileInfo'); if (inf) inf.textContent = filename||'Loaded';
-    const cnt = byId('miiCount'); if (cnt) cnt.textContent = model.count+' entries';
-    const bs = byId('miiByteSize'); if (bs) bs.textContent = (buf.byteLength)+' bytes';
-    const ok = byId('miiValidation'); if (ok) ok.textContent = 'OK';
+    setMiiEnabled(true);
+    setLoadPills(ids, filename, model.count+' entries', buf.byteLength, '✓ Parsed');
     renderMiiEditor();
   }catch(err){
-    const ok = byId('miiValidation'); if (ok) ok.textContent = 'Error: '+err.message;
+    console.error(err);
+    setLoadError(ids, err);
+    alert('Failed to parse miiDispParam: ' + err.message);
   }
 }
-
-byId('miiFileInput') && byId('miiFileInput').addEventListener('change',(e)=>{
-  const f = e.target.files && e.target.files[0]; if (!f) return;
-  f.arrayBuffer().then(buf=> handleMiiBuf(buf, f.name));
-});
-
-(function(){
-  const el = byId('miiDropArea'); if (!el) return;
-  el.addEventListener('dragover', ev=>{ ev.preventDefault(); el.style.borderColor = 'var(--accent)'; });
-  el.addEventListener('dragleave', ()=>{ el.style.borderColor = 'var(--muted)'; });
-  el.addEventListener('drop', ev=>{
-    ev.preventDefault(); el.style.borderColor = 'var(--muted)';
-    const f = ev.dataTransfer.files && ev.dataTransfer.files[0];
-    if (f) f.arrayBuffer().then(buf=> handleMiiBuf(buf, f.name));
-  });
-})();
 
 // ========== JSON Import Fixup: ensure all editors actually update state and re-render ==========
 (function(){
@@ -2813,81 +3044,143 @@ byId('miiFileInput') && byId('miiFileInput').addEventListener('change',(e)=>{
 
   // Kart (veh) editor
   attachJsonImport('importJsonInput', 'kartParam',
-    function(model){ state.model = model; },
+    function(model){
+      state.model = model;
+      state.currentIndex = 0;
+      state.dirty = true;
+      byId('status').textContent = 'Imported JSON';
+      byId('dirtyFlag').textContent = 'Unsaved edits';
+    },
     function(){ if (typeof renderEditor==='function') renderEditor(); });
 
   // Driver editor
   attachJsonImport('importDriverJsonInput', 'driverParam',
-    function(model){ state.driverModel = model; },
+    function(model){
+      state.driverModel = model;
+      const n = model && Array.isArray(model.drivers) ? model.drivers.length : 0;
+      state.currentCharIndex = (getDriverParamDisplayOrder(n)[0] ?? 0);
+    },
     function(){ if (typeof renderDriverEditor==='function') renderDriverEditor(); });
 
   // Bike editor (bike parts disp)
   attachJsonImport('importBikeJsonInput', 'bikePartsDispParam',
-    function(model){ state.bikeModel = model; },
+    function(model){
+      const bikesIn = model && Array.isArray(model.bikes) ? model.bikes : [];
+      const bikes = bikesIn.map(entry=>{
+        const b = { ...entry };
+        let raw = null;
+        if (typeof entry?._rawB64 === 'string' && entry._rawB64.length > 0) {
+          try { raw = base64ToU8(entry._rawB64); } catch {}
+        } else if (entry?._raw && Array.isArray(entry._raw)) {
+          raw = new Uint8Array(entry._raw);
+        } else if (entry?._raw instanceof Uint8Array) {
+          raw = entry._raw;
+        }
+        if (raw && raw.length === BIKE_PARTS_SECTION_SIZE) {
+          try { Object.defineProperty(b, '_raw', { value: raw, enumerable: false, writable: true }); } catch {}
+        }
+        delete b._rawB64;
+        return b;
+      });
+      state.bikeModel = { count: bikes.length, bikes };
+      state.currentBikeIndex = 0;
+      state.bikeDirty = true;
+      byId('bikeStatus').textContent = 'Imported JSON';
+      byId('bikeDirty').textContent = 'Unsaved edits';
+    },
     function(){ if (typeof renderBikeEditor==='function') renderBikeEditor(); });
 
   // DriverDisp editor
   attachJsonImport('importDriverDispJsonInput', 'driverDispParam',
-    function(model){ state.driverDispModel = model; },
+    function(model){
+      state.driverDispModel = model;
+      state.currentDriverDispIndex = 0;
+      state.driverDispDirty = true;
+      var info = byId('driverDispFileInfo'); if (info) info.textContent = 'Imported JSON';
+      var cnt = byId('driverDispCount'); if (cnt) cnt.textContent = (((model && model.drivers) ? model.drivers.length : 0) | 0) + ' drivers';
+      var val = byId('driverDispValidation'); if (val) val.textContent = '✓ Parsed JSON';
+      var st = byId('driverDispStatus'); if (st) st.textContent = 'Imported JSON';
+      var dirty = byId('driverDispDirty'); if (dirty) dirty.textContent = 'Unsaved edits';
+    },
     function(){ if (typeof renderDriverDispEditor==='function') renderDriverDispEditor(); });
 
   // KartDriverDisp editor
   attachJsonImport('importKartDriverDispJsonInput', 'kartDriverDispParam',
-    function(model){ state.kartDriverDispModel = model; },
-    function(){ if (typeof renderKartDriverDispEditor==='function') renderKartDriverDispEditor(); });
+    function(model){
+      const vehicles = model && (model.vehicles|0);
+      const chars = model && (model.chars|0);
+      if (vehicles < 1 || chars < 1) throw new Error('Invalid kartDriverDispParam JSON: vehicles/chars must be >= 1');
+      if (!Array.isArray(model.entries) || model.entries.length !== vehicles) {
+        throw new Error('Invalid kartDriverDispParam JSON: entries row count mismatch');
+      }
+      for (let v = 0; v < vehicles; v++) {
+        if (!Array.isArray(model.entries[v]) || model.entries[v].length !== chars) {
+          throw new Error('Invalid kartDriverDispParam JSON: entries column count mismatch at vehicle ' + v);
+        }
+        for (let c = 0; c < chars; c++) {
+          const e = model.entries[v][c];
+          if (!e || !Array.isArray(e.bones) || e.bones.length !== 12) {
+            throw new Error('Invalid kartDriverDispParam JSON: expected 12 bone floats at [' + v + '][' + c + ']');
+          }
+        }
+      }
+
+      state.kartDriverDispModel = {
+        vehicles,
+        chars,
+        entries: model.entries
+      };
+      state.kartDriverDispFileBuf = null;
+      state.kartDriverDispFilename = 'kartDriverDispParam';
+      state.currentKartDriverDispVehicle = 0;
+      state.currentKartDriverDispChar = 0;
+      state.kartDriverDispDirty = false;
+
+      byId('kartDriverDispFileInfo').textContent = 'Imported JSON';
+      byId('kartDriverDispByteSize').textContent = (8 + vehicles * chars * 56) + ' bytes (computed)';
+      byId('kartDriverDispCounts').textContent = (vehicles + ' vehicles × ' + chars + ' chars');
+      byId('kartDriverDispValidation').textContent = '✓ Parsed JSON';
+      byId('kartDriverDispStatus').textContent = 'Ready.';
+
+      setKartDriverDispEnabled(true);
+    },
+    function(){
+      refreshKartDriverDispSelectors();
+      updateKartDriverDispEditor();
+    });
 
   // ItemSlot editor
   attachJsonImport('importItemSlotJsonInput', 'itemSlot',
-    function(model){ state.itemSlotModel = model; },
+    function(model){
+      state.itemSlotModel = model;
+      state.currentItemSlotTableIndex = 0;
+      state.itemSlotDirty = true;
+      var info = byId('itemSlotFileInfo'); if (info) info.textContent = 'Imported JSON';
+      var cnt = byId('itemSlotTableCount'); if (cnt) cnt.textContent = (((model && model.tables) ? model.tables.length : 0) | 0) + ' tables';
+      var val = byId('itemSlotValidation'); if (val) val.textContent = '✓ Parsed JSON';
+      var st = byId('itemSlotStatus'); if (st) st.textContent = 'Imported JSON';
+      var dirty = byId('itemSlotDirty'); if (dirty) dirty.textContent = 'Unsaved edits';
+    },
     function(){ if (typeof renderItemSlotEditor==='function') renderItemSlotEditor(); });
-
-  // DriverIK editor
-  attachJsonImport('importDriverIkJsonInput', 'driverIkParam',
-    function(model){ state.driverIkModel = model; },
-    function(){ if (typeof renderDriverIkEditor==='function') renderDriverIkEditor(); });
-
-  // KartAI Action editor
-  attachJsonImport('importKartAiJsonInput', 'kartAiActionParam',
-    function(model){ state.kartAiModel = model; },
-    function(){ if (typeof renderKartAiEditor==='function') renderKartAiEditor(); });
-
-  // KartAI Speed editor
-  attachJsonImport('importKartAiSpdJsonInput', 'kartAiSpdParam',
-    function(model){ state.kartAiSpdModel = model; },
-    function(){ if (typeof renderKartAiSpdEditor==='function') renderKartAiSpdEditor(); });
 
   // Kart Camera editor
   attachJsonImport('importKartCamJsonInput', 'kartCameraParam',
-    function(model){ state.kartCamModel = model; },
+    function(model){
+      state.kartCamModel = model;
+      state.kartCamFileBuf = null;
+      state.kartCamFilename = 'kartCameraParam';
+      state.currentKartCamEntry = 0;
+      state.currentKartCamCamera = 0;
+      state.kartCamDirty = true;
+      var info = byId('kartCamFileInfo'); if (info) info.textContent = 'Imported JSON';
+      var cnt = byId('kartCamInfo'); if (cnt) cnt.textContent = (((model && model.entries) ? model.entries.length : 0) | 0) + ' entries';
+      var bs = byId('kartCamByteSize'); if (bs) bs.textContent = 'n/a (JSON)';
+      var val = byId('kartCamValidation'); if (val) val.textContent = '✓ Parsed JSON';
+      var st = byId('kartCamStatus'); if (st) st.textContent = 'Imported JSON';
+      var dirty = byId('kartCamDirty'); if (dirty) dirty.textContent = 'Unsaved edits';
+    },
     function(){ if (typeof renderKartCamEditor==='function') renderKartCamEditor(); });
 
-  // Kart Parts Disp editor
-  attachJsonImport('importKartPartsJsonInput', 'kartPartsDispParam',
-    function(model){ state.kartPartsModel = model; },
-    function(){ if (typeof renderKartPartsEditor==='function') renderKartPartsEditor(); });
-
-  // Mii Disp editor (accept either wrapped or raw model)
-  (function(){
-    var el = byId('importMiiJsonInput'); if (!el) return;
-    el.addEventListener('change', function(e){
-      var f = e.target.files && e.target.files[0]; if(!f) return;
-      f.text().then(function(t){
-        try{
-      {
-        const scope = document.querySelector('.tab:not(.hidden)') || document.body;
-        const bad = Array.from(scope.querySelectorAll('input[type="number"]')).some(inp => inp.validity && inp.validity.badInput);
-        if (bad) throw new Error('Invalid number input detected (too large/NaN). Fix fields before exporting.');
-      }
-
-          var obj = JSON.parse(t);
-          if (obj.format && obj.format !== 'miiDispParam') throw new Error('Wrong JSON format: '+obj.format);
-          var model = obj.model !== undefined ? obj.model : obj;
-          state.miiModel = model;
-          if (typeof renderMiiEditor === 'function') renderMiiEditor();
-        }catch(err){ alert('JSON import failed: '+err.message); }
-      });
-    });
-  })();
 })();
 </script>
 
@@ -2924,10 +3217,6 @@ byId('miiFileInput') && byId('miiFileInput').addEventListener('change',(e)=>{
     if (n.includes("miidispparam"))      { atleast(4); const c=readU32BE(u8,0); return 4 + c*12; }
     if (n.includes("driverikparam"))     { atleast(12); const e=readU32BE(u8,0), v=readU32BE(u8,4), ch=readU32BE(u8,8); return 12 + 256 + e*v*ch; }
     if (n.includes("kartdriverdispparam")){
-      if (len >= 12){
-        const a = readU32BE(u8,0), b = readU32BE(u8,4), c = readU32BE(u8,8);
-        if (a <= 4 && b > 0 && c > 0) return 12 + (b*c*56);
-      }
       if (len >= 8){ const veh=readU32BE(u8,0), ch=readU32BE(u8,4); return 8 + (veh*ch*56); }
     }
     return len;
