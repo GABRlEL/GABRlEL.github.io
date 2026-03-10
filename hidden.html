@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hidden GP Score Calculator</title>
+  <title>Hidden GP Score Calculator v1.1</title>
   <style>
     :root { --fg:#0b1321; --bg:#f7f8fb; --muted:#6b7280; --card:#ffffff; --accent:#2563eb; }
     * { box-sizing: border-box; }
@@ -58,7 +58,7 @@
 </head>
 <body>
   <header>
-    <h1>Hidden GP Score Calculator</h1>
+    <h1>Hidden GP Score Calculator v1.1</h1>
     <p class="subtitle">Reproduces MKWii's per‑race hidden score used for GP star ranks.</p>
   </header>
 
@@ -119,16 +119,16 @@
             <input id="hits" type="number" min="0" step="1" value="0" />
           </div>
           <div class="col-4">
-            <label>AI rank bonus <span id="aiNote" class="pill warn" style="display:none;">N/A on 50cc</span></label>
+            <label>AI rank bonus (Speed advantage state) <span id="aiNote" class="pill warn" style="display:none;">N/A on 50cc</span></label>
             <input id="aiBonus" type="number" min="0" step="1" value="0" />
           </div>
 
           <div class="col-4">
-            <label>Wall collisions</label>
+            <label>Wall collisions (with collision sound/effect)</label>
             <input id="wallBonks" type="number" min="0" step="1" value="0" />
           </div>
           <div class="col-4">
-            <label>Object collisions (course damage)</label>
+            <label>Object collisions (course damage with spin out)</label>
             <input id="objHits" type="number" min="0" step="1" value="0" />
           </div>
           <div class="col-4">
