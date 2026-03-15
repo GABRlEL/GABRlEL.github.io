@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>RKG Web • v1.2.1</title>
+<title>RKG Web • v1.2.2</title>
 <style>
   :root {
     --bg: #0f1220;
@@ -405,6 +405,19 @@
   .inline-link:hover {
     text-decoration: underline;
   }
+  .inline-link-button {
+    font: inherit;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .inline-link-button:hover {
+    background: none;
+  }
   .filter-toggle {
     cursor: pointer;
     color: var(--accent-2);
@@ -697,7 +710,7 @@
 <body>
   <header>
     <div class="title">
-      <span class="title-main">RKG Web • v1.2.1</span>
+      <span class="title-main">RKG Web • v1.2.2</span>
       <span id="status" class="title-status">No file loaded.</span>
       <span id="dirtyBadge" style="display:none;">Edited</span>
     </div>
@@ -924,6 +937,7 @@
         <div id="ckgdGhostId" class="inline-player">
           <span id="ckgdGhostIdValue" class="mono">—</span>
           <a id="ckgdGhostLink" class="inline-link" href="#" target="_blank" rel="noopener" style="display:none;">Open ghost page</a>
+          <a id="ckgdGhostMiiLink" class="inline-link" href="#" target="_blank" rel="noopener" style="display:none;">Open Mii picture</a>
         </div>
         <label>Category</label><div id="ckgdCategory">—</div>
         <label>Shortcut definition</label><div id="ckgdShortcutDef">—</div>
@@ -986,14 +1000,14 @@
           </div>
         </details>
         <details class="mapping">
-          <summary>Unknown fields</summary>
+          <summary>Reserved security info</summary>
           <div class="kv" style="margin-top:8px;">
-            <label>Unknown SHA1 #1</label><div id="ckgdUnknownSha1a" class="mono">—</div>
-            <label>Unknown2</label><div id="ckgdUnknown2">—</div>
-            <label>Unknown SHA1 #2</label><div id="ckgdUnknownSha1b" class="mono">—</div>
-            <label>Unknown3</label><div id="ckgdUnknown3">—</div>
+            <label>Reserved security field #1</label><div id="ckgdUnknownSha1a" class="mono">—</div>
+            <label>Reserved security field #2</label><div id="ckgdUnknown2">—</div>
+            <label>Reserved security field #3</label><div id="ckgdUnknownSha1b" class="mono">—</div>
+            <label>Reserved security field #4</label><div id="ckgdUnknown3">—</div>
             <label>Legacy const</label><div id="ckgdUnknown4">—</div>
-            <label>Unknown SHA1 #3</label><div id="ckgdUnknownSha1c" class="mono">—</div>
+            <label>Reserved security field #5</label><div id="ckgdUnknownSha1c" class="mono">—</div>
           </div>
         </details>
         <details id="ckgdShroomTableDetails" class="mapping">
@@ -5618,6 +5632,12 @@ function formatGhostPageUrl(hash) {
   return "https://chadsoft.co.uk/time-trials/rkgd/" + hex.slice(0, 2) + "/" + hex.slice(2, 4) + "/" + hex.slice(4) + ".html";
 }
 
+function formatGhostMiiUrl(hash) {
+  const pageUrl = formatGhostPageUrl(hash);
+  if (!pageUrl) return null;
+  return pageUrl.replace(/\.html$/i, ".mii");
+}
+
 const CTGP_VERSION_CANDIDATE_MAP = Object.freeze({
   "01030142": ["1.03.1044-1"],
   "01030144": ["1.03.1046-5"],
@@ -5956,7 +5976,7 @@ function miiCreationDateLabel(info) {
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
   const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return y + "-" + m + "-" + day + " " + hh + ":" + mm + ":" + ss + " UTC";
+  return y + "-" + m + "-" + day + " " + hh + ":" + mm + ":" + ss;
 }
 
 function miiHeightLabel(info) {
@@ -6861,6 +6881,8 @@ const inputRawLine = document.getElementById("inputRawLine");
 const mushroomDetectedLabel = document.getElementById("mushroomStratDetectedLabel");
 const mushroomDetectedValue = document.getElementById("mushroomStratDetected");
 const antiCheatSummary = document.getElementById("antiCheatSummary");
+const antiCheatSuspiciousEl = document.getElementById("antiCheatSuspicious");
+const antiCheatWarningEl = document.getElementById("antiCheatWarning");
 const antiCheat200cc = document.getElementById("antiCheat200cc");
 const ckgdFetchBtn = document.getElementById("ckgdFetchBtn");
 const ckgdFetchStatus = document.getElementById("ckgdFetchStatus");
@@ -8660,9 +8682,30 @@ function detectMushroomStratFromInputs(info, inputs) {
   return { counts, strat, uses, boundaries };
 }
 
+function formatIssueLine(text) {
+  const raw = text == null ? "" : String(text);
+  const pattern = /\bframe -?\d+\b/g;
+  let html = "";
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(raw)) !== null) {
+    html += escapeHtml(raw.slice(lastIndex, match.index));
+    const frameText = match[0];
+    const frameValue = parseInt(frameText.slice(6), 10);
+    html += "<button type=\"button\" class=\"inline-link-button issue-frame-jump\" data-frame=\"" +
+      String(frameValue) +
+      "\" title=\"Pause input viewer and jump to this frame\">" +
+      escapeHtml(frameText) +
+      "</button>";
+    lastIndex = match.index + frameText.length;
+  }
+  html += escapeHtml(raw.slice(lastIndex));
+  return html;
+}
+
 function formatIssueList(list) {
   if (!list || !list.length) return "None";
-  return list.join("<br>");
+  return list.map((item) => formatIssueLine(item)).join("<br>");
 }
 
 function ensureItemUseCounts(inputs) {
@@ -8846,6 +8889,39 @@ function detectLowLevelInvalidEncodings(inputs) {
   return out;
 }
 
+function detectShortAccelerateReleases(inputs, startFrame) {
+  const out = {
+    hitCount: 0,
+    shortHits: 0,
+    longHits: 0,
+    firstFrame: null,
+  };
+  if (!inputs || inputs.error || !inputs.faceFrames || !inputs.frameCount) return out;
+
+  const frames = inputs.faceFrames;
+  const frameCount = inputs.frameCount | 0;
+  let i = Math.max(1, startFrame | 0);
+  while (i < frameCount) {
+    if ((frames[i] & 0x01) !== 0) {
+      i++;
+      continue;
+    }
+    const start = i;
+    while (i < frameCount && (frames[i] & 0x01) === 0) i++;
+    const end = i;
+    const duration = end - start;
+    const prevPressed = (frames[start - 1] & 0x01) !== 0;
+    const nextPressed = end < frameCount && (frames[end] & 0x01) !== 0;
+    if (!prevPressed || !nextPressed) continue;
+    if (duration < 1 || duration > 10) continue;
+    out.hitCount++;
+    if (out.firstFrame == null) out.firstFrame = start;
+    if (duration >= 5) out.longHits++;
+    else out.shortHits++;
+  }
+  return out;
+}
+
 function getAntiCheatThresholds(use200cc) {
   if (use200cc) {
     return {
@@ -8914,6 +8990,18 @@ function analyzeInputs(inputs, controllerId, thresholds) {
     const sample = invalidEncoding.invalidTrickExample == null ? "" : (", sample " + formatHex(invalidEncoding.invalidTrickExample, 2));
     warning.push("Invalid trick encoding detected (" + invalidEncoding.invalidTrickCount +
       " hit" + (invalidEncoding.invalidTrickCount === 1 ? "" : "s") + ", first at frame " + first + sample + ").");
+  }
+  const shortAccelRelease = detectShortAccelerateReleases(inputs, 240);
+  if (shortAccelRelease.shortHits > 0) {
+    const first = shortAccelRelease.firstFrame == null ? "?" : shortAccelRelease.firstFrame;
+    warning.push("Short accelerate release (" + shortAccelRelease.hitCount +
+      " hit" + (shortAccelRelease.hitCount === 1 ? "" : "s") + ", first at frame " + first +
+      "). Possibly pause-buffering, save-stating, controller issues or lag spike.");
+  } else if (shortAccelRelease.longHits > 0) {
+    const first = shortAccelRelease.firstFrame == null ? "?" : shortAccelRelease.firstFrame;
+    suspicious.push("Short accelerate release (" + shortAccelRelease.hitCount +
+      " hit" + (shortAccelRelease.hitCount === 1 ? "" : "s") + ", first at frame " + first +
+      "). Possibly pause-buffering, save-stating, controller issues or lag spike.");
   }
   const durationSec = frameCount / 60;
   // Removed stream-length mismatch heuristic (too noisy).
@@ -8992,15 +9080,15 @@ function analyzeInputs(inputs, controllerId, thresholds) {
   }
   if (largeStepHits >= 3) {
     const frameText = largeStepFirstFrame == null ? "" : ", first at frame " + largeStepFirstFrame;
-    warning.push("High single-frame controller movement (" + largeStepHits + " hits" + frameText + "). Likely pause-buffering or save-stating.");
+    warning.push("High single-frame controller movement (" + largeStepHits + " hits" + frameText + "). Likely pause-buffering, save-stating or lag spike.");
   } else if (largeStepHits >= 1) {
     const frameText = largeStepFirstFrame == null ? "" : ", first at frame " + largeStepFirstFrame;
-    suspicious.push("High single-frame controller movement (" + largeStepHits + " hit" + frameText + "). Likely pause-buffering or save-stating.");
+    suspicious.push("High single-frame controller movement (" + largeStepHits + " hit" + frameText + "). Likely pause-buffering, save-stating or lag spike.");
   }
   if (snapToNeutralHits >= 3) {
-    warning.push("Fast snap to neutral from high stick magnitude (" + snapToNeutralHits + " hits). Possible pause-buffering or save-stating.");
+    warning.push("Fast snap to neutral from high stick magnitude (" + snapToNeutralHits + " hits). Possibly pause-buffering, save-stating or lag spike.");
   } else if (snapToNeutralHits >= 1) {
-    suspicious.push("Fast snap to neutral from high stick magnitude (" + snapToNeutralHits + " hit). Possible pause-buffering or save-stating.");
+    suspicious.push("Fast snap to neutral from high stick magnitude (" + snapToNeutralHits + " hit). Possibly pause-buffering, save-stating or lag spike.");
   }
   if (illegalInputs >= 3) {
     const sample = illegalExample ? (", example " + illegalExample) : "";
@@ -9942,6 +10030,7 @@ function render(info) {
     document.getElementById("ckgdCtgpVersionCandidates").textContent = formatCtgpVersionCandidates(c.ctgpVersion);
     const ghostIdValue = document.getElementById("ckgdGhostIdValue");
     const ghostLink = document.getElementById("ckgdGhostLink");
+    const ghostMiiLink = document.getElementById("ckgdGhostMiiLink");
     const ghostIdHex = fileSha1Hex || null;
     if (ghostIdValue) {
       ghostIdValue.textContent = ghostIdHex || "Computing...";
@@ -9954,6 +10043,16 @@ function render(info) {
       } else {
         ghostLink.style.display = "none";
         ghostLink.removeAttribute("href");
+      }
+    }
+    if (ghostMiiLink) {
+      const ghostMiiUrl = ghostIdHex ? formatGhostMiiUrl(ghostIdHex) : null;
+      if (ghostMiiUrl) {
+        ghostMiiLink.href = ghostMiiUrl;
+        ghostMiiLink.style.display = "inline-block";
+      } else {
+        ghostMiiLink.style.display = "none";
+        ghostMiiLink.removeAttribute("href");
       }
     }
     const trackIdValue = document.getElementById("ckgdTrackIdValue");
@@ -10231,6 +10330,12 @@ function setInputFrameIndex(value) {
   renderInputFrame(currentInputs, idx);
 }
 
+function pauseAndJumpToInputFrame(value) {
+  if (!currentInputs) return;
+  setInputPlaying(false);
+  setInputFrameIndex(value);
+}
+
 function updateInputStepButtons() {
   const enabled = !!currentInputs && !inputPlayTimer;
   if (inputStepBackBtn) inputStepBackBtn.disabled = !enabled;
@@ -10268,6 +10373,22 @@ inputFrameNumber.addEventListener("input", () => {
   if (!currentInputs) return;
   setInputFrameIndex(parseInt(inputFrameNumber.value, 10));
 });
+
+function handleIssueFrameJumpClick(event) {
+  const target = event.target instanceof Element ? event.target.closest(".issue-frame-jump") : null;
+  if (!target) return;
+  const frame = parseInt(target.getAttribute("data-frame") || "", 10);
+  if (Number.isNaN(frame)) return;
+  pauseAndJumpToInputFrame(frame);
+}
+
+if (antiCheatSuspiciousEl) {
+  antiCheatSuspiciousEl.addEventListener("click", handleIssueFrameJumpClick);
+}
+
+if (antiCheatWarningEl) {
+  antiCheatWarningEl.addEventListener("click", handleIssueFrameJumpClick);
+}
 
 inputPlayBtn.addEventListener("click", () => {
   if (!currentInputs) return;
