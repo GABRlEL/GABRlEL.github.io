@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Godtool (Web) • v1.2</title>
+<title>Godtool (Web) • v1.2.1</title>
 <style>
   :root {
     --bg-main: #101014;
@@ -37,6 +37,9 @@
     gap: 6px;
     margin-bottom: 3px;
     flex-wrap: wrap;
+  }
+  header .row:first-child {
+    margin-bottom: 9px;
   }
   header .logo {
     font-weight: 700;
@@ -83,6 +86,22 @@ header .group-label {
   button:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+  #downloadBtn {
+    background: linear-gradient(180deg, #3a5b86 0%, #2f496e 100%);
+    border-color: #79b8ff;
+    color: #f7fbff;
+    font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(127, 195, 255, 0.12), 0 6px 16px rgba(18, 33, 56, 0.28);
+  }
+  #downloadBtn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #456893 0%, #38557d 100%);
+  }
+  #downloadBtn:disabled {
+    background: #222533;
+    border-color: #3a3d4e;
+    color: #eee;
+    box-shadow: none;
   }
   input[type="file"] {
     font-size: 12px;
@@ -146,6 +165,7 @@ header .group-label {
     width: 70px;
   }
   .dwc-field,
+  .dwc-fc-field,
   .dwc-salt-field,
   .fileinfo-field,
   .friends-field,
@@ -195,6 +215,9 @@ header .group-label {
     line-height: 1.4;
     border-radius: 4px;
     white-space: nowrap;
+  }
+  .dwc-fc-field {
+    width: 110px;
   }
 
   .dwc-warn-flag {
@@ -797,7 +820,7 @@ button.ghost-export-btn {
 <body>
 <header>
   <div class="row">
-    <span class="logo">Godtool (Web) • v1.2</span>
+    <span class="logo">Godtool (Web) • v1.2.1</span>
     <input type="file" id="fileInput" accept=".dat,.ikw,.rkp">
     <button id="downloadBtn" disabled>Download DAT</button>
     <span id="status">No file loaded</span>
@@ -824,6 +847,7 @@ button.ghost-export-btn {
     <button id="exportFriendsBtn"    disabled>Export Friends CSV</button>
     <button id="importFriendsBtn"    disabled>Import Friends CSV</button>
     <button id="exportAllMiisBtn"    disabled>Export Miis (ZIP)</button>
+    <button id="setFavoriteComboBtn" disabled>Set favorite combo on all licenses</button>
     <span class="toolbar-sep"></span>
     <label class="tool-toggle">
       <input type="checkbox" id="disablePackFeatures">
@@ -868,7 +892,7 @@ button.ghost-export-btn {
     The Retro Rewind community for providing many save files to help with development of the tool.
   </div>
   <div>
-    ChatGPT 5.1 Thinking, 5.2 Thinking, 5.2-Codex High & Extra High for making the tool.
+    ChatGPT 5.1 Thinking, 5.2 Thinking, 5.2 & 5.4 Codex High & Extra High for making the tool.
   </div>
 </footer>
 
@@ -931,6 +955,25 @@ button.ghost-export-btn {
       <button id="miiExportAllBtn">All</button>
       <button id="miiExportGlobalBtn">Global only</button>
       <button id="miiExportCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Favorite combo modal -->
+<div id="favoriteComboOverlay" class="modal-overlay">
+  <div class="modal">
+    <p>Set favorite combo on all licenses</p>
+    <div style="margin-bottom:10px;">
+      <label for="favoriteComboCharacter">Character</label>
+      <select id="favoriteComboCharacter"></select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label for="favoriteComboVehicle">Vehicle</label>
+      <select id="favoriteComboVehicle"></select>
+    </div>
+    <div class="modal-buttons">
+      <button id="favoriteComboOk">Set combo</button>
+      <button id="favoriteComboCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1930,7 +1973,13 @@ function getFriendCodeSaltBytesForLicense(lic) {
   return gameIdBytesToFcSalt(gameIdBytes) || DEFAULT_FC_SALT;
 }
 
-function pidToFriendCode(pid, saltBytes) {
+function formatFriendCodeDigits(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length !== 12) return digits;
+  return digits.slice(0, 4) + "-" + digits.slice(4, 8) + "-" + digits.slice(8);
+}
+
+function friendCodeChecksum(pid, saltBytes) {
   const salt = (saltBytes && saltBytes.length === 4) ? saltBytes : DEFAULT_FC_SALT;
   const buf = new Uint8Array(8);
   buf[0] = pid & 0xFF;
@@ -1942,11 +1991,41 @@ function pidToFriendCode(pid, saltBytes) {
   buf[6] = salt[2];
   buf[7] = salt[3];
   const md = md5Bytes(buf);
-  const csum = (md[0] >>> 1) & 0x7F;
+  return (md[0] >>> 1) & 0x7F;
+}
+
+function pidToFriendCode(pid, saltBytes) {
+  const csum = friendCodeChecksum(pid >>> 0, saltBytes);
   const fc64 = (BigInt(csum) << 32n) | BigInt(pid >>> 0);
   let s = fc64.toString(10);
   while (s.length < 12) s = "0" + s;
   return s.slice(0,4) + "-" + s.slice(4,8) + "-" + s.slice(8);
+}
+
+function friendCodeToPid(raw, saltBytes) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length !== 12) {
+    return { ok: false, message: "Friend code must contain exactly 12 digits." };
+  }
+  const fcVal = BigInt(digits);
+  const max39 = (1n << 39n) - 1n;
+  if (fcVal > max39) {
+    return { ok: false, message: "Friend code is out of range for Mario Kart Wii." };
+  }
+  const pid = Number(fcVal & 0xFFFFFFFFn) >>> 0;
+  const csum = Number((fcVal >> 32n) & 0x7Fn);
+  const expected = friendCodeChecksum(pid, saltBytes);
+  if (csum !== expected) {
+    return {
+      ok: false,
+      message: "Please check your input. The friend code checksum is invalid for the current game salt."
+    };
+  }
+  return {
+    ok: true,
+    pid,
+    formatted: formatFriendCodeDigits(digits)
+  };
 }
 
 function copyTextToClipboard(text, successMsg) {
@@ -2346,6 +2425,13 @@ const miiExportGlobalBtn = document.getElementById("miiExportGlobalBtn");
 const miiExportCancelBtn = document.getElementById("miiExportCancelBtn");
 let miiExportResolve     = null;
 
+const favoriteComboOverlay   = document.getElementById("favoriteComboOverlay");
+const favoriteComboCharacter = document.getElementById("favoriteComboCharacter");
+const favoriteComboVehicle   = document.getElementById("favoriteComboVehicle");
+const favoriteComboOk        = document.getElementById("favoriteComboOk");
+const favoriteComboCancel    = document.getElementById("favoriteComboCancel");
+let favoriteComboResolve     = null;
+
 function showUnsavedPrompt(label) {
   if (!unsavedOverlay || !unsavedMsg) {
     // Fallback: if modal is missing, just proceed without blocking.
@@ -2448,6 +2534,41 @@ function closeMiiExportPrompt(choice) {
   }
 }
 
+function showFavoriteComboPrompt() {
+  if (!favoriteComboOverlay || !favoriteComboCharacter || !favoriteComboVehicle) {
+    return Promise.resolve(null);
+  }
+  favoriteComboCharacter.innerHTML = "";
+  for (const [name] of FAVORITE_CHARACTERS) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    favoriteComboCharacter.appendChild(opt);
+  }
+  favoriteComboVehicle.innerHTML = "";
+  for (const [name] of FAVORITE_VEHICLES) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    favoriteComboVehicle.appendChild(opt);
+  }
+  favoriteComboCharacter.value = FAVORITE_CHARACTERS[0]?.[0] || "";
+  favoriteComboVehicle.value = FAVORITE_VEHICLES[0]?.[0] || "";
+  favoriteComboOverlay.style.display = "flex";
+  return new Promise(resolve => {
+    favoriteComboResolve = resolve;
+  });
+}
+
+function closeFavoriteComboPrompt(choice) {
+  if (favoriteComboOverlay) favoriteComboOverlay.style.display = "none";
+  if (favoriteComboResolve) {
+    const r = favoriteComboResolve;
+    favoriteComboResolve = null;
+    r(choice);
+  }
+}
+
 
 if (unsavedApplyBtn && unsavedDiscardBtn && unsavedCancelBtn) {
   unsavedApplyBtn.onclick   = () => closeUnsavedPrompt("apply");
@@ -2463,6 +2584,16 @@ if (miiExportLicenseBtn && miiExportAllBtn && miiExportGlobalBtn && miiExportCan
   miiExportAllBtn.onclick = () => closeMiiExportPrompt({ mode: "all" });
   miiExportGlobalBtn.onclick = () => closeMiiExportPrompt({ mode: "global" });
   miiExportCancelBtn.onclick = () => closeMiiExportPrompt(null);
+}
+
+if (favoriteComboOk && favoriteComboCancel) {
+  favoriteComboOk.onclick = () => {
+    closeFavoriteComboPrompt({
+      character: favoriteComboCharacter ? favoriteComboCharacter.value : "",
+      vehicle: favoriteComboVehicle ? favoriteComboVehicle.value : ""
+    });
+  };
+  favoriteComboCancel.onclick = () => closeFavoriteComboPrompt(null);
 }
 
 async function withUnsavedGuard(onOk) {
@@ -2514,7 +2645,7 @@ document.getElementById("fileInput").addEventListener("change", async ev => {
     if (!isRkpSize && !isRksysSize) {
       alert(
         "Unexpected file size: got " + arr.length +
-        " bytes, expected 0x2BC000 (standard), 0x28000 (IKW trimmed), or 0x8CC0 (.rkp)."
+        " bytes, expected 0x2BC000 (standard), 0x28000 (trimmed save), or 0x8CC0 (.rkp)."
       );
       return;
     }
@@ -2579,14 +2710,13 @@ document.getElementById("fileInput").addEventListener("change", async ev => {
     currentFileMode = "rksys";
     hasDownloaded = false;
     updateDownloadLabel();
-    const sizeNote = (arr.length === 0x28000) ? " (IKW trimmed)" : "";
+    const isIkwExt = /\.ikw$/i.test(file.name || "");
+    const sizeNote = (arr.length === 0x28000)
+      ? (isIkwExt ? " (IKW trimmed)" : " (trimmed)")
+      : "";
     statusEl.textContent = "Loaded " + file.name + " (" + arr.length + " bytes)" + sizeNote;
     enableButtons(true);
     syncRegionSelectorFromSave();   // ← this line is new
-    const isIkwExt = /\.ikw$/i.test(file.name || "");
-    if (arr.length === 0x28000 && !isIkwExt) {
-      alert("Warning: This file is trimmed to 0x28000 bytes but does not have a .ikw extension. This is unusual.");
-    }
     const toggle = document.getElementById("disablePackFeatures");
     if (isIkwExt) {
       disablePackFeatures = true;
@@ -2657,7 +2787,7 @@ function enableButtons(enabled) {
     "downloadBtn","exportLicenseBtn","importLicenseBtn","copyLicenseBtn",
     "swapLicenseBtn","deleteLicenseBtn","blankLicenseBtn","recomputeCrcsBtn","showCrcBtn",
     "completeNormalBtn","completeExpertBtn","staffGhostsBtn",
-    "exportFriendsBtn","importFriendsBtn","exportAllMiisBtn",
+    "exportFriendsBtn","importFriendsBtn","exportAllMiisBtn","setFavoriteComboBtn",
     "regionApplyBtn"
   ];
   ids.forEach(id => {
@@ -2672,6 +2802,7 @@ function enableButtons(enabled) {
       "recomputeCrcsBtn",
       "showCrcBtn",
       "regionApplyBtn",
+      "setFavoriteComboBtn",
       "exportLicenseBtn",
       "importLicenseBtn",
       "copyLicenseBtn",
@@ -2987,6 +3118,34 @@ document.getElementById("exportAllMiisBtn").onclick = async () => {
   } else if (choice.mode === "license") {
     exportLicenseMiisZip(choice.lic);
   }
+};
+
+document.getElementById("setFavoriteComboBtn").onclick = async () => {
+  if (!ensureLoaded()) return;
+  await withUnsavedGuard(async () => {
+    if (currentFileMode === "rkp") return;
+    const choice = await showFavoriteComboPrompt();
+    if (!choice) return;
+
+    const charOff = new Map(FAVORITE_CHARACTERS).get(choice.character);
+    const vehOff = new Map(FAVORITE_VEHICLES).get(choice.vehicle);
+    if (charOff === undefined || vehOff === undefined) {
+      alert("Failed to resolve favorite combo offsets.");
+      return;
+    }
+
+    for (let lic = 0; lic < 4; lic++) {
+      const base = licBase(lic);
+      view.setUint16(base + charOff, 0xFFFF, false);
+      view.setUint16(base + vehOff, 0xFFFF, false);
+    }
+
+    hasDownloaded = false;
+    statusEl.textContent =
+      `Set ${choice.character} + ${choice.vehicle} to 65535 on all licenses.`;
+    clearDirtyTab(true);
+    renderCurrentTab();
+  });
 };
 friendsCsvInput.addEventListener("change", ev => {
   const file = ev.target.files[0];
@@ -4032,6 +4191,14 @@ function renderDwcTab(lic) {
   const gameIdBytes = content.slice(base + 0x24, base + 0x28);
   const gameIdText = formatGameIdSalt(gameIdBytes);
   const gameIdFormat = gameIdSaltFormatLabel(gameIdText);
+  const pid = view.getUint32(base + 0x1C, false) >>> 0;
+  let friendCode = "";
+  try {
+    friendCode = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic));
+  } catch (e) {
+    friendCode = "(error)";
+  }
+  const friendCodeFieldValue = /^\d{4}-\d{4}-\d{4}$/.test(friendCode) ? friendCode : "";
   let html = `<div class="group-box">
     <div class="group-title">DWC User Data</div>
     <div class="grid-2col">`;
@@ -4044,6 +4211,24 @@ function renderDwcTab(lic) {
   `;
   for (const [label, off] of DWC_FIELDS) {
     const val = view.getUint32(base + off, false) >>> 0;
+    if (off === 0x1C) {
+      html += `
+      <label>${label}</label>
+      <span class="dwc-input-wrap">
+        <input type="number" class="small-input dwc-field"
+               id="dwcProfileIdInput"
+               data-off="${off}" value="${val}">
+        <button id="dwcPidFromFcBtn" class="copy-btn" type="button" title="Convert friend code to Profile ID">←</button>
+        <input type="text" class="small-input dwc-fc-field"
+               id="dwcFriendCodeInput"
+               inputmode="numeric"
+               maxlength="14"
+               value="${friendCodeFieldValue}"
+               placeholder="Friend code">
+      </span>
+    `;
+      continue;
+    }
     html += `
       <label>${label}</label>
       <span class="dwc-input-wrap">
@@ -4056,13 +4241,6 @@ function renderDwcTab(lic) {
       </div>
       <div id="dwcWarningSummaryWrap"></div>
     </div>`;
-  const pid = view.getUint32(base + 0x1C, false) >>> 0;
-  let friendCode = "";
-  try {
-    friendCode = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic));
-  } catch (e) {
-    friendCode = "(error)";
-  }
   html += `
     <div style="margin-top:4px; font-size:12px;">
       Friend Code (from Profile ID):
@@ -4085,9 +4263,12 @@ function renderDwcTab(lic) {
     if (btn) btn.click();
   });
   const dwcInputs = tabContent.querySelectorAll(".dwc-field");
+  const pidInput = document.getElementById("dwcProfileIdInput");
+  const fcInput = document.getElementById("dwcFriendCodeInput");
   dwcInputs.forEach(inp => {
     inp.addEventListener("input", () => {
       markDirtyNow();
+      syncDwcFriendCodeDisplay();
       markDwcWarnings(lic);
     });
   });
@@ -4097,22 +4278,82 @@ function renderDwcTab(lic) {
       const fmtEl = document.getElementById("dwcGameIdSaltFormat");
       if (fmtEl) fmtEl.textContent = gameIdSaltFormatLabel(gameIdInput.value);
       markDirtyNow();
+      syncDwcFriendCodeDisplay();
       markDwcWarnings(lic);
     });
   }
 
+  function getCurrentFriendCodeSaltBytes() {
+    if (gameIdInput) {
+      const parsed = parseGameIdSaltInput(gameIdInput.value);
+      if (!parsed) return null;
+      return gameIdBytesToFcSalt(parsed) || DEFAULT_FC_SALT;
+    }
+    return getFriendCodeSaltBytesForLicense(lic);
+  }
+
+  function syncDwcFriendCodeDisplay() {
+    const fcTextEl = document.getElementById("dwcFriendCodeText");
+    const saltBytes = getCurrentFriendCodeSaltBytes();
+    const rawPid = pidInput ? String(pidInput.value).trim() : "";
+    const pidVal = /^[+-]?\d+$/.test(rawPid) ? Number(rawPid) : NaN;
+    let fcText = "—";
+    if (saltBytes == null) {
+      fcText = "(invalid salt)";
+    } else if (Number.isFinite(pidVal) && pidVal !== 0) {
+      try {
+        fcText = pidToFriendCode(pidVal >>> 0, saltBytes);
+      } catch (e) {
+        fcText = "(error)";
+      }
+    }
+    if (fcTextEl) fcTextEl.textContent = fcText;
+    if (fcInput) {
+      const lastComputed = fcInput.dataset.lastComputed || "";
+      const currentValue = String(fcInput.value || "").trim();
+      if (!currentValue || currentValue === lastComputed) {
+        fcInput.value = /^\d{4}-\d{4}-\d{4}$/.test(fcText) ? fcText : "";
+      }
+      fcInput.dataset.lastComputed = /^\d{4}-\d{4}-\d{4}$/.test(fcText) ? fcText : "";
+    }
+  }
+
   markDwcWarnings(lic);
+  syncDwcFriendCodeDisplay();
 
   const copyFcBtn = document.getElementById("dwcCopyFriendCodeBtn");
   if (copyFcBtn) {
     copyFcBtn.onclick = () => {
       const txtEl = document.getElementById("dwcFriendCodeText");
       const fcText = txtEl ? txtEl.textContent.trim() : "";
-      if (!fcText || fcText === "—" || fcText === "(error)") {
+      if (!fcText || fcText === "—" || fcText === "(error)" || fcText === "(invalid salt)") {
         alert("No friend code to copy.");
         return;
       }
       copyTextToClipboard(fcText, "Friend code copied.");
+    };
+  }
+
+  const pidFromFcBtn = document.getElementById("dwcPidFromFcBtn");
+  if (pidFromFcBtn) {
+    pidFromFcBtn.onclick = () => {
+      if (!pidInput || !fcInput) return;
+      const saltBytes = getCurrentFriendCodeSaltBytes();
+      if (!saltBytes) {
+        alert("Game ID salt must be 4 ASCII characters or 8 hex digits.");
+        return;
+      }
+      const res = friendCodeToPid(fcInput.value, saltBytes);
+      if (!res.ok) {
+        alert(res.message);
+        return;
+      }
+      pidInput.value = String(res.pid >>> 0);
+      fcInput.value = res.formatted;
+      fcInput.dataset.lastComputed = res.formatted;
+      markDirtyNow();
+      syncDwcFriendCodeDisplay();
+      markDwcWarnings(lic);
     };
   }
 
@@ -4122,15 +4363,13 @@ function renderDwcTab(lic) {
       if (!content || !view) return;
       const resultEl = document.getElementById("dwcRwfcResult");
 
-      const pid = view.getUint32(base + 0x1C, false) >>> 0;
-      if (!pid) {
+      const fcTextEl = document.getElementById("dwcFriendCodeText");
+      const fc = fcTextEl ? fcTextEl.textContent.trim() : "";
+      if (!fc || fc === "—") {
         if (resultEl) resultEl.textContent = "No Profile ID found.";
         return;
       }
-
-      let fc = "";
-      try { fc = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic)); } catch (e) { fc = ""; }
-      if (!fc) {
+      if (fc === "(error)" || fc === "(invalid salt)") {
         if (resultEl) resultEl.textContent = "Failed to compute friend code.";
         return;
       }
@@ -5728,7 +5967,8 @@ function rrClamp(v, lo, hi) {
 
 const rrRound2 = x => Math.round(x * 100) / 100;
 
-function rrScoreToRank(score) {
+function rrScoreToRank(score, eligible = true) {
+  if (!eligible) return 0;
   if (score >= 100) return 9;
   if (score >= 94)  return 8;
   if (score >= 84)  return 7;
@@ -5737,12 +5977,11 @@ function rrScoreToRank(score) {
   if (score >= 48)  return 4;
   if (score >= 36)  return 3;
   if (score >= 24)  return 2;
-  if (score >= 12)  return 1;
-  return 0;
+  return 1;
 }
 
-function rrNextThresholdFromScore(score) {
-  const r = rrScoreToRank(score);
+function rrNextThresholdFromScore(score, eligible = true) {
+  const r = rrScoreToRank(score, eligible);
   if (r >= 9) return null;
   return RR_RANK_THRESH[r];
 }
@@ -5760,8 +5999,8 @@ function rrComputeScore(stats) {
   if (vrClamped > 1000.0) vrClamped = 1000.0;
   const vrNorm = (vrClamped / 1000.0) * 100.0;
 
-  const firstsNorm  = (firsts >= 2500.0)   ? 100.0 : (100.0 * firsts  / 2500.0);
-  const distNorm    = (dist   >= 50000.0)  ? 100.0 : (100.0 * dist    / 50000.0);
+  const firstsNorm  = (firsts >= 2250.0)   ? 100.0 : (100.0 * firsts  / 2250.0);
+  const distNorm    = (dist   >= 40000.0)  ? 100.0 : (100.0 * dist    / 40000.0);
   const dist1stNorm = (dist1st >= 10000.0) ? 100.0 : (100.0 * dist1st / 10000.0);
 
   const M =
@@ -5791,12 +6030,12 @@ function rrComputeScore(stats) {
 
 function rrNeededForNext(stats) {
   const cur = rrComputeScore(stats);
-  const thr = rrNextThresholdFromScore(cur.score);
+  const thr = rrNextThresholdFromScore(cur.score, cur.eligible);
 
   if (thr == null) {
     return {
       currentScore: cur.score,
-      currentRank: rrScoreToRank(cur.score),
+      currentRank: rrScoreToRank(cur.score, cur.eligible),
       nextRank: null,
       threshold: null,
       details: null
@@ -5840,8 +6079,8 @@ function rrNeededForNext(stats) {
 
   const vrRaw     = rrClamp(Math.ceil(vrNormReq      * 10 * 100), 0, 1000 * 100);
   const winPctRaw = rrClamp(Math.ceil(winPctReq      * 100) / 100, 0, 100);
-  const firstsRaw = rrClamp(Math.ceil(firstsNormReq  * 25), 0, 2500);
-  const distRaw   = rrClamp(Math.ceil(distNormReq    * 500), 0, 50000);
+  const firstsRaw = rrClamp(Math.ceil(firstsNormReq  * 22.5), 0, 2250);
+  const distRaw   = rrClamp(Math.ceil(distNormReq    * 400), 0, 40000);
   const dist1Raw  = rrClamp(Math.ceil(dist1stNormReq * 100), 0, 10000);
 
   function feas(normReq) {
@@ -5864,8 +6103,8 @@ function rrNeededForNext(stats) {
 
   return {
     currentScore: cur.score,
-    currentRank: rrScoreToRank(cur.score),
-    nextRank:    rrScoreToRank(thr),
+    currentRank: rrScoreToRank(cur.score, cur.eligible),
+    nextRank:    rrScoreToRank(thr, true),
     threshold:   thr,
     details: {
       vrPoints: {
@@ -6015,7 +6254,7 @@ function renderRecordsTab(lic) {
   // Retro Rewind: compute current score & rank from file
   const rrFileStats   = rrStatsFromFile(lic);
   const rrScoreInfo   = rrComputeScore(rrFileStats);
-  const rrRankIndex   = rrScoreToRank(rrScoreInfo.score);
+  const rrRankIndex   = rrScoreToRank(rrScoreInfo.score, rrScoreInfo.eligible);
   const rrRankLabel   = RR_RANK_LABELS[rrRankIndex] || "Unranked";
   const rrScorePretty = rrRound2(rrScoreInfo.score).toFixed(2);
   const rrScoreSuffix = rrScoreInfo.eligible ? "" : `; ${rrScoreInfo.totalVs}/${RR_MIN_VS_MATCHES} VS races`;
@@ -6137,7 +6376,7 @@ function renderRecordsTab(lic) {
 
     const stats = rrStatsFromDom();
     const info = rrComputeScore(stats);
-    const rankIndex = rrScoreToRank(info.score);
+    const rankIndex = rrScoreToRank(info.score, info.eligible);
     const label = RR_RANK_LABELS[rankIndex] || "Unranked";
     const scorePretty = rrRound2(info.score).toFixed(2);
     const suffix = info.eligible ? "" : `; ${info.totalVs}/${RR_MIN_VS_MATCHES} VS races`;
@@ -6304,7 +6543,7 @@ Remaining needed: ${RR_MIN_VS_MATCHES - totalVs}`);
       }
       const cur   = rrComputeScore(stats);
       const need  = rrNeededForNext(stats);
-      const curRankLabel = RR_RANK_LABELS[rrScoreToRank(cur.score)] || "Unranked";
+      const curRankLabel = RR_RANK_LABELS[rrScoreToRank(cur.score, cur.eligible)] || "Unranked";
 
       let msg =
 `Current RR score: ${rrRound2(cur.score).toFixed(2)} (${curRankLabel})`;
@@ -8452,7 +8691,7 @@ function renderGhostsTab(lic, initialSlot) {
     tabContent.innerHTML = `
       <div class="group-box">
         <div class="group-title">Ghosts</div>
-        <div>Ghost data is not present in this file (IKW trimmed save).</div>
+        <div>Ghost data is not present in this file (trimmed save).</div>
       </div>`;
     return;
   }
