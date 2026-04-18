@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Retro Rewind — rksys.dat Rank Helper by Gab</title>
+<title>Retro Rewind — Rank Helper by Gab</title>
 <style>
   :root { --bg:#0b0e13; --panel:#121722; --muted:#9aa4b2; --text:#e8ecf1; --accent:#6ad3ff; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; }
   html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font:14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
@@ -64,10 +64,12 @@
 </head>
 <body>
   <header>
-    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.4.1</h1>
+    <h1>Retro Rewind — <span class="accent">rksys.dat</span> Rank Helper <span class="accent">by Gab</span> — based on v6.9.2</h1>
     <div class="row">
-      <input id="file" type="file" accept=".dat" />
+      <input id="file" type="file" accept=".dat,.ikw" />
       <div id="dropzone" class="card">Drop <code>rksys.dat</code> here</div>
+      <input id="ratingFile" type="file" accept=".pul" />
+      <div id="ratingDropzone" class="card">Drop <code>RRRating.pul</code> here</div>
       <div class="hint" id="meta"></div>
     </div>
   </header>
@@ -97,12 +99,12 @@
           <div class="section">
             <p>This tool reads <code>rksys.dat</code> locally in your browser and shows, for each license, the stats used by Retro Rewind’s VS ranking alongside the <em>minimum</em> value each stat would have to reach (if changed in isolation) to hit the next rank threshold.</p>
             <ul>
-              <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (50%), VS win% (30%), 1st-place count (10%), distance travelled (5%), distance while 1st (5%).</li>
-              <li>Normalizations: VR 0–30000 → 0–100; 1st-place: 0–1250 → 0–100 (saturates by 2725); distance: 0–50000 → 0–100 (saturates by 100000); 1st distance: 0–10000 → 0–100 (saturates by 25000); Win% 0–100 (if no VS races, baseline 45%).</li>
-              <li>Affine mapping uses anchors so that a strong profile maps near 100 and a weak/brand new profile maps near ~10. Ranks are bucketed by the score (12,24,36,48,60,72,84,94,100).</li>
-              <li>Per-stat notes for max rank (with other stats maxed): VR ≈ 19,650; VS Win% ≈ 43%; there is no hard minimum for Times 1st or distance metrics — extremely strong VR and Win% can still reach max rank even with low 1st-place and distance values.</li>
+              <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (60%), VS win% (15%), 1st-place count (15%), distance travelled (5%), distance while 1st (5%).</li>
+              <li>For the rank score, VR counts up to 100,000, 1st places up to 2,250, distance up to 40,000 m, and 1st-place distance up to 10,000 m. Going above those maximums does not raise the score further. Win% uses 0–100, or 45% if you have no VS races.</li>
+              <li>Your stats are turned into a score from 0 to 100, and that score decides your rank. The promotion points are 12, 24, 36, 48, 60, 72, 84, 94, and 100. Once you have at least 100 VS races, any score below 24 is still rank 1.</li>
+              <li>Per-stat notes for max rank (with other stats near their effective caps): VR effectively caps for the ranking model around 100,000 VR ; VS Win% is anchored around 55%; there is no simple hard minimum for Times 1st or distance metrics — they still help, but strong VR and Win% dominate and can achieve top rank even if 1st-place and distance values are not maxed.</li>
               <li>Nothing is uploaded; everything is client-side. You can save this file and run it offline.</li>
-              <li>Made by ChatGPT 5 Thinking.</li>
+              <li>Made by ChatGPT 5 Thinking and GPT 5.4 Codex Extra-High.</li>
             </ul>
           </div>
         </details>
@@ -116,6 +118,8 @@
   // ===== rksys constants
   const LICENSE_OFFSETS = [0x08, 0x8CC8, 0x11988, 0x1A648];
   const REGION_ID_OFFSET = 0x26B0A; // global
+  const FULL_RKSYS_SIZE = 0x2BC000;
+  const TRIMMED_RKSYS_SIZE = 0x28000;
   const DWC_OFFSET = 0x40; // license-local DWC
 
   // record offsets (license-local)
@@ -145,6 +149,7 @@
   const U32 = (dv, off) => dv.getUint32(off, false);
   const I32 = (dv, off) => dv.getInt32(off, false);
   const F32 = (dv, off) => dv.getFloat32(off, false);
+  const hasBytes = (dv, off, len) => off >= 0 && (off + len) <= dv.byteLength;
 
   // ===== UI helpers =====
   const $ = sel => document.querySelector(sel);
@@ -177,14 +182,16 @@
   }
   function pidToFriendCode(pid){ pid=(pid>>>0); const buf=new Uint8Array(8); buf[0]=pid&0xFF; buf[1]=(pid>>>8)&0xFF; buf[2]=(pid>>>16)&0xFF; buf[3]=(pid>>>24)&0xFF; buf[4]=0x4A; buf[5]=0x43; buf[6]=0x4D; buf[7]=0x52; const md=md5Bytes(buf), csum=md[0]>>>1; const fc=(BigInt(csum)<<32n)|BigInt(pid); let s=fc.toString(); if(s.length<12) s=s.padStart(12,'0'); return `${s.slice(0,4)}-${s.slice(4,8)}-${s.slice(8,12)}`; }
 
-  // ===== Ranking model (mirrors Retro Rewind implementation)
-  const W_VR=0.50, W_RWIN=0.30, W_FIRSTS=0.10, W_DIST=0.05, W_DIST1ST=0.05;
-  const AH={VR:100.0,RWIN:65.0,FIRSTS:55.0,DIST:75.0,DIST1ST:80.0};
-  const AL={VR:16.6667,RWIN:50.0,FIRSTS:0.0,DIST:0.0,DIST1ST:0.0};
+  // ===== Ranking model (mirrors Retro Rewind implementation, Ranking.cpp)
+  const W_VR=0.60, W_RWIN=0.15, W_FIRSTS=0.15, W_DIST=0.05, W_DIST1ST=0.05;
+  const AH={VR:100.0,RWIN:55.0,FIRSTS:100.0,DIST:100.0,DIST1ST:100.0};
+  const AL={VR:5.0,RWIN:50.0,FIRSTS:0.0,DIST:0.0,DIST1ST:0.0};
   const M1=W_VR*AH.VR + W_RWIN*AH.RWIN + W_FIRSTS*AH.FIRSTS + W_DIST*AH.DIST + W_DIST1ST*AH.DIST1ST;
   const M2=W_VR*AL.VR + W_RWIN*AL.RWIN + W_FIRSTS*AL.FIRSTS + W_DIST*AL.DIST + W_DIST1ST*AL.DIST1ST;
-  const ALPHA = 89.0 / (M1 - M2);
+  const ALPHA = 90.0 / (M1 - M2);
   const BETA  = 100.0 - ALPHA * M1;
+  const MIN_VS_MATCHES = 100;
+
 
   // Rank icon mapping (index 1..9). Put these PNGs next to the HTML, or
   // define window.RR_RANK_ICONS as an array of data-URIs to embed inline.
@@ -202,36 +209,86 @@
   ];
 
   const RANK_THRESH = [12,24,36,48,60,72,84,94,100];
-  function scoreToRank(score){ if(score>=100) return 9; if(score>=94) return 8; if(score>=84) return 7; if(score>=72) return 6; if(score>=60) return 5; if(score>=48) return 4; if(score>=36) return 3; if(score>=24) return 2; if(score>=12) return 1; return 0; }
-  function nextThresholdFromScore(score){ const r=scoreToRank(score); if(r>=9) return null; return RANK_THRESH[r]; }
+  function rankFromScore(score){
+    if(score>=100.0) return 9;
+    if(score>=94.0)  return 8;
+    if(score>=84.0)  return 7;
+    if(score>=72.0)  return 6;
+    if(score>=60.0)  return 5;
+    if(score>=48.0)  return 4;
+    if(score>=36.0)  return 3;
+    if(score>=24.0)  return 2;
+    return 1;
+  }
+  function scoreToRank(score, meetsRaceReq=true){ return meetsRaceReq ? rankFromScore(score) : 0; }
+  function nextThresholdFromRank(rank){ if(rank>=9) return null; return RANK_THRESH[rank]; }
+  function nextThresholdFromScore(score, meetsRaceReq=true){ return nextThresholdFromRank(scoreToRank(score, meetsRaceReq)); }
 
   function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
   const round2 = x => Math.round(x*100)/100;
+
+  // VR range helpers:
+  // - Internal rating: 0–10000.00 (float, as used in the C++ code)
+  // - "Fancy" VR: 0–1,000,000 (internal * 100, what the user types/sees)
+  const MAX_VR_FLOAT = 10000.0;
+  const MAX_VR_FANCY = 1000000.0;
+
+  // Accept either:
+  //  - direct rating (0–10000)
+  //  - or "fancy" VR (0–1000000 = rating*100)
+  function toInternalVr(vrPoints){
+    let v = Number(vrPoints);
+    if (!isFinite(v)) v = 0;
+    // Work purely in "fancy" VR units (rating × 100) for UI / save values.
+    v = Math.round(v);
+    v = clamp(v, 0, MAX_VR_FANCY);
+    const rating = v / 100.0;
+    return clamp(rating, 0, MAX_VR_FLOAT);
+  }
 
   function computeScore(stats){
     const {vrPoints, vsWins, vsLosses, firsts, dist, dist1st} = stats;
     const totalVs = vsWins + vsLosses;
     const winPct = totalVs>0 ? (100.0 * vsWins / totalVs) : 45.0;
-    const vrNorm = clamp((clamp(vrPoints,0,30000) / 30000.0) * 100.0, 0, 100);
-    const firstsNorm = (firsts >= 2725) ? 100.0 : (100.0*firsts/1250.0);
-    const distNorm = (dist >= 100000) ? 100.0 : (100.0*dist/50000.0);
-    const dist1stNorm = (dist1st >= 25000) ? 100.0 : (100.0*dist1st/10000.0);
+
+    // VR normalization mirrors ComputeVsScoreFromLicense:
+    // toInternalVr plays the role of PointRating::GetUserVR, then we clamp to [0,1000]
+    const vrInternal = toInternalVr(vrPoints);
+    let vrClamped = vrInternal;
+    if (vrClamped > 1000.0) vrClamped = 1000.0;
+    if (vrClamped < 0.0)   vrClamped = 0.0;
+    const vrNorm = (vrClamped / 1000.0) * 100.0;
+
+    // Other stats as in Ranking.cpp
+    const firstsNorm = (firsts >= 2250.0) ? 100.0 : (100.0 * firsts / 2250.0);
+    const distNorm   = (dist   >= 40000.0) ? 100.0 : (100.0 * dist   / 40000.0);
+    const dist1stNorm= (dist1st>= 10000.0) ? 100.0 : (100.0 * dist1st/ 10000.0);
+
     const M = W_VR*vrNorm + W_RWIN*winPct + W_FIRSTS*firstsNorm + W_DIST*distNorm + W_DIST1ST*dist1stNorm;
-    const score = clamp(ALPHA*M + BETA, 0, 100);
-    return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm};
+    let score = clamp(ALPHA*M + BETA, 0, 100);
+
+    const meetsRaceReq = (totalVs >= MIN_VS_MATCHES);
+    if (!meetsRaceReq) {
+      // Mirror in-game behavior: no rank until minimum VS matches are met.
+      score = 0.0;
+    }
+
+    return {score, M, winPct, vrNorm, firstsNorm, distNorm, dist1stNorm, totalVs, meetsRaceReq};
   }
 
-  function neededForNext(stats){
+  function neededForNext(stats, respectRaceReq=true){
     const cur = computeScore(stats);
-    const thr = nextThresholdFromScore(cur.score);
+    const effectiveScore = respectRaceReq ? cur.score : clamp(ALPHA*cur.M + BETA, 0, 100);
+    const curRank = respectRaceReq ? scoreToRank(cur.score, cur.meetsRaceReq) : rankFromScore(effectiveScore);
+    const thr = nextThresholdFromRank(curRank);
     if(thr==null) return { note:'Already max rank', byStat:null, threshold:null };
     const M_req = (thr - BETA) / ALPHA; // target composite M
 
     const totals = { VR:W_VR, RWIN:W_RWIN, FIRSTS:W_FIRSTS, DIST:W_DIST, DIST1ST:W_DIST1ST };
 
     const otherSum = (omit) => {
-      const {vrNorm, winPct, firstsNorm, distNorm, dist1stNorm} = computeScore(stats);
-      const parts = { VR:vrNorm, RWIN:winPct, FIRSTS:firstsNorm, DIST:distNorm, DIST1ST:dist1stNorm };
+      const base = computeScore(stats);
+      const parts = { VR:base.vrNorm, RWIN:base.winPct, FIRSTS:base.firstsNorm, DIST:base.distNorm, DIST1ST:base.dist1stNorm };
       let s=0; for(const k of Object.keys(parts)){ if(k!==omit) s += totals[k]*parts[k]; }
       return s;
     };
@@ -239,21 +296,30 @@
     function solveNorm(omit){
       const sumOthers = otherSum(omit);
       const w = totals[omit];
-      const neededNorm = (M_req - sumOthers) / w; // raw 0..100-ish
+      const neededNorm = (M_req - sumOthers) / w; // raw 0..100-ish (but may exceed 100 → infeasible)
       return neededNorm;
     }
 
-    const vrNormReq   = solveNorm('VR');
-    const winPctReq   = solveNorm('RWIN');
-    const firstsNormReq = solveNorm('FIRSTS');
-    const distNormReq   = solveNorm('DIST');
-    const dist1stNormReq= solveNorm('DIST1ST');
+    const vrNormReq      = solveNorm('VR');
+    const winPctReq      = solveNorm('RWIN');
+    const firstsNormReq  = solveNorm('FIRSTS');
+    const distNormReq    = solveNorm('DIST');
+    const dist1stNormReq = solveNorm('DIST1ST');
 
-    const vrRaw     = clamp(Math.ceil(vrNormReq * 300), 0, 30000); // 100→30000
+    // VR:
+    //   vrNorm = 100 * vrClamped / 1000, with vrClamped in [0,1000]
+    //   → required internal VR; UI always uses "fancy" VR = rating × 100
+    const vrInternalRaw = clamp(
+      Math.ceil(vrNormReq * 10.0),  // vrNorm = vrInternal / 10
+      0,
+      1000.0
+    );
+    const vrRaw = Math.round(vrInternalRaw * 100.0);
+
     const winPctRaw = clamp(Math.ceil(winPctReq * 100) / 100, 0, 100); // show 2dp
-    const firstsRaw = clamp(Math.ceil(firstsNormReq * 12.5), 0, 2725);   // 100→1250 (saturates by 2725)
-    const distRaw   = clamp(Math.ceil(distNormReq   * 500), 0, 100000); // 100→50000 (saturates by 100000)
-    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 100), 0, 25000); // 100→10000 (saturates by 25000)
+    const firstsRaw = clamp(Math.ceil(firstsNormReq * 22.5), 0, 2250);   // 100→2250
+    const distRaw   = clamp(Math.ceil(distNormReq   * 400.0), 0, 40000);  // 100→40000
+    const dist1Raw  = clamp(Math.ceil(dist1stNormReq* 100.0), 0, 10000);  // 100→10000
 
     function feas(normReq){ return normReq<=100 ? 'ok' : (normReq<=110 ? 'warn' : 'bad'); }
 
@@ -278,8 +344,8 @@
     };
   }
 
-  function rankLabel(score){
-    const r=scoreToRank(score);
+  function rankLabel(score, meetsRaceReq=true){
+    const r=scoreToRank(score, meetsRaceReq);
     const labels=['0','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ'];
     return {rank:r, label:labels[r]||String(r)};
   }
@@ -299,7 +365,17 @@
   function span(kind, text){ const s=document.createElement('span'); s.className=kind==='ok'?'ok':(kind==='warn'?'warn':'bad'); s.textContent=text; return s; }
 
   // ===== License helpers =====
-  function readMiiName(dv, licBase){ const bytes=new Uint8Array(dv.buffer, licBase+0x14, 0x14); let s=''; for(let i=0;i<bytes.length;i+=2){ const code=(bytes[i]<<8)|bytes[i+1]; if(!code) break; s+=String.fromCharCode(code);} return s||'—'; }
+  function readMiiName(dv, licBase){
+    if (!hasBytes(dv, licBase + 0x14, 0x14)) return '—';
+    const bytes = new Uint8Array(dv.buffer, dv.byteOffset + licBase + 0x14, 0x14);
+    let s = '';
+    for(let i=0;i<bytes.length;i+=2){
+      const code=(bytes[i]<<8)|bytes[i+1];
+      if(!code) break;
+      s+=String.fromCharCode(code);
+    }
+    return s || '—';
+  }
 
   // Compute contributions that exactly sum to FINAL score (0–100)
   function computeContrib(stats){
@@ -329,23 +405,61 @@
   }
 
   function readStats(dv, licBase){
-    const vrPoints = U16(dv, licBase+OFF_VR);
-    const vsWins   = I32(dv, licBase+OFF_VS_WINS);
-    const vsLosses = I32(dv, licBase+OFF_VS_LOSSES);
-    const firsts   = I32(dv, licBase+OFF_FIRSTS);
-    const dist     = F32(dv, licBase+OFF_DIST);
-    const dist1st  = F32(dv, licBase+OFF_DIST1ST);
+    const vrPoints = hasBytes(dv, licBase + OFF_VR, 2) ? U16(dv, licBase + OFF_VR) : 0;
+    const vsWins   = hasBytes(dv, licBase + OFF_VS_WINS, 4) ? I32(dv, licBase + OFF_VS_WINS) : 0;
+    const vsLosses = hasBytes(dv, licBase + OFF_VS_LOSSES, 4) ? I32(dv, licBase + OFF_VS_LOSSES) : 0;
+    const firsts   = hasBytes(dv, licBase + OFF_FIRSTS, 4) ? I32(dv, licBase + OFF_FIRSTS) : 0;
+    const dist     = hasBytes(dv, licBase + OFF_DIST, 4) ? F32(dv, licBase + OFF_DIST) : 0;
+    const dist1st  = hasBytes(dv, licBase + OFF_DIST1ST, 4) ? F32(dv, licBase + OFF_DIST1ST) : 0;
     return { vrPoints, vsWins, vsLosses, firsts, dist, dist1st };
   }
 
   // ===== State =====
-  const STATE = { whatIf:false, licenses:[] };
+  const STATE = { whatIf:false, licenses:[], vrByProfile:{}, hasRksys:false, hasRating:false };
+
+  function applyRatingOverrides(){
+    if (!STATE.hasRksys || !STATE.hasRating || !STATE.vrByProfile) return;
+    STATE.licenses.forEach((lic)=>{
+      if (!lic || !lic.profileId) return;
+      const raw = STATE.vrByProfile[lic.profileId];
+      if (raw == null || !isFinite(raw)) return;
+      // RRRating.pul stores the float rating (0–10000.00); UI uses fancy VR (×100, whole number).
+      const vrInternal = clamp(raw, 0, MAX_VR_FLOAT);
+      const vrFancy = Math.round(vrInternal * 100); // e.g. 3005.00 → 300500
+      // Update the underlying stats and the current What-If view with fancy VR
+      lic.base.vrPoints = vrFancy;
+      lic.cur.vrPoints = vrFancy;
+      if (lic.inputs && lic.inputs.vrPoints) {
+        lic.inputs.vrPoints.value = vrFancy;
+      }
+      if (typeof lic.update === 'function') lic.update();
+    });
+  }
+
+  function updateVrWarnings(){
+    STATE.licenses.forEach((lic)=>{
+      if (!lic || !lic.vrWarning) return;
+      let msg = '';
+      if (!STATE.hasRksys) {
+        msg = '';
+      } else if (!STATE.hasRating) {
+        msg = ' (VR from rksys.dat only — load RRRating.pul for accurate values)';
+      } else if (!lic.profileId || !STATE.vrByProfile || STATE.vrByProfile[lic.profileId] == null) {
+        msg = ' (no RRRating entry for this profile ID)';
+      } else {
+        msg = '';
+      }
+      lic.vrWarning.textContent = msg;
+    });
+  }
+
 
   function renderLicensePane(pane, dv, licBase, licIndex){
     const base = readStats(dv, licBase);
     const name = readMiiName(dv, licBase);
-    const profileId = U32(dv, licBase + DWC_OFFSET + DWC_PROFILE_ID_OFF);
-    const friendCode = pidToFriendCode(profileId);
+    const profileIdOffset = licBase + DWC_OFFSET + DWC_PROFILE_ID_OFF;
+    const profileId = hasBytes(dv, profileIdOffset, 4) ? U32(dv, profileIdOffset) : 0;
+    const friendCode = profileId > 0 ? pidToFriendCode(profileId) : '—';
 
     const header = el('div','section');
     header.appendChild(el('h3',null,`License ${licIndex+1}`));
@@ -353,6 +467,10 @@
     const scoreSpan = el('span','pill','—');
     const rankImg = new Image(); rankImg.className = 'rank-icon'; rankImg.alt = 'rank icon';
     scoreWrap.appendChild(scoreSpan); scoreWrap.appendChild(rankImg);
+    const raceWarn = el('span','subtle','');
+    raceWarn.style.display = 'block';
+    raceWarn.style.marginTop = '2px';
+    scoreWrap.appendChild(raceWarn);
     const nextSpan  = el('span','pill','—');
     renderKV(header, [
       ['Mii / License name', name],
@@ -367,8 +485,14 @@
     const contribCells = { vr:null, win:null, firsts:null, dist:null, dist1st:null };
 
     const rows = [];
+    const vrLabel = document.createElement('span');
+    vrLabel.textContent = 'VR (Race Rating)';
+    const vrWarn = document.createElement('span');
+    vrWarn.className = 'subtle';
+    vrWarn.style.marginLeft = '4px';
+    vrLabel.appendChild(vrWarn);
     currentCells.vr = el('span','mono','—'); neededCells.vr  = el('span','mono','—'); contribCells.vr = el('span','mono','—');
-    rows.push(['VR (Race Rating)', currentCells.vr, neededCells.vr, contribCells.vr]);
+    rows.push([vrLabel, currentCells.vr, neededCells.vr, contribCells.vr]);
 
     currentCells.win = el('span','mono','—'); neededCells.win  = el('span','mono','—'); contribCells.win = el('span','mono','—');
     rows.push(['VS Win %', currentCells.win, neededCells.win, contribCells.win]);
@@ -390,14 +514,14 @@
     controls.appendChild(el('h4',null,'What If? — edit stats (no saving, preview only)'));
     const grid = el('div','grid2');
     const inputs = {};
-    inputs.vrPoints = mkNum('VR points — max: 30000', 0, 30000, 1);
+    inputs.vrPoints = mkNum('VR points — max: 100000', 0, 1000000, 1);
     inputs.vsWins   = mkNum('VS wins', 0, 2147483647, 1);
     inputs.vsLosses = mkNum('VS losses', 0, 2147483647, 1);
-    inputs.firsts   = mkNum('Times 1st — max: 2725', 0, 2725, 1);
-    inputs.dist     = mkNum('Distance (m) — max: 100000', 0, 100000, 1);
-    inputs.dist1st  = mkNum('1st Distance (m) — max: 25000', 0, 25000, 1);
+    inputs.firsts   = mkNum('Times 1st — max: 2250', 0, 2725, 1);
+    inputs.dist     = mkNum('Distance (m) — max: 40000', 0, 100000, 1);
+    inputs.dist1st  = mkNum('1st Distance (m) — max: 10000', 0, 25000, 1);
     controls.appendChild(grid);
-    controls.appendChild(el('div','note','Tip: toggle “What If?” above to enable editing. Reset restores file values.'));
+    controls.appendChild(el('div','note','Tip: toggle “What If?” above to enable editing. Reset restores file values. Stats above those max values still load, but they do not increase the score further.'));
     pane.appendChild(controls);
 
     function mkNum(label, min, max, step){ const L=el('label',null,''); const cap=el('span',null,label); const inp=document.createElement('input'); inp.type='number'; inp.min=min; inp.max=max; inp.step=step; inp.disabled = !STATE.whatIf; L.appendChild(cap); L.appendChild(inp); grid.appendChild(L); return inp; }
@@ -413,11 +537,18 @@
       const stats = STATE.whatIf ? cur : baseStats;
       const calced = computeScore(stats);
       const need   = neededForNext(stats);
-      const rr = rankLabel(calced.score);
+      const rr = rankLabel(calced.score, calced.meetsRaceReq);
       scoreSpan.textContent = `${calced.score.toFixed(2)} (rank ${rr.rank})`;
       const ICONS = (window.RR_RANK_ICONS && Array.isArray(window.RR_RANK_ICONS)) ? window.RR_RANK_ICONS : RANK_ICON_URLS;
       rankImg.src = ICONS[rr.rank] || ''; rankImg.style.display = rr.rank>0 ? 'inline-block' : 'none';
       nextSpan.textContent  = (need.threshold==null? '— (max)' : `${need.threshold.toFixed(0)}`);
+
+      // Minimum VS race requirement warning
+      if (!calced.meetsRaceReq) {
+        raceWarn.textContent = `Needs at least ${MIN_VS_MATCHES} VS races for an in-game rank; currently ${calced.totalVs}.`;
+      } else {
+        raceWarn.textContent = '';
+      }
 
       // Current column
       currentCells.vr.textContent = `${stats.vrPoints} VR`;
@@ -448,7 +579,7 @@
       inp.addEventListener('input', ()=>{ let v=Number(inp.value); if(!isFinite(v)) v=0; v=Math.max(Number(inp.min), Math.min(Number(inp.max), v)); cur[k]=v; update(); });
     }
 
-    STATE.licenses[licIndex] = { base:baseStats, cur, inputs, update };
+    STATE.licenses[licIndex] = { base:baseStats, cur, inputs, update, profileId, vrWarning:vrWarn, raceWarning:raceWarn };
     update();
   }
 
@@ -496,6 +627,10 @@ function ensureTab(id, label){
     const scoreSpan = el('span','pill','—');
     const rankImg = new Image(); rankImg.className = 'rank-icon'; rankImg.alt = 'rank icon';
     scoreWrap.appendChild(scoreSpan); scoreWrap.appendChild(rankImg);
+    const raceWarn = el('span','subtle','');
+    raceWarn.style.display = 'block';
+    raceWarn.style.marginTop = '2px';
+    scoreWrap.appendChild(raceWarn);
     const nextSpan  = el('span','pill','—');
     renderKV(header,[
       ['Mode', 'Manual input (no file needed)'],
@@ -532,16 +667,16 @@ function ensureTab(id, label){
     controls.appendChild(el('h4',null,'Enter stats (no saving; preview only)'));
     const grid = el('div','grid2');
     const inputs = {};
-    inputs.vrPoints = mkNum('VR points — max: 30000', 0, 30000, 1);
+    inputs.vrPoints = mkNum('VR points — max: 100000', 0, 1000000, 1);
     inputs.vsWins   = mkNum('VS wins', 0, 2147483647, 1);
     inputs.vsLosses = mkNum('VS losses', 0, 2147483647, 1);
-    inputs.firsts   = mkNum('Times 1st — max: 2725', 0, 2725, 1);
-    inputs.dist     = mkNum('Distance (m) — max: 100000', 0, 100000, 1);
-    inputs.dist1st  = mkNum('1st Distance (m) — max: 25000', 0, 25000, 1);
+    inputs.firsts   = mkNum('Times 1st — max: 2250', 0, 2725, 1);
+    inputs.dist     = mkNum('Distance (m) — max: 40000', 0, 100000, 1);
+    inputs.dist1st  = mkNum('1st Distance (m) — max: 10000', 0, 25000, 1);
     const resetBtn = el('button','tabbtn','Reset values'); resetBtn.style.marginTop='6px';
     controls.appendChild(grid);
     controls.appendChild(resetBtn);
-    controls.appendChild(el('div','note','Tip: this tab works without loading a file. Values update the score, needed thresholds, and contributions instantly.'));
+    controls.appendChild(el('div','note',`Tip: this tab works without loading a file. It ignores the ${MIN_VS_MATCHES}-race minimum and updates instantly.`));
     pane.appendChild(controls);
 
     function mkNum(label, min, max, step){ const L=el('label',null,''); const cap=el('span',null,label); const inp=document.createElement('input'); inp.type='number'; inp.min=min; inp.max=max; inp.step=step; L.appendChild(cap); L.appendChild(inp); grid.appendChild(L); return inp; }
@@ -555,12 +690,17 @@ function ensureTab(id, label){
     function update(){
       const stats = cur;
       const calced = computeScore(stats);
-      const need   = neededForNext(stats);
-      const rr = rankLabel(calced.score);
-      scoreSpan.textContent = `${calced.score.toFixed(2)} (rank ${rr.rank})`;
+      const need   = neededForNext(stats, false);
+      const baseScore = clamp(ALPHA*calced.M + BETA, 0, 100);
+      const rr = rankLabel(baseScore, true);
+      scoreSpan.textContent = `${baseScore.toFixed(2)} (rank ${rr.rank})`;
       const ICONS = (window.RR_RANK_ICONS && Array.isArray(window.RR_RANK_ICONS)) ? window.RR_RANK_ICONS : RANK_ICON_URLS;
       rankImg.src = ICONS[rr.rank] || ''; rankImg.style.display = rr.rank>0 ? 'inline-block' : 'none';
-      nextSpan.textContent  = (need.threshold==null? '— (max)' : `${need.threshold.toFixed(0)}`);
+      const thr = nextThresholdFromScore(baseScore, true);
+      nextSpan.textContent  = (thr==null? '— (max)' : `${thr.toFixed(0)}`);
+
+      // Calculator ignores the minimum VS race requirement
+      raceWarn.textContent = `Calculator view ignores the ${MIN_VS_MATCHES}-race minimum.`;
 
       // Current column
       currentCells.vr.textContent      = `${stats.vrPoints} VR`;
@@ -607,6 +747,8 @@ function ensureTab(id, label){
   // ===== File handling =====
   const fileInput = document.getElementById('file');
   const drop = document.getElementById('dropzone');
+  const ratingInput = document.getElementById('ratingFile');
+  const ratingDrop = document.getElementById('ratingDropzone');
   const whatIfToggle = document.getElementById('whatIfToggle');
   const resetWhatIf  = document.getElementById('resetWhatIf');
   // Default What If? to ON
@@ -616,7 +758,18 @@ function ensureTab(id, label){
   // Build default Calculator tab so the tool is usable without loading a file
   buildBaseTabs();
 
-  function setRegionBadge(dv){ const id=U16(dv, REGION_ID_OFFSET); const label=REGION_IDS.get(id) || `Unknown (0x${id.toString(16)})`; document.getElementById('region').textContent=label; }
+  function setRegionBadge(dv){
+    const regionEl = document.getElementById('region');
+    if (!hasBytes(dv, REGION_ID_OFFSET, 2)) {
+      regionEl.textContent = (dv.byteLength === TRIMMED_RKSYS_SIZE)
+        ? 'Unavailable (trimmed save)'
+        : 'Unavailable';
+      return;
+    }
+    const id = U16(dv, REGION_ID_OFFSET);
+    const label = REGION_IDS.get(id) || `Unknown (0x${id.toString(16)})`;
+    regionEl.textContent = label;
+  }
 
 function ensureContributionNote() {
   const host = document.getElementById('tabsCard');
@@ -637,17 +790,105 @@ function ensureContributionNote() {
     setRegionBadge(dv);
     whatIfToggle.disabled = false;
     resetWhatIf.disabled = false;
+    STATE.hasRksys = true;
+    applyRatingOverrides();
+    updateVrWarnings();
     // Add/refresh contribution semantics note
     ensureContributionNote();
   }
 
 
-  function loadFile(f){ const reader=new FileReader(); reader.onload = () => { const buf=reader.result; document.getElementById('meta').textContent = `${f.name} — ${buf.byteLength.toLocaleString()} bytes`; document.getElementById('filesize').textContent = `${buf.byteLength.toLocaleString()} bytes`; parseBuffer(buf); }; reader.readAsArrayBuffer(f); }
+  function parseRatingBuffer(buf){
+    const dv = new DataView(buf);
+    if (dv.byteLength < 8) return;
+    const magic0 = String.fromCharCode(
+      dv.getUint8(0),
+      dv.getUint8(1),
+      dv.getUint8(2),
+      dv.getUint8(3)
+    );
+    const version = dv.getUint16(4, false);
+    const count = dv.getUint16(6, false);
+    if (magic0 !== 'RRRT' || version !== 1) return;
+    const maxEntries = Math.min(count, 10000);
+    const map = {};
+    let off = 8;
+    for (let i = 0; i < maxEntries; ++i) {
+      if (off + 16 > dv.byteLength) break;
+      const profileId = dv.getInt32(off, false); off += 4;
+      const vr = dv.getFloat32(off, false); off += 4;
+      const br = dv.getFloat32(off, false); off += 4;
+      const flags = dv.getUint32(off, false); off += 4;
+      if (profileId <= 0 || !isFinite(vr)) continue;
+      const vrClamped = clamp(vr, 0, MAX_VR_FLOAT);
+      map[profileId] = vrClamped;
+    }
+    STATE.vrByProfile = map;
+    STATE.hasRating = true;
+    applyRatingOverrides();
+    updateVrWarnings();
+  }
+
+  function loadRatingFile(f){
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const buf = ev.target && ev.target.result;
+      if (!buf) return;
+      parseRatingBuffer(buf);
+    };
+    reader.readAsArrayBuffer(f);
+  }
+
+
+  function loadFile(f){
+    const reader = new FileReader();
+    reader.onload = () => {
+      const buf = reader.result;
+      if (!buf) return;
+      const dv = new DataView(buf);
+      const size = dv.byteLength;
+      const isFull = size === FULL_RKSYS_SIZE;
+      const isTrimmed = size === TRIMMED_RKSYS_SIZE;
+
+      if (!isFull && !isTrimmed) {
+        window.alert(
+          `Unexpected file size: got ${size} bytes, expected 0x${FULL_RKSYS_SIZE.toString(16)} (standard) or 0x${TRIMMED_RKSYS_SIZE.toString(16)} (trimmed save).`
+        );
+        return;
+      }
+
+      if (
+        size < 4 ||
+        dv.getUint8(0) !== 0x52 ||
+        dv.getUint8(1) !== 0x4B ||
+        dv.getUint8(2) !== 0x53 ||
+        dv.getUint8(3) !== 0x44
+      ) {
+        window.alert('File does not start with RKSD magic; this might not be a Mario Kart Wii save.');
+        return;
+      }
+
+      const sizeNote = isTrimmed ? ' (trimmed save)' : '';
+      document.getElementById('meta').textContent = `${f.name} — ${size.toLocaleString()} bytes${sizeNote}`;
+      document.getElementById('filesize').textContent = `${size.toLocaleString()} bytes`;
+      parseBuffer(buf);
+    };
+    reader.readAsArrayBuffer(f);
+  }
 
   fileInput.addEventListener('change', e=>{ const f=e.target.files && e.target.files[0]; if(f) loadFile(f); });
   ;['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add('drag'); }));
   ;['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); }));
   drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files && e.dataTransfer.files[0]; if(f) loadFile(f); });
+
+  if (ratingInput) {
+    ratingInput.addEventListener('change', e=>{ const f=e.target.files && e.target.files[0]; if(f) loadRatingFile(f); });
+  }
+  if (ratingDrop) {
+    ['dragenter','dragover'].forEach(ev=> ratingDrop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); ratingDrop.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev=> ratingDrop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); ratingDrop.classList.remove('drag'); }));
+    ratingDrop.addEventListener('drop', e=>{ const f=e.dataTransfer.files && e.dataTransfer.files[0]; if(f) loadRatingFile(f); });
+  }
 
   // What If global handlers
   whatIfToggle.addEventListener('change', ()=>{
