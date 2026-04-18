@@ -101,7 +101,7 @@
             <ul>
               <li>Score = <span class="mono">clamp(α·M + β, 0, 100)</span> where <span class="mono">M</span> is a weighted mix of normalized metrics: VR (60%), VS win% (15%), 1st-place count (15%), distance travelled (5%), distance while 1st (5%).</li>
               <li>For the rank score, VR counts up to 100,000, 1st places up to 2,250, distance up to 40,000 m, and 1st-place distance up to 10,000 m. Going above those maximums does not raise the score further. Win% uses 0–100, or 45% if you have no VS races.</li>
-              <li>Your stats are turned into a score from 0 to 100, and that score decides your rank. The promotion points are 12, 24, 36, 48, 60, 72, 84, 94, and 100. Once you have at least 100 VS races, any score below 24 is still rank 1.</li>
+              <li>Your stats are turned into a score from 0 to 100, and that score decides your rank. The promotion points are 0, 24, 36, 48, 60, 72, 84, 94, and 100. Once you have at least 100 VS races, any score below 24 is still rank 1.</li>
               <li>Per-stat notes for max rank (with other stats near their effective caps): VR effectively caps for the ranking model around 100,000 VR ; VS Win% is anchored around 55%; there is no simple hard minimum for Times 1st or distance metrics — they still help, but strong VR and Win% dominate and can achieve top rank even if 1st-place and distance values are not maxed.</li>
               <li>Nothing is uploaded; everything is client-side. You can save this file and run it offline.</li>
               <li>Made by ChatGPT 5 Thinking and GPT 5.4 Codex Extra-High.</li>
@@ -676,7 +676,7 @@ function ensureTab(id, label){
     const resetBtn = el('button','tabbtn','Reset values'); resetBtn.style.marginTop='6px';
     controls.appendChild(grid);
     controls.appendChild(resetBtn);
-    controls.appendChild(el('div','note',`Tip: this tab works without loading a file. It ignores the ${MIN_VS_MATCHES}-race minimum and updates instantly.`));
+    controls.appendChild(el('div','note',`Tip: this tab works without loading a file. It ignores the ${MIN_VS_MATCHES}-race minimum and updates instantly. Stats above max values still load, but they do not increase the score further.`));
     pane.appendChild(controls);
 
     function mkNum(label, min, max, step){ const L=el('label',null,''); const cap=el('span',null,label); const inp=document.createElement('input'); inp.type='number'; inp.min=min; inp.max=max; inp.step=step; L.appendChild(cap); L.appendChild(inp); grid.appendChild(L); return inp; }
