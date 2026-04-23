@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>main.tweaks for MKWii</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#171a20; --muted:#a0a4ae; --text:#e6e7ea; --brand:#7aa2ff; --ok:#4cc38a; --warn:#f5a623; --bad:#ef4e4e; --info:#8fb2ff; }
+    html, body { height: 100%; }
+    body { margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif; color:var(--text); background:radial-gradient(1200px 600px at 10% -10%, #1a2030, #0d0f14 55%, #0a0c10 100%) fixed; }
+    a { color: var(--brand); text-decoration: none; }
+    .container { max-width: 1100px; margin: 28px auto 64px; padding: 0 18px; }
+    header { display:flex; gap:16px; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+    .title { font-weight: 700; font-size: 20px; letter-spacing: 0.3px; }
+    .subtitle { color: var(--muted); font-size: 12px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 16px; }
+    .card { background: linear-gradient(180deg, #1c2130, #151924); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04); overflow: hidden; }
+    .card h2 { margin: 0; padding: 14px 16px; font-size: 14px; letter-spacing: 0.2px; background: linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.07)); border-bottom: 1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .card .body { padding: 14px 16px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .drop { border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 16px; text-align: center; transition: border-color .2s, background .2s; }
+    .drop.drag { border-color: var(--brand); background: rgba(122,162,255,0.06); }
+    .btn { display:inline-flex; align-items:center; gap:8px; background: #1e2433; color: var(--text); border: 1px solid rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 10px; cursor:pointer; transition: transform .02s ease, background .2s, border-color .2s; user-select:none; }
+    .btn:hover { background: #232a3e; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: #27314a; border-color: rgba(122,162,255,0.35); color:#eaf0ff; }
+    .btn.ok { background: #1c2b24; border-color: rgba(76,195,138,0.3); color:#c8f5e3; }
+    .btn.warn { background: #2d2515; border-color: rgba(245,166,35,0.3); color:#ffe4bf; }
+    .btn.bad { background: #2a1922; border-color: rgba(239,78,78,0.35); color:#ffdee1; }
+    .btn:disabled { opacity: .55; cursor: default; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row + .row { margin-top: 8px; }
+    .kv { display:grid; grid-template-columns: 130px 1fr; gap: 12px; align-items:center; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .muted { color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; vertical-align: top; }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+    .status { display:inline-flex; align-items:center; gap:6px; padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+    .status.ok { background: rgba(76,195,138,0.14); color:#c8f5e3; }
+    .status.warn { background: rgba(245,166,35,0.12); color:#ffe4bf; }
+    .status.bad { background: rgba(239,78,78,0.12); color:#ffdee1; }
+    .status.info { background: rgba(143,178,255,0.14); color:#d7e5ff; }
+    .swatch { width: 22px; height: 22px; border-radius: 6px; border:1px solid rgba(255,255,255,0.15); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+    .group { margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow:hidden; }
+    .group h3 { margin:0; padding:8px 10px; font-size:12px; color:#dbe3ff; background: linear-gradient(0deg, rgba(122,162,255,0.1), rgba(122,162,255,0.05)); border-bottom:1px solid rgba(255,255,255,0.08); }
+    .color-row { display:grid; grid-template-columns: 160px 160px 110px minmax(260px, 1fr); gap:8px; padding:8px 10px; align-items:center; }
+    .color-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+    input[type="text"], input[type="number"] { background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12px; width:100%; box-sizing:border-box; }
+    input[type="text"].mono { font-size: 12px; letter-spacing: .2px; }
+    input[type="color"] { width: 100%; height: 30px; border:none; background: transparent; }
+    .footer { margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .small { font-size: 11px; }
+    details > summary { cursor: pointer; color: var(--muted); }
+    .sep { height: 8px; }
+    .hr { height: 1px; background: rgba(255,255,255,0.08); margin: 10px 0; }
+    select { background:#121620; border:1px solid rgba(255,255,255,0.14); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12px; width:100%; box-sizing:border-box; }
+    .controls-grid { display:grid; grid-template-columns: minmax(220px, 320px) auto minmax(240px, 1fr); gap:10px; align-items:end; }
+    .region-status { min-height: 34px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .recommended-region { color: #c8f5e3; font-weight: 600; }
+    .empty-row { color: var(--muted); font-style: italic; }
+    @media (max-width: 900px) {
+      header { flex-direction: column; align-items: stretch; }
+      .controls-grid { grid-template-columns: 1fr; }
+      .color-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">main.tweaks for MKWii</div>
+        <div class="subtitle">100% client-side. Detects disc variant, patches Region ID algorithm bytes, changes loading screen color, edits FaceLib Mii colors, then downloads a patched <code class="mono">main.dol</code>.</div>
+      </div>
+      <div class="row">
+        <button id="btnDownload" class="btn ok" disabled>⬇ Download patched <span class="mono">main.dol</span></button>
+        <button id="btnRevert" class="btn" disabled>↩ Revert unsaved changes</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1) Load <code class="mono">main.dol</code><span class="hint"> No uploads — everything stays local.</span></h2>
+        <div class="body">
+          <div id="drop" class="drop">
+            <div class="row" style="justify-content:center; gap:12px;">
+              <label class="btn primary" for="file">Choose file…</label>
+              <input id="file" type="file" accept=".dol" hidden />
+              <div class="muted">…or drag & drop your <span class="mono">main.dol</span> here</div>
+            </div>
+            <div class="hr"></div>
+            <div class="kv">
+              <div class="muted">Loaded file</div>
+              <div id="fileInfo" class="mono">—</div>
+              <div class="muted">Detected disc variant</div>
+              <div id="variant" class="mono">—</div>
+              <div class="muted">Override variant</div>
+              <div>
+                <select id="variantOverride">
+                  <option value="">Auto (detected)</option>
+                  <option value="NTSC-U">NTSC-U (RMCE01)</option>
+                  <option value="PAL">PAL (RMCP01)</option>
+                  <option value="NTSC-J">NTSC-J (RMCJ01)</option>
+                  <option value="NTSC-K">NTSC-K (RMCK01)</option>
+                </select>
+              </div>
+              <div class="muted">FaceLib base</div>
+              <div id="facelib" class="mono">—</div>
+              <div class="muted">Changed entries</div>
+              <div id="patchCount" class="mono">0</div>
+            </div>
+          </div>
+          <div class="sep"></div>
+          <details>
+            <summary>Verification & detection details</summary>
+            <div class="hr"></div>
+            <div class="table-wrap">
+              <table id="detTable">
+                <thead>
+                  <tr><th style="width:160px">Variant / Path</th><th class="mono" style="width:90px">Offset</th><th style="width:110px">Found byte</th><th>Meaning</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="small muted" style="margin-top:8px">Region-byte scan matches the algorithm offsets from <a href="https://mariokartwii.com/showthread.php?tid=1055" target="_blank" rel="noopener noreferrer">Vega</a>'s documentation; PAL and JP have two code paths. Values map to <span class="mono">00..06</span> = Japan, Americas, Europe, AUS/NZ, Taiwan, South Korea, China.</div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2) Patch Region ID bytes <span class="hint">(line colors / matchmaking region)</span></h2>
+        <div class="body">
+          <div class="controls-grid">
+            <label>
+              <div class="hint" style="margin-bottom:6px">New region value</div>
+              <select id="regionValue"></select>
+            </label>
+            <button id="btnApplyRegion" class="btn primary" disabled>Apply to selected offset(s)</button>
+            <div id="regionStatus" class="region-status hint">Load a file to inspect and patch region bytes.</div>
+          </div>
+          <div class="hr"></div>
+          <div class="table-wrap">
+            <table id="regionTable">
+              <thead>
+                <tr><th style="width:210px">Variant / Path</th><th class="mono" style="width:90px">Offset</th><th style="width:110px">Current byte</th><th>Meaning</th><th style="width:86px">Select</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="small muted" style="margin-top:8px">PAL and NTSC-J normally patch both valid code paths. The global revert button restores both region-byte and FaceLib edits.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3) Patch loading screen color <span class="hint">(RGB immediate patch)</span></h2>
+        <div class="body">
+          <div class="controls-grid">
+            <label>
+              <div class="hint" style="margin-bottom:6px">Loading screen RGB</div>
+              <input id="loadingColor" type="color" value="#000000" />
+            </label>
+            <div class="row">
+              <button id="btnApplyLoading" class="btn primary" disabled>Apply loading color</button>
+              <button id="btnRestoreLoading" class="btn" disabled>Restore stock routine</button>
+            </div>
+            <div id="loadingStatus" class="region-status hint">Load a file to inspect the loading screen color routine.</div>
+          </div>
+          <div class="hr"></div>
+          <div class="kv">
+            <div class="muted">Routine offset</div>
+            <div id="loadingOffset" class="mono">—</div>
+            <div class="muted">Routine state</div>
+            <div id="loadingMode" class="mono">—</div>
+            <div class="muted">Current RGB</div>
+            <div id="loadingRgb" class="mono">—</div>
+          </div>
+          <div class="small muted" style="margin-top:8px">This patch replaces three <span class="mono">lbz</span> instructions with immediate loads for red, green, and blue. The alpha load remains untouched.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>4) Edit all Mii colors <span class="hint">(FaceLib element colors)</span></h2>
+        <div class="body" id="editor">
+          <div class="muted">Load a file to populate the editor.</div>
+        </div>
+        <div class="body footer">
+          <button id="btnDefaults" class="btn warn" disabled>↺ Reset to MKW defaults (per Wiiki)</button>
+          <button id="btnExport" class="btn" disabled>⇥ Export palette (.json)</button>
+          <button id="btnImport" class="btn" disabled>⇤ Import palette (.json)</button>
+          <input id="importJson" type="file" accept="application/json" hidden />
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Notes</h2>
+      <div class="body small">
+        <ul>
+          <li>Disc variant detection reads the known <em>Region ID algorithm result</em> byte inside <code class="mono">main.dol</code> at offsets: <span class="mono">0x6113 (RMCE01)</span>, <span class="mono">0x614F / 0x61AF (RMCP01)</span>, <span class="mono">0x60A3 / 0x60D3 (RMCJ01)</span>, <span class="mono">0x625F (RMCK01)</span>. PAL and JP have two valid paths.</li>
+          <li>Loading screen color routine offsets: <span class="mono">PAL 0x210784</span>, <span class="mono">NTSC-U 0x2106E4</span>, <span class="mono">NTSC-J 0x2106A4</span>, <span class="mono">NTSC-K 0x210AF8</span>. The patch converts the RGB loads into immediate values while leaving alpha untouched.</li>
+          <li>FaceLib base addresses for Mario Kart Wii: <span class="mono">PAL 0x2479B0, NTSC-U 0x247678, NTSC-J 0x247340, NTSC-K 0x247788</span>. All element color offsets are relative to this base.</li>
+          <li>Colors are stored as 32-bit big-endian RGBA words. The HTML color input edits RGB; alpha can be adjusted separately (0-255).</li>
+          <li><strong>Back up</strong> your original file. To patch a full ISO/WBFS, extract <code class="mono">main.dol</code>, patch here, then rebuild with Wiimm's WIT or your preferred tool. Alternatively use in My Stuff on packs that allow it.</li>
+          <li>Credits to Vega for the documented region-byte offsets, to hazel for the loading screen color documentation, and to Tockdom for the <a href="https://wiki.tockdom.com/wiki/Main.dol" target="_blank" rel="noopener noreferrer">Main.dol file</a> documentation.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+// ======= Constants =======
+const REGION_PATHS = [
+  { variant: 'NTSC-U (RMCE01)', key:'NTSC-U', paths: [ { id:'RMCE01', name:'RMCE01', offset: 0x6113, defaultValue: 0x01 } ] },
+  { variant: 'PAL (RMCP01)',    key:'PAL',    paths: [ { id:'RMCP01-EU', name:'RMCP01 (EU)', offset: 0x614F, defaultValue: 0x02 }, { id:'RMCP01-AUS', name:'RMCP01 (AUS/NZ)', offset: 0x61AF, defaultValue: 0x03 } ] },
+  { variant: 'NTSC-J (RMCJ01)', key:'NTSC-J', paths: [ { id:'RMCJ01-JPN', name:'RMCJ01 (no TWN)', offset: 0x60A3, defaultValue: 0x00 }, { id:'RMCJ01-TWN', name:'RMCJ01 (TWN)', offset: 0x60D3, defaultValue: 0x04 } ] },
+  { variant: 'NTSC-K (RMCK01)', key:'NTSC-K', paths: [ { id:'RMCK01', name:'RMCK01', offset: 0x625F, defaultValue: 0x05 } ] },
+];
+const REGION_MAP = {
+  0x00: { name:'Japan', detail:'Japan (red line)' },
+  0x01: { name:'Americas', detail:'Americas (blue line)' },
+  0x02: { name:'Europe', detail:'Europe (green line)' },
+  0x03: { name:'Australia/NZ', detail:'Australia/NZ (yellow line)' },
+  0x04: { name:'Taiwan', detail:'Taiwan (white line)' },
+  0x05: { name:'South Korea', detail:'South Korea (purple line)' },
+  0x06: { name:'China', detail:'China (white line)' }
+};
+const REGION_OPTIONS = [
+  { value:'00', label:'00 — Japan (red line)' },
+  { value:'01', label:'01 — Americas (blue line)' },
+  { value:'02', label:'02 — Europe (green line)' },
+  { value:'03', label:'03 — Australia/NZ (yellow line)' },
+  { value:'04', label:'04 — Taiwan (white line)' },
+  { value:'05', label:'05 — South Korea (purple line)' },
+  { value:'06', label:'06 — China (white line)' }
+];
+const LOADING_COLOR_OFFSETS = { 'PAL': 0x210784, 'NTSC-U': 0x2106E4, 'NTSC-J': 0x2106A4, 'NTSC-K': 0x210AF8 };
+const LOADING_STOCK_WORDS = [0x881C0010, 0x881C0011, 0x881C0012];
+const LOADING_WORD_REL_OFFSETS = [0x00, 0x10, 0x18];
+const LOADING_GROUP_LENGTH = 0x1C;
+const FACELIB_BASE = { 'PAL': 0x2479B0, 'NTSC-U': 0x247678, 'NTSC-J': 0x247340, 'NTSC-K': 0x247788 };
+
+const WIIKI_DEFAULTS = {
+  0x00:'F0D8C4FF',0x04:'FFBC80FF',0x08:'D88850FF',0x0C:'FFB090FF',0x10:'985030FF',0x14:'522E1CFF',
+  0x18:'1E1A18FF',0x1C:'382015FF',0x20:'552617FF',0x24:'704024FF',0x28:'727278FF',0x2C:'49361AFF',0x30:'7A5928FF',0x34:'C19F64FF',
+  0x38:'1E1A18FF',0x3C:'382015FF',0x40:'552617FF',0x44:'704024FF',0x48:'727278FF',0x4C:'49361AFF',0x50:'7A5928FF',0x54:'C19F64FF',
+  0x58:'101010FF',0x5C:'603810FF',0x60:'981810FF',0x64:'203060FF',0x68:'905800FF',0x6C:'605850FF',
+  0x70:'B84030FF',0x74:'F07828FF',0x78:'F8D820FF',0x7C:'80C828FF',0x80:'007428FF',0x84:'204898FF',0x88:'40A0D8FF',0x8C:'E86078FF',0x90:'702CA8FF',0x94:'483818FF',0x98:'E0E0E0FF',0x9C:'181814FF',
+  0x118:'000000FF',0x11C:'7C8080FF',0x120:'705040FF',0x124:'706E40FF',0x128:'5868B8FF',0x12C:'488068FF',
+  0x130:'1E1A18FF',0x134:'382015FF',0x138:'552617FF',0x13C:'704024FF',0x140:'727278FF',0x144:'49361AFF',0x148:'7A5928FF',0x14C:'C19F64FF',
+  0x150:'BE4E26FF',0x154:'D83028FF',0x158:'CF4447FF',0x15C:'712A04FF',0x160:'781510FF',0x164:'7E2528FF',
+  0x168:'1E1A18FF',0x16C:'382015FF',0x170:'552617FF',0x174:'704024FF',0x178:'727278FF',0x17C:'49361AFF',0x180:'7A5928FF',0x184:'C19F64FF'
+};
+const GROUPS = [
+  { name:'Skin colors', keys:[0x00,0x04,0x08,0x0C,0x10,0x14] },
+  { name:'Hair colors', keys:[0x18,0x1C,0x20,0x24,0x28,0x2C,0x30,0x34] },
+  { name:'Beard colors', keys:[0x38,0x3C,0x40,0x44,0x48,0x4C,0x50,0x54] },
+  { name:'Glasses colors', keys:[0x58,0x5C,0x60,0x64,0x68,0x6C] },
+  { name:'Hat colors', keys:[0x70,0x74,0x78,0x7C,0x80,0x84,0x88,0x8C,0x90,0x94,0x98,0x9C] },
+  { name:'Eye colors', keys:[0x118,0x11C,0x120,0x124,0x128,0x12C] },
+  { name:'Eyebrow colors', keys:[0x130,0x134,0x138,0x13C,0x140,0x144,0x148,0x14C] },
+  { name:'Lips colors', keys:[0x150,0x154,0x158,0x15C,0x160,0x164] },
+  { name:'Moustache colors', keys:[0x168,0x16C,0x170,0x174,0x178,0x17C,0x180,0x184] }
+];
+const ALL_REGION_PATHS = REGION_PATHS.flatMap(({ variant, key, paths }) => paths.map((path) => ({ ...path, variant, key })));
+const FACELIB_REL_KEYS = GROUPS.flatMap((group) => group.keys);
+const FACELIB_LAST_REL = Math.max(...FACELIB_REL_KEYS) + 3;
+const EDITABLE_UNITS = new Map([
+  ...ALL_REGION_PATHS.map((path) => [`region:${path.id}`, { offset: path.offset, length: 1 }]),
+  ...Object.entries(LOADING_COLOR_OFFSETS).map(([variant, offset]) => [`loading:${variant}`, { offset, length: LOADING_GROUP_LENGTH }]),
+  ...Object.entries(FACELIB_BASE).flatMap(([variant, base]) => FACELIB_REL_KEYS.map((rel) => [`color:${variant}:${rel}`, { offset: base + rel, length: 4 }]))
+]);
+
+// ======= State =======
+let originalBytes = null;
+let bytes = null;
+let view = null;
+let fileHandle = null;
+let selectedVariant = null;
+let detectedPaths = [];
+let faceBase = null;
+let patchCount = 0;
+let variantOverride = null;
+let dirtyEntries = new Set();
+let selectedRegionIds = new Set();
+
+// ======= Helpers =======
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const hex = (n, w=2) => '0x' + n.toString(16).toUpperCase().padStart(w,'0');
+const toRGBAHex = (val) => val.toString(16).toUpperCase().padStart(8,'0');
+const fromRGBAHex = (str) => parseInt(str.replace(/[^0-9a-f]/gi,'').padEnd(8,'F'), 16) >>> 0;
+const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
+
+function regionName(byte) {
+  return REGION_MAP[byte]?.name ?? 'Unknown';
+}
+
+function regionDetail(byte) {
+  return REGION_MAP[byte]?.detail ?? 'Unknown';
+}
+
+function activeVariant() {
+  return variantOverride || selectedVariant;
+}
+
+function hasFaceLibBounds() {
+  return !!(bytes && faceBase != null && faceBase + FACELIB_LAST_REL < bytes.length);
+}
+
+function setEditorPlaceholder(message) {
+  $('#editor').innerHTML = `<div class="muted">${message}</div>`;
+}
+
+function setRegionStatus(message, tone='info') {
+  $('#regionStatus').innerHTML = `<span class="status ${tone}">${tone}</span><span class="hint">${message}</span>`;
+}
+
+function regionDirtyKey(id) {
+  return `region:${id}`;
+}
+
+function colorDirtyKey(variant, rel) {
+  return `color:${variant}:${rel}`;
+}
+
+function loadingDirtyKey(variant) {
+  return `loading:${variant}`;
+}
+
+function loadingOffsetForVariant(variant = activeVariant()) {
+  return variant ? LOADING_COLOR_OFFSETS[variant] ?? null : null;
+}
+
+function hasLoadingBounds() {
+  const offset = loadingOffsetForVariant();
+  return !!(bytes && offset != null && offset + LOADING_GROUP_LENGTH <= bytes.length);
+}
+
+function syncDirtyEntry(key) {
+  const unit = EDITABLE_UNITS.get(key);
+  if (!unit || !originalBytes || !bytes) return;
+  let dirty = false;
+  for (let i = 0; i < unit.length; i++) {
+    if (bytes[unit.offset + i] !== originalBytes[unit.offset + i]) {
+      dirty = true;
+      break;
+    }
+  }
+  if (dirty) dirtyEntries.add(key);
+  else dirtyEntries.delete(key);
+  patchCount = dirtyEntries.size;
+}
+
+function writeByte(offset, value, dirtyKey) {
+  const next = value & 0xFF;
+  if (!bytes || offset < 0 || offset >= bytes.length) return false;
+  if (bytes[offset] === next) return false;
+  bytes[offset] = next;
+  syncDirtyEntry(dirtyKey);
+  return true;
+}
+
+function writeWord(offset, value, dirtyKey) {
+  const next = value >>> 0;
+  if (!view) return false;
+  if (view.getUint32(offset, false) === next) return false;
+  view.setUint32(offset, next, false);
+  syncDirtyEntry(dirtyKey);
+  return true;
+}
+
+function updateHeader() {
+  const av = activeVariant();
+  $('#fileInfo').textContent = fileHandle ? `${fileHandle.name} — ${bytes?.length.toLocaleString()} bytes` : '—';
+  $('#variant').textContent = av ? (av + (variantOverride ? ' (manual)' : '')) : '—';
+  $('#facelib').textContent = faceBase != null ? hex(faceBase,6) : '—';
+  $('#patchCount').textContent = String(patchCount);
+  $('#btnDownload').disabled = !bytes || patchCount === 0;
+  $('#btnRevert').disabled = !bytes || patchCount === 0;
+  $('#btnDefaults').disabled = !hasFaceLibBounds();
+  $('#btnExport').disabled = !hasFaceLibBounds();
+  $('#btnImport').disabled = !hasFaceLibBounds();
+}
+
+function defaultSelectedRegionIds() {
+  const key = activeVariant();
+  return key ? ALL_REGION_PATHS.filter((path) => path.key === key).map((path) => path.id) : [];
+}
+
+function recommendedRegionRows() {
+  const defaults = new Set(defaultSelectedRegionIds());
+  return detectedPaths.filter((row) => defaults.has(row.id) && row.present);
+}
+
+function isRecommendedRegionRow(row) {
+  return new Set(defaultSelectedRegionIds()).has(row.id);
+}
+
+function recommendedRegionLabels() {
+  return [...new Set(recommendedRegionRows().map((row) => row.variant))];
+}
+
+function formatRegionCell(row) {
+  const variant = isRecommendedRegionRow(row) ? `<span class="recommended-region">${row.variant}</span>` : row.variant;
+  return `${variant} — <span class="muted">${row.path}</span>`;
+}
+
+function regionSelectionWarningMessage(id, checked) {
+  const defaults = new Set(defaultSelectedRegionIds());
+  if (!defaults.size || defaults.has(id) === checked) return null;
+
+  const recommendedList = recommendedRegionLabels().length
+    ? recommendedRegionLabels().map((label) => `<span class="recommended-region">${label}</span>`).join(', ')
+    : 'the preselected path(s)';
+
+  if (checked) {
+    return `This path is not recommended for the detected build. The relevant path(s) for ${recommendedList} are already preselected.`;
+  }
+
+  return `This path is recommended for ${recommendedList} and was preselected for a reason.`;
+}
+
+function syncRegionSelection(forceDefault = false) {
+  const presentIds = new Set(detectedPaths.filter((row) => row.present).map((row) => row.id));
+  const kept = new Set([...selectedRegionIds].filter((id) => presentIds.has(id)));
+  if (forceDefault || kept.size === 0) {
+    const defaults = defaultSelectedRegionIds().filter((id) => presentIds.has(id));
+    selectedRegionIds = new Set(defaults);
+  } else {
+    selectedRegionIds = kept;
+  }
+}
+
+function updateRegionControls() {
+  const hasSelection = [...selectedRegionIds].some((id) => detectedPaths.some((row) => row.id === id && row.present));
+  $('#regionValue').disabled = !bytes;
+  $('#btnApplyRegion').disabled = !bytes || !hasSelection;
+}
+
+function refreshRegionStatus(message = null, tone = 'info') {
+  if (message) {
+    setRegionStatus(message, tone);
+    return;
+  }
+  if (!bytes) {
+    setRegionStatus('Load a file to inspect and patch region bytes.', 'info');
+    return;
+  }
+  const av = activeVariant();
+  const selectedRows = detectedPaths.filter((row) => selectedRegionIds.has(row.id) && row.present);
+  if (!selectedRows.length) {
+    if (av) setRegionStatus(`Auto-detected ${av}. Select one or more path(s) to patch. PAL and NTSC-J usually use both paths.`, 'warn');
+    else setRegionStatus('Disc variant was not detected. Select path(s) manually or choose a variant override above.', 'warn');
+    return;
+  }
+  const summary = selectedRows.map((row) => `${row.name} @ ${hex(row.offset,4)}`).join(', ');
+  setRegionStatus(`Selected path(s): ${summary}.`, 'info');
+}
+
+function refreshEditor() {
+  if (!bytes) {
+    setEditorPlaceholder('Load a file to populate the editor.');
+    return;
+  }
+  if (!activeVariant()) {
+    setEditorPlaceholder('Could not determine the disc variant automatically. You can still edit after selecting a variant override above.');
+    return;
+  }
+  if (!hasFaceLibBounds()) {
+    setEditorPlaceholder('The selected FaceLib table falls outside this file, so Mii colors cannot be edited for the current variant.');
+    return;
+  }
+  buildEditor();
+}
+
+function getLoadingPatchState() {
+  const variant = activeVariant();
+  const offset = loadingOffsetForVariant(variant);
+  if (!variant) return { kind:'no-variant', offset:null, rgb:null };
+  if (!bytes || offset == null || offset + LOADING_GROUP_LENGTH > bytes.length) return { kind:'missing', offset, rgb:null };
+
+  const words = LOADING_WORD_REL_OFFSETS.map((rel) => view.getUint32(offset + rel, false) >>> 0);
+  const stock = words.every((word, index) => word === LOADING_STOCK_WORDS[index]);
+  const patched = words.every((word) => (word & 0xFFFFFF00) === 0x38000000);
+  const rgb = patched ? words.map((word) => word & 0xFF) : null;
+
+  if (stock) return { kind:'stock', offset, rgb:null, words };
+  if (patched) return { kind:'patched', offset, rgb, words };
+  return { kind:'unknown', offset, rgb:null, words };
+}
+
+function refreshLoadingControls(syncPicker = false, message = null, tone = null) {
+  const state = getLoadingPatchState();
+  const offsetLabel = state.offset != null ? hex(state.offset, 6) : '—';
+  $('#loadingOffset').textContent = offsetLabel;
+
+  if (state.kind === 'patched' && state.rgb) {
+    const rgbHex = '#' + state.rgb.map((value) => value.toString(16).padStart(2, '0')).join('');
+    $('#loadingMode').textContent = 'patched (immediate RGB)';
+    $('#loadingRgb').textContent = rgbHex.toUpperCase();
+    if (syncPicker) $('#loadingColor').value = rgbHex;
+  } else if (state.kind === 'stock') {
+    $('#loadingMode').textContent = 'stock routine';
+    $('#loadingRgb').textContent = 'dynamic / unknown';
+  } else if (state.kind === 'unknown') {
+    $('#loadingMode').textContent = 'unrecognized bytes';
+    $('#loadingRgb').textContent = '—';
+  } else if (state.kind === 'missing') {
+    $('#loadingMode').textContent = 'offset unavailable';
+    $('#loadingRgb').textContent = '—';
+  } else {
+    $('#loadingMode').textContent = 'no variant';
+    $('#loadingRgb').textContent = '—';
+  }
+
+  $('#btnApplyLoading').disabled = !(state.kind === 'stock' || state.kind === 'patched' || state.kind === 'unknown');
+  $('#btnRestoreLoading').disabled = !(state.kind === 'patched' || state.kind === 'unknown');
+
+  if (message) {
+    $('#loadingStatus').innerHTML = `<span class="status ${tone || 'info'}">${tone || 'info'}</span><span class="hint">${message}</span>`;
+    return;
+  }
+
+  if (state.kind === 'patched' && state.rgb) {
+    const rgbText = '#' + state.rgb.map((value) => value.toString(16).padStart(2, '0')).join('').toUpperCase();
+    $('#loadingStatus').innerHTML = `<span class="status ok">ok</span><span class="hint">Custom loading RGB patch detected at <span class="mono">${offsetLabel}</span>: <span class="mono">${rgbText}</span>.</span>`;
+  } else if (state.kind === 'stock') {
+    $('#loadingStatus').innerHTML = `<span class="status info">info</span><span class="hint">Stock loading routine detected at <span class="mono">${offsetLabel}</span>. RGB values are loaded dynamically, so the current default color is not exposed here.</span>`;
+  } else if (state.kind === 'unknown') {
+    $('#loadingStatus').innerHTML = `<span class="status warn">warn</span><span class="hint">The bytes at <span class="mono">${offsetLabel}</span> do not match the known stock or patched loading routine. You can still overwrite them with a new RGB patch.</span>`;
+  } else if (state.kind === 'missing') {
+    $('#loadingStatus').innerHTML = `<span class="status bad">bad</span><span class="hint">The loading screen color routine offset is outside this file for the selected variant.</span>`;
+  } else {
+    $('#loadingStatus').innerHTML = `<span class="status warn">warn</span><span class="hint">Select or detect a disc variant before editing the loading screen color.</span>`;
+  }
+}
+
+function hasLis8024(win){
+  for (let i=0;i<=win.length-4;i++){
+    const a=win[i], b=win[i+1], c=win[i+2], d=win[i+3];
+    if (a===0x3C && (b&0x1F)===0x00 && (b>=0x60 && b<=0xE0) && c===0x80 && d===0x24) return true;
+  }
+  return false;
+}
+
+function hasLiImm(win, imm){
+  for (let i=0;i<=win.length-4;i++){
+    const a=win[i], b=win[i+1], c=win[i+2], d=win[i+3];
+    if (a===0x38 && (b&0x1F)===0x00 && (b>=0x60 && b<=0xE0) && c===0x00 && d===imm) return true;
+  }
+  return false;
+}
+
+// ======= File loading =======
+function loadFile(f) {
+  if (!f) return;
+  fileHandle = f;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const buf = fr.result;
+    originalBytes = new Uint8Array(buf);
+    bytes = new Uint8Array(buf.slice(0));
+    view = new DataView(bytes.buffer);
+    patchCount = 0;
+    dirtyEntries = new Set();
+    selectedVariant = null;
+    faceBase = null;
+    detectedPaths = [];
+    selectedRegionIds = new Set();
+    variantOverride = null;
+    const sel = $('#variantOverride');
+    if (sel) sel.value = '';
+    updateHeader();
+    runDetection();
+    renderRegionEditor(true);
+    refreshLoadingControls(true);
+    refreshEditor();
+  };
+  fr.readAsArrayBuffer(f);
+}
+
+// ======= Region/variant detection =======
+function runDetection() {
+  const tbody = $('#detTable tbody');
+  tbody.innerHTML = '';
+  const rows = [];
+  const perVariant = new Map();
+
+  for (const v of REGION_PATHS) {
+    let score = 0;
+    let hits = 0;
+    for (const p of v.paths) {
+      let byte = null;
+      let ok = false;
+      let present = false;
+      let meaning = '—';
+
+      if (bytes && p.offset < bytes.length) {
+        byte = bytes[p.offset];
+        present = true;
+        if (byte >= 0x00 && byte <= 0x06) {
+          ok = true;
+          hits++;
+          meaning = `${byte} — ${regionName(byte)}`;
+          score += 1;
+        } else {
+          meaning = `${byte} — out of range`;
+        }
+
+        const start = Math.max(0, p.offset - 40);
+        const end = Math.min(bytes.length, p.offset + 41);
+        const win = bytes.slice(start, end);
+        let gotLi = false;
+        let gotLis = false;
+        if (ok && hasLiImm(win, byte)) { score += 4; gotLi = true; }
+        if (hasLis8024(win)) { score += 2; gotLis = true; }
+        if (gotLi || gotLis) meaning += ` ${gotLi ? '| li imm' : ''}${gotLis ? ' | lis 0x8024' : ''}`;
+      } else {
+        meaning = 'offset not present in file';
+      }
+
+      rows.push({
+        id: p.id,
+        variant: v.variant,
+        key: v.key,
+        path: p.name,
+        name: p.name,
+        offset: p.offset,
+        defaultValue: p.defaultValue,
+        byte,
+        ok,
+        present,
+        meaning
+      });
+    }
+    perVariant.set(v.key, { score, hits });
+  }
+
+  let bestKey = null;
+  let bestScore = -1;
+  let bestHits = -1;
+  for (const [key, stats] of perVariant.entries()) {
+    if (stats.score > bestScore || (stats.score === bestScore && stats.hits > bestHits)) {
+      bestKey = key;
+      bestScore = stats.score;
+      bestHits = stats.hits;
+    }
+  }
+
+  selectedVariant = (bestScore > 0 || bestHits > 0) ? bestKey : null;
+  faceBase = activeVariant() ? FACELIB_BASE[activeVariant()] : null;
+  detectedPaths = rows;
+
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+    const status = row.ok ? '<span class="status ok">ok</span>' : (row.present ? '<span class="status warn">sus</span>' : '<span class="status bad">n/a</span>');
+    tr.innerHTML = `<td>${formatRegionCell(row)}</td>
+                    <td class="mono">${hex(row.offset,4)}</td>
+                    <td>${status} <span class="mono">${row.byte != null ? hex(row.byte) : '—'}</span></td>
+                    <td>${row.meaning}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  updateHeader();
+}
+
+function renderRegionEditor(forceDefaultSelection = false) {
+  const tbody = $('#regionTable tbody');
+  tbody.innerHTML = '';
+
+  if (!bytes) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">Load a file to inspect the known region-byte paths.</td></tr>';
+    updateRegionControls();
+    refreshRegionStatus();
+    return;
+  }
+
+  syncRegionSelection(forceDefaultSelection);
+
+  for (const row of detectedPaths) {
+    const tr = document.createElement('tr');
+    const meaning = !row.present
+      ? 'Offset not present in file'
+      : (!row.ok
+        ? 'Not a documented region value'
+        : (row.byte === row.defaultValue
+          ? `${regionDetail(row.byte)} (default for this path)`
+          : `${regionDetail(row.byte)} (default ${hex(row.defaultValue)})`));
+
+    tr.innerHTML = `<td>${formatRegionCell(row)}</td>
+                    <td class="mono">${hex(row.offset,4)}</td>
+                    <td>${row.present ? `<span class="mono">${hex(row.byte)}</span>` : '<span class="muted">—</span>'}</td>
+                    <td>${meaning}</td>
+                    <td>${row.present ? `<label class="row" style="gap:6px"><input type="checkbox" data-id="${row.id}" ${selectedRegionIds.has(row.id) ? 'checked' : ''} /><span class="hint">edit</span></label>` : '<span class="muted">n/a</span>'}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  $$('#regionTable input[type="checkbox"]').forEach((cb) => {
+    cb.addEventListener('change', (event) => {
+      const id = event.target.getAttribute('data-id');
+      if (event.target.checked) selectedRegionIds.add(id);
+      else selectedRegionIds.delete(id);
+      updateRegionControls();
+      const warning = regionSelectionWarningMessage(id, event.target.checked);
+      if (warning) refreshRegionStatus(warning, 'warn');
+      else refreshRegionStatus();
+    });
+  });
+
+  updateRegionControls();
+  refreshRegionStatus();
+}
+
+// ======= Editor UI =======
+function buildEditor() {
+  const av = activeVariant();
+  if (!bytes || !av || !hasFaceLibBounds()) {
+    setEditorPlaceholder('Load a valid file and select a working variant to edit Mii colors.');
+    return;
+  }
+
+  const container = document.createElement('div');
+
+  for (const group of GROUPS) {
+    const g = document.createElement('div');
+    g.className = 'group';
+    const title = document.createElement('h3');
+    title.textContent = group.name;
+    g.appendChild(title);
+
+    for (let i = 0; i < group.keys.length; i++) {
+      const rel = group.keys[i];
+      const abs = faceBase + rel;
+      const val = view.getUint32(abs, false);
+      const hex8 = toRGBAHex(val);
+      const R = (val >>> 24) & 0xFF;
+      const G = (val >>> 16) & 0xFF;
+      const B = (val >>> 8) & 0xFF;
+      const A = val & 0xFF;
+      const dirtyKey = colorDirtyKey(av, rel);
+
+      const row = document.createElement('div');
+      row.className = 'color-row';
+      const label = document.createElement('div');
+      label.innerHTML = `<span class="mono">${group.name.replace(/ .*/, '')} #${i+1}</span> <span class="muted">(rel ${hex(rel,3)} / abs ${hex(abs,6)})</span>`;
+
+      const color = document.createElement('input');
+      color.type = 'color';
+      color.value = `#${hex8.slice(0,6)}`;
+      color.title = 'RGB';
+
+      const alpha = document.createElement('input');
+      alpha.type = 'number';
+      alpha.min = 0;
+      alpha.max = 255;
+      alpha.step = 1;
+      alpha.value = A;
+      alpha.title = 'Alpha (0-255)';
+
+      const code = document.createElement('input');
+      code.type = 'text';
+      code.className = 'mono';
+      code.value = hex8;
+      code.maxLength = 8;
+      code.title = 'RRGGBBAA';
+
+      const sw = document.createElement('div');
+      sw.className = 'swatch';
+      sw.style.background = `rgba(${R},${G},${B},${(A/255).toFixed(3)})`;
+
+      function write(val32) {
+        if (writeWord(abs, val32, dirtyKey)) updateHeader();
+      }
+
+      function syncFromRGB() {
+        const rgb = color.value.replace('#','');
+        const a = clamp(parseInt(alpha.value, 10) || 0, 0, 255);
+        const val32 = ((parseInt(rgb.slice(0,2),16) << 24) | (parseInt(rgb.slice(2,4),16) << 16) | (parseInt(rgb.slice(4,6),16) << 8) | a) >>> 0;
+        code.value = toRGBAHex(val32);
+        sw.style.background = `rgba(${(val32>>>24)&255},${(val32>>>16)&255},${(val32>>>8)&255},${((val32&255)/255).toFixed(3)})`;
+        write(val32);
+      }
+
+      function syncFromCode() {
+        const v = fromRGBAHex(code.value);
+        color.value = '#' + toRGBAHex(v).slice(0,6);
+        alpha.value = String(v & 255);
+        sw.style.background = `rgba(${(v>>>24)&255},${(v>>>16)&255},${(v>>>8)&255},${((v&255)/255).toFixed(3)})`;
+        write(v);
+      }
+
+      color.addEventListener('input', syncFromRGB);
+      alpha.addEventListener('change', syncFromRGB);
+      code.addEventListener('change', syncFromCode);
+
+      row.append(label, color, alpha, code, sw);
+      g.appendChild(row);
+    }
+
+    container.appendChild(g);
+  }
+
+  const editor = $('#editor');
+  editor.innerHTML = '';
+  editor.appendChild(container);
+}
+
+// ======= Actions =======
+function applyVariantUse() {
+  faceBase = activeVariant() ? FACELIB_BASE[activeVariant()] : null;
+  renderRegionEditor(true);
+  refreshLoadingControls(true);
+  refreshEditor();
+  updateHeader();
+}
+
+function applyRegionPatch() {
+  if (!bytes) return;
+  const value = parseInt($('#regionValue').value, 16) & 0xFF;
+  const selectedRows = detectedPaths.filter((row) => selectedRegionIds.has(row.id) && row.present);
+  let changed = 0;
+
+  for (const row of selectedRows) {
+    if (writeByte(row.offset, value, regionDirtyKey(row.id))) changed++;
+  }
+
+  runDetection();
+  renderRegionEditor(false);
+  refreshRegionStatus(
+    changed > 0
+      ? `Patched ${changed} region byte(s) to ${hex(value)} (${regionDetail(value)}).`
+      : `Selected path(s) already use ${hex(value)} (${regionDetail(value)}).`,
+    changed > 0 ? 'ok' : 'warn'
+  );
+}
+
+function applyLoadingColorPatch() {
+  const variant = activeVariant();
+  if (!variant || !hasLoadingBounds()) return;
+  const offset = loadingOffsetForVariant(variant);
+  const rgb = $('#loadingColor').value.replace('#', '');
+  const values = [rgb.slice(0, 2), rgb.slice(2, 4), rgb.slice(4, 6)].map((part) => parseInt(part, 16) & 0xFF);
+  let changed = 0;
+
+  LOADING_WORD_REL_OFFSETS.forEach((rel, index) => {
+    const word = (0x38000000 | values[index]) >>> 0;
+    if (writeWord(offset + rel, word, loadingDirtyKey(variant))) changed++;
+  });
+
+  refreshLoadingControls(true,
+    changed > 0
+      ? `Patched the loading screen RGB routine at ${hex(offset, 6)} to ${$('#loadingColor').value.toUpperCase()}.`
+      : `The loading screen routine already uses ${$('#loadingColor').value.toUpperCase()}.`,
+    changed > 0 ? 'ok' : 'warn'
+  );
+  updateHeader();
+}
+
+function restoreStockLoadingRoutine() {
+  const variant = activeVariant();
+  if (!variant || !hasLoadingBounds()) return;
+  const offset = loadingOffsetForVariant(variant);
+  let changed = 0;
+
+  LOADING_WORD_REL_OFFSETS.forEach((rel, index) => {
+    if (writeWord(offset + rel, LOADING_STOCK_WORDS[index], loadingDirtyKey(variant))) changed++;
+  });
+
+  refreshLoadingControls(true,
+    changed > 0
+      ? `Restored the stock loading RGB loads at ${hex(offset, 6)}.`
+      : `The loading screen routine already matches the stock RGB loads.`,
+    changed > 0 ? 'ok' : 'warn'
+  );
+  updateHeader();
+}
+
+function download() {
+  if (!bytes) return;
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const name = fileHandle?.name?.replace(/\.dol$/i,'') || 'main';
+  a.download = `${name}.patched.dol`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function revertChanges() {
+  if (!originalBytes || !bytes) return;
+  bytes.set(originalBytes);
+  view = new DataView(bytes.buffer);
+  patchCount = 0;
+  dirtyEntries = new Set();
+  runDetection();
+  renderRegionEditor(true);
+  refreshLoadingControls(true);
+  refreshEditor();
+  updateHeader();
+}
+
+function setDefaults() {
+  const av = activeVariant();
+  if (!av || !hasFaceLibBounds()) return;
+  for (const [relHex, hexStr] of Object.entries(WIIKI_DEFAULTS)) {
+    const rel = Number(relHex);
+    const abs = faceBase + rel;
+    writeWord(abs, fromRGBAHex(hexStr), colorDirtyKey(av, rel));
+  }
+  buildEditor();
+  updateHeader();
+}
+
+function exportJSON() {
+  const av = activeVariant();
+  if (!av || !hasFaceLibBounds()) return;
+  const out = { variant: av, faceBase, entries: {} };
+  for (const rel of FACELIB_REL_KEYS) {
+    out.entries[rel] = toRGBAHex(view.getUint32(faceBase + rel, false));
+  }
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mii_colors.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function importJSONFile(f) {
+  if (!hasFaceLibBounds() || !activeVariant()) return;
+  const av = activeVariant();
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const obj = JSON.parse(fr.result);
+      if (!obj || !obj.entries) throw new Error('Invalid palette JSON');
+      for (const [relStr, hexStr] of Object.entries(obj.entries)) {
+        const rel = Number(relStr);
+        if (!Number.isFinite(rel)) continue;
+        const abs = faceBase + rel;
+        if (abs < 0 || abs + 3 >= bytes.length) continue;
+        writeWord(abs, fromRGBAHex(String(hexStr)), colorDirtyKey(av, rel));
+      }
+      buildEditor();
+      updateHeader();
+    } catch (e) {
+      alert('Import failed: ' + e.message);
+    }
+  };
+  fr.readAsText(f);
+}
+
+// ======= Wire up UI =======
+const regionSelect = $('#regionValue');
+regionSelect.innerHTML = REGION_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('');
+regionSelect.value = '01';
+
+$('#file').addEventListener('change', e => loadFile(e.target.files[0]));
+const drop = $('#drop');
+if (drop) {
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault();
+    drop.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    loadFile(f);
+  });
+}
+
+$('#btnApplyRegion').addEventListener('click', applyRegionPatch);
+$('#btnApplyLoading').addEventListener('click', applyLoadingColorPatch);
+$('#btnRestoreLoading').addEventListener('click', restoreStockLoadingRoutine);
+$('#btnDownload').addEventListener('click', download);
+$('#btnRevert').addEventListener('click', revertChanges);
+$('#btnDefaults').addEventListener('click', setDefaults);
+$('#btnExport').addEventListener('click', exportJSON);
+$('#btnImport').addEventListener('click', () => $('#importJson').click());
+$('#importJson').addEventListener('change', e => {
+  if (e.target.files[0]) importJSONFile(e.target.files[0]);
+  e.target.value = '';
+});
+
+const selVariant = $('#variantOverride');
+if (selVariant) selVariant.addEventListener('change', (e) => {
+  variantOverride = e.target.value || null;
+  applyVariantUse();
+});
+
+renderRegionEditor();
+refreshLoadingControls(true);
+updateHeader();
+  </script>
+</body>
+</html>
