@@ -1,0 +1,2954 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SSX 3 Save Editor</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f8;
+      --surface: #ffffff;
+      --surface-alt: #eef3f1;
+      --ink: #1d2329;
+      --muted: #65717d;
+      --line: #d9e0e5;
+      --line-strong: #b8c3cc;
+      --accent: #0f766e;
+      --accent-ink: #ffffff;
+      --warn: #9a5b00;
+      --warn-bg: #fff3d8;
+      --bad: #a33131;
+      --bad-bg: #ffe7e7;
+      --good: #146c43;
+      --good-bg: #e4f5ec;
+      --code-bg: #101418;
+      --code-ink: #e9eef2;
+      --shadow: 0 1px 2px rgba(29, 35, 41, 0.08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    button.primary:hover:not(:disabled) {
+      color: var(--accent-ink);
+      filter: brightness(0.95);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--ink);
+      padding: 7px 10px;
+    }
+
+    input[type="text"]:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.22);
+      border-color: var(--accent);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 760;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .brand .sub {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .side,
+    .main {
+      min-width: 0;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel + .panel {
+      margin-top: 12px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfc;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #3f4a54;
+    }
+
+    .panel-body {
+      padding: 14px;
+    }
+
+    .dropzone {
+      display: grid;
+      align-items: center;
+      min-height: 148px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface-alt);
+      color: var(--ink);
+      padding: 16px;
+      cursor: pointer;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragging {
+      border-color: var(--accent);
+      background: #e6f2ef;
+    }
+
+    .drop-title {
+      margin: 0 0 8px;
+      font-weight: 760;
+      font-size: 15px;
+    }
+
+    .drop-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 680;
+      color: #384650;
+      background: #f7f9fa;
+      white-space: nowrap;
+    }
+
+    .badge.good {
+      border-color: #b8dfca;
+      color: var(--good);
+      background: var(--good-bg);
+    }
+
+    .badge.warn {
+      border-color: #efcd8c;
+      color: var(--warn);
+      background: var(--warn-bg);
+    }
+
+    .badge.bad {
+      border-color: #efb0b0;
+      color: var(--bad);
+      background: var(--bad-bg);
+    }
+
+    .summary-list {
+      display: grid;
+      grid-template-columns: minmax(94px, auto) minmax(0, 1fr);
+      gap: 9px 12px;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .summary-list dt {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .summary-list dd {
+      margin: 0;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 620;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      padding: 8px;
+    }
+
+    .tab {
+      border-color: transparent;
+      background: transparent;
+      min-height: 34px;
+      padding: 0 12px;
+      color: var(--muted);
+    }
+
+    .tab.active {
+      border-color: var(--line-strong);
+      background: var(--surface-alt);
+      color: var(--ink);
+    }
+
+    .tab-content {
+      display: none;
+      padding: 16px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .editor-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 14px;
+      line-height: 1.2;
+      color: var(--ink);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .field label,
+    .field .label {
+      font-size: 12px;
+      font-weight: 760;
+      color: #3f4a54;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .field-value {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8fafb;
+      padding: 7px 10px;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+    }
+
+    .note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .note.warn {
+      color: var(--warn);
+    }
+
+    .note.bad {
+      color: var(--bad);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .stats-table input[type="text"] {
+      width: 76px;
+      min-width: 64px;
+      min-height: 32px;
+      padding: 5px 7px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-table input[type="text"] {
+      width: 110px;
+      min-width: 96px;
+      min-height: 32px;
+      padding: 5px 7px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-table .candidate td {
+      background: #fffaf0;
+    }
+
+    .stats-table .current-row td {
+      background: #f1f7f4;
+    }
+
+    .collectible-table td {
+      white-space: normal;
+    }
+
+    .collectible-count {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+      gap: 6px;
+      min-width: 260px;
+      max-width: 640px;
+    }
+
+    .slot-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfc;
+      color: var(--ink);
+      padding: 4px 6px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+    }
+
+    .slot-toggle:has(input:checked) {
+      border-color: #b8dfca;
+      background: var(--good-bg);
+      color: var(--good);
+    }
+
+    .slot-toggle input {
+      margin: 0;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f8fafb;
+      color: #3f4a54;
+      font-size: 12px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td.mono,
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 560px;
+      overflow: auto;
+      border-radius: 8px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      padding: 14px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      tab-size: 2;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 230px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fbfcfc;
+      color: var(--muted);
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+    }
+
+    .changed {
+      margin-top: 14px;
+    }
+
+    .footer-status {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    @media (max-width: 880px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .actions {
+        justify-content: flex-start;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>SSX 3 Save Editor</h1>
+        <span class="sub" id="loadedName">No file loaded</span>
+      </div>
+      <div class="actions">
+        <button type="button" id="chooseFile">Choose File</button>
+        <button type="button" id="downloadOriginal" disabled>Download Unchanged</button>
+        <button type="button" id="downloadCore" disabled>Download Core</button>
+        <button type="button" id="downloadEditedCore" disabled>Download Edited Core</button>
+        <button type="button" id="downloadEdited" class="primary" disabled>Download Edited</button>
+        <button type="button" id="resetEdits" disabled>Reset Edits</button>
+      </div>
+      <input class="file-input" id="fileInput" type="file" accept=".ssx,.gci,.xps,.max,.cbs,application/octet-stream">
+    </header>
+
+    <main class="workspace">
+      <aside class="side">
+        <section class="panel">
+          <div class="panel-body">
+            <div class="dropzone" id="dropzone" role="button" tabindex="0">
+              <div>
+                <p class="drop-title">Drop save file</p>
+                <p class="drop-meta">Xbox Data.ssx, GameCube .gci, PS2 XPort .xps, Max Drive .max, CodeBreaker .cbs</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Status</h2>
+          </div>
+          <div class="panel-body" id="statusPanel">
+            <div class="status-row">
+              <span class="badge">Waiting</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>File Summary</h2>
+          </div>
+          <div class="panel-body" id="summaryPanel">
+            <div class="empty">No save file selected.</div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="main panel">
+        <nav class="tabs" aria-label="Save sections">
+          <button type="button" class="tab active" data-tab="editor">Editor</button>
+          <button type="button" class="tab" data-tab="diagnostics">Diagnostics</button>
+          <button type="button" class="tab" data-tab="technical">Technical</button>
+        </nav>
+
+        <section class="tab-content active" id="tab-editor">
+          <div class="empty">No parsed save data.</div>
+        </section>
+
+        <section class="tab-content" id="tab-diagnostics">
+          <div class="empty">No diagnostics available.</div>
+        </section>
+
+        <section class="tab-content" id="tab-technical">
+          <pre>{}</pre>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const CONSTANTS = Object.freeze({
+        CORE_SIZE: 0x9b61,
+        XBOX_SIGNATURE_SIZE: 20,
+        XBOX_TOTAL_SIZE: 0x9b61 + 20,
+        GC_HEADER_SIZE: 0x40,
+        GC_FILE_DATA_SIZE: 0x10000,
+        GC_CORE_FILE_OFFSET: 0x4844,
+        XPORT_RECORD_SIZE: 0xfa,
+        PROFILE_FIELD_LEN: 12,
+        PROFILE_NAME_MAX: 11,
+        GC_COMMENT_LINE_LEN: 32,
+        GC_COMMENT_MAX: 31,
+        GC_MONEY_OFFSET: 0x3968,
+        CORE_TAIL_RIDER_OFFSET: 0x9b5c,
+        CORE_TAIL_VALUE_OFFSET: 0x9b5d,
+        CORE_CHECKSUM_POLY: 0xa001,
+        CORE_CHECKSUM_XOR: 0x0185,
+        GC_COLLECTIBLE_TABLE_OFFSET: 0x2ea8,
+        GC_COLLECTIBLE_ENTRY_SIZE: 0x0c,
+        GC_COLLECTIBLE_ENTRY_COUNT: 23,
+        GC_COLLECTIBLE_MASK_OFFSET: 4,
+        GC_COLLECTIBLE_MASK_LENGTH: 8,
+        GC_EVENT_RECORD_TABLE_OFFSET: 0x0ad8,
+        GC_EVENT_RECORD_SIZE: 0x08,
+        GC_EVENT_STATUS_OFFSET: 4,
+        GC_EVENT_TIME_MAX_SECONDS: 999999,
+        RIDER_STAT_ROW_OFFSET: 0x0beb,
+        RIDER_STAT_VALUE_SCALE: 5,
+        RIDER_STAT_MAX_RAW: 55,
+        RIDER_SLOT_MARKER_OFFSET: 0x0beb,
+        RIDER_SLOT_STRIDE: 0x0f88,
+        RIDER_SLOT_COUNT: 10
+      });
+
+      const GAME_DATA_ID_RE = /^B[AE]SL[UE]S-\d{5}-GAM\d{4}$/;
+      const RIDER_STAT_FIELDS = Object.freeze([
+        { id: "acceleration", label: "Acceleration", byteIndex: 1 },
+        { id: "edging", label: "Edging", byteIndex: 3 },
+        { id: "speed", label: "Speed", byteIndex: 0 },
+        { id: "spin", label: "Spin", byteIndex: 4 },
+        { id: "stability", label: "Stability", byteIndex: 6 },
+        { id: "toughness", label: "Toughness", byteIndex: 5 },
+        { id: "tricks", label: "Tricks", byteIndex: 2 }
+      ]);
+
+      const GC_COLLECTIBLE_AREAS = Object.freeze([
+        { id: "snowJam", peak: "Peak 1", label: "Snow Jam", entryIndex: 0, total: 30 },
+        { id: "metroCity", peak: "Peak 1", label: "Metro City", entryIndex: 1, total: 35 },
+        { id: "ruthlessRidge", peak: "Peak 2", label: "Ruthless Ridge", entryIndex: 2, total: 30 },
+        { id: "intimidator", peak: "Peak 2", label: "Intimidator", entryIndex: 3, total: 25 },
+        { id: "rnb", peak: "Peak 1", label: "R&B", entryIndex: 5, total: 30 },
+        { id: "crowsNest", peak: "Peak 1", label: "Crow's Nest", entryIndex: 8, total: 2 },
+        { id: "theJunction", peak: "Peak 1", label: "The Junction", entryIndex: 11, total: 4 },
+        { id: "happiness", peak: "Peak 1", label: "Happiness", entryIndex: 14, total: 44 },
+        { id: "ruthless", peak: "Peak 2", label: "Ruthless", entryIndex: 15, total: 44 },
+        { id: "greenStation", peak: "Peak 1", label: "Green Station", entryIndex: 17, total: 5 },
+        { id: "blueStation", peak: "Peak 1", label: "Blue Station", entryIndex: 18, total: 5 },
+        { id: "redStation", peak: "Peak 2", label: "Red Station", entryIndex: 20, total: 5 }
+      ]);
+
+      const GC_EVENT_RECORDS = Object.freeze([
+        { id: "peak1Race", peak: "Peak 1", category: "Race", label: "Peak I Race", type: "time", recordIndex: 1, confidence: "confirmed" },
+        { id: "peak2Race", peak: "Peak 2", category: "Race", label: "Peak II Race", type: "time", recordIndex: 2, confidence: "confirmed" },
+        { id: "peak1Jam", peak: "Peak 1", category: "Freestyle", label: "Peak I Jam", type: "score", recordIndex: 4, confidence: "confirmed" },
+        { id: "snowJam", peak: "Peak 1", category: "Race", label: "Snow Jam", type: "time", recordIndex: 7, confidence: "candidate" },
+        { id: "happinessJam", peak: "Peak 1", category: "Freestyle", label: "Happiness Jam", type: "score", recordIndex: 8, confidence: "confirmed" },
+        { id: "ruthless", peak: "Peak 2", category: "Race", label: "Ruthless", type: "time", recordIndex: 9, confidence: "candidate" },
+        { id: "intimidator", peak: "Peak 2", category: "Race", label: "Intimidator", type: "time", recordIndex: 13, confidence: "confirmed" },
+        { id: "metroCity", peak: "Peak 1", category: "Race", label: "Metro City", type: "time", recordIndex: 14, confidence: "confirmed" },
+        { id: "ruthlessRidge", peak: "Peak 2", category: "Race", label: "Ruthless Ridge", type: "time", recordIndex: 15, confidence: "confirmed" },
+        { id: "happiness", peak: "Peak 1", category: "Race", label: "Happiness", type: "time", recordIndex: 16, confidence: "candidate" },
+        { id: "rnb", peak: "Peak 1", category: "Freestyle", label: "R&B", type: "score", recordIndex: 18, confidence: "confirmed" },
+        { id: "crowsNest", peak: "Peak 1", category: "Freestyle", label: "Crow's Nest", type: "score", recordIndex: 21, confidence: "candidate" },
+        { id: "theJunction", peak: "Peak 1", category: "Freestyle", label: "The Junction", type: "score", recordIndex: 24, confidence: "confirmed" }
+      ]);
+
+      const FIELD_REGISTRY = Object.freeze([
+        {
+          id: "profileName",
+          label: "Profile Name",
+          coreOffset: 0,
+          length: CONSTANTS.PROFILE_FIELD_LEN,
+          maxLength: CONSTANTS.PROFILE_NAME_MAX,
+          codec: "ascii-z"
+        },
+        {
+          id: "currentRiderId",
+          label: "Current Rider ID",
+          coreOffset: CONSTANTS.CORE_TAIL_RIDER_OFFSET,
+          length: 1,
+          min: 0,
+          max: 255,
+          codec: "u8-candidate"
+        },
+        {
+          id: "gameCubeMoney",
+          label: "Money",
+          coreOffset: CONSTANTS.GC_MONEY_OFFSET,
+          length: 4,
+          min: 0,
+          max: 4294967295,
+          codec: "u32be",
+          platform: "GameCube"
+        },
+        {
+          id: "gameCubeCommentLine1",
+          label: "GameCube Comment Line 1",
+          absoluteOffset: CONSTANTS.GC_HEADER_SIZE,
+          length: CONSTANTS.GC_COMMENT_LINE_LEN,
+          maxLength: CONSTANTS.GC_COMMENT_MAX,
+          codec: "ascii-z",
+          wrapperOnly: true
+        },
+        {
+          id: "gameCubeCommentLine2",
+          label: "GameCube Comment Line 2",
+          absoluteOffset: CONSTANTS.GC_HEADER_SIZE + 0x20,
+          length: CONSTANTS.GC_COMMENT_LINE_LEN,
+          maxLength: CONSTANTS.GC_COMMENT_MAX,
+          codec: "ascii-z",
+          wrapperOnly: true
+        }
+      ]);
+
+      function byteAt(bytes, offset) {
+        return offset >= 0 && offset < bytes.length ? bytes[offset] : 0;
+      }
+
+      function u16le(bytes, offset) {
+        return byteAt(bytes, offset) | (byteAt(bytes, offset + 1) << 8);
+      }
+
+      function u16be(bytes, offset) {
+        return (byteAt(bytes, offset) << 8) | byteAt(bytes, offset + 1);
+      }
+
+      function u32le(bytes, offset) {
+        return (byteAt(bytes, offset) |
+          (byteAt(bytes, offset + 1) << 8) |
+          (byteAt(bytes, offset + 2) << 16) |
+          (byteAt(bytes, offset + 3) * 0x1000000)) >>> 0;
+      }
+
+      function u32be(bytes, offset) {
+        return ((byteAt(bytes, offset) * 0x1000000) |
+          (byteAt(bytes, offset + 1) << 16) |
+          (byteAt(bytes, offset + 2) << 8) |
+          byteAt(bytes, offset + 3)) >>> 0;
+      }
+
+      function writeU32le(bytes, offset, value) {
+        const v = Number(value) >>> 0;
+        bytes[offset] = v & 0xff;
+        bytes[offset + 1] = (v >>> 8) & 0xff;
+        bytes[offset + 2] = (v >>> 16) & 0xff;
+        bytes[offset + 3] = (v >>> 24) & 0xff;
+      }
+
+      function writeU32be(bytes, offset, value) {
+        const v = Number(value) >>> 0;
+        bytes[offset] = (v >>> 24) & 0xff;
+        bytes[offset + 1] = (v >>> 16) & 0xff;
+        bytes[offset + 2] = (v >>> 8) & 0xff;
+        bytes[offset + 3] = v & 0xff;
+      }
+
+      function xportChecksum(bytes, start, end) {
+        let checksum = 0;
+        for (let offset = start; offset < end; offset += 1) {
+          checksum = (checksum + ((byteAt(bytes, offset) << (checksum % 24)) >>> 0)) >>> 0;
+        }
+        return checksum >>> 0;
+      }
+
+      function ssxCoreChecksum(coreBytes) {
+        let checksum = 0;
+        for (let offset = 0; offset < CONSTANTS.CORE_TAIL_VALUE_OFFSET; offset += 1) {
+          checksum = (checksum ^ byteAt(coreBytes, offset)) & 0xffff;
+          for (let bit = 0; bit < 8; bit += 1) {
+            if ((checksum & 1) !== 0) {
+              checksum = ((checksum >>> 1) ^ CONSTANTS.CORE_CHECKSUM_POLY) & 0xffff;
+            } else {
+              checksum = (checksum >>> 1) & 0xffff;
+            }
+          }
+        }
+        return (checksum ^ CONSTANTS.CORE_CHECKSUM_XOR) & 0xffff;
+      }
+
+      function writeCoreChecksum(coreBytes, valueEndian) {
+        const checksum = ssxCoreChecksum(coreBytes);
+        if (valueEndian === "big") {
+          writeU32be(coreBytes, CONSTANTS.CORE_TAIL_VALUE_OFFSET, checksum);
+        } else {
+          writeU32le(coreBytes, CONSTANTS.CORE_TAIL_VALUE_OFFSET, checksum);
+        }
+        return checksum;
+      }
+
+      function copyBytes(bytes) {
+        return new Uint8Array(bytes);
+      }
+
+      function asciiFixed(bytes, offset, length) {
+        let value = "";
+        const end = Math.min(bytes.length, offset + length);
+        for (let i = offset; i < end; i += 1) {
+          const b = bytes[i];
+          value += b >= 32 && b <= 126 ? String.fromCharCode(b) : ".";
+        }
+        return value;
+      }
+
+      function asciiZ(bytes, offset, maxLength) {
+        let value = "";
+        const end = Math.min(bytes.length, offset + maxLength);
+        for (let i = offset; i < end; i += 1) {
+          const b = bytes[i];
+          if (b === 0) {
+            break;
+          }
+          if (b < 32 || b > 126) {
+            break;
+          }
+          value += String.fromCharCode(b);
+        }
+        return value.replace(/\s+$/, "");
+      }
+
+      function hasAscii(bytes, offset, text) {
+        if (offset < 0 || offset + text.length > bytes.length) {
+          return false;
+        }
+        for (let i = 0; i < text.length; i += 1) {
+          if (bytes[offset + i] !== text.charCodeAt(i)) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function hexByte(value) {
+        return value.toString(16).padStart(2, "0");
+      }
+
+      function hexValue(value, width) {
+        return "0x" + value.toString(16).padStart(width || 0, "0");
+      }
+
+      function bytesToHex(bytes, maxLength) {
+        const length = Math.min(bytes.length, maxLength || bytes.length);
+        let parts = [];
+        for (let i = 0; i < length; i += 1) {
+          parts.push(hexByte(bytes[i]));
+        }
+        if (length < bytes.length) {
+          parts.push("...");
+        }
+        return parts.join(" ");
+      }
+
+      function parseIntegerDraft(value) {
+        const text = String(value == null ? "" : value).trim();
+        if (text === "") {
+          return NaN;
+        }
+        if (/^0x[0-9a-f]+$/i.test(text)) {
+          return Number.parseInt(text, 16);
+        }
+        if (!/^\d+$/.test(text)) {
+          return NaN;
+        }
+        return Number.parseInt(text, 10);
+      }
+
+      function readCoreEndianValue(core, offset) {
+        return core.valueEndian === "big" ? u32be(core.bytes, offset) : u32le(core.bytes, offset);
+      }
+
+      function readCoreRiderId(container) {
+        return container && container.core ? byteAt(container.core.bytes, CONSTANTS.CORE_TAIL_RIDER_OFFSET) : 0;
+      }
+
+      function readCoreTailValue(container) {
+        return container && container.core ? readCoreEndianValue(container.core, CONSTANTS.CORE_TAIL_VALUE_OFFSET) : 0;
+      }
+
+      function supportsGameCubeGameplayFields(container) {
+        return Boolean(container && container.kind === "gamecube-gci" && container.core);
+      }
+
+      function readGameCubeMoney(container) {
+        return supportsGameCubeGameplayFields(container) ? u32be(container.core.bytes, CONSTANTS.GC_MONEY_OFFSET) : 0;
+      }
+
+      function riderStatRowOffset(index) {
+        return CONSTANTS.RIDER_STAT_ROW_OFFSET + (index * CONSTANTS.RIDER_SLOT_STRIDE);
+      }
+
+      function readRiderStats(container, index) {
+        const stats = {};
+        if (!supportsGameCubeGameplayFields(container)) {
+          return stats;
+        }
+        const rowOffset = riderStatRowOffset(index);
+        RIDER_STAT_FIELDS.forEach((field) => {
+          stats[field.id] = byteAt(container.core.bytes, rowOffset + field.byteIndex) / CONSTANTS.RIDER_STAT_VALUE_SCALE;
+        });
+        return stats;
+      }
+
+      function readAllRiderStats(container) {
+        const rows = [];
+        for (let index = 0; index < CONSTANTS.RIDER_SLOT_COUNT; index += 1) {
+          rows.push(readRiderStats(container, index));
+        }
+        return rows;
+      }
+
+      function formatStatValue(value) {
+        return (Math.round(Number(value) * 10) / 10).toFixed(1);
+      }
+
+      function emptyRiderStatsDraft() {
+        return Array.from({ length: CONSTANTS.RIDER_SLOT_COUNT }, () => {
+          const row = {};
+          RIDER_STAT_FIELDS.forEach((field) => {
+            row[field.id] = "";
+          });
+          return row;
+        });
+      }
+
+      function gameCubeStatsDraft(container) {
+        if (!supportsGameCubeGameplayFields(container)) {
+          return emptyRiderStatsDraft();
+        }
+        return readAllRiderStats(container).map((stats) => {
+          const row = {};
+          RIDER_STAT_FIELDS.forEach((field) => {
+            row[field.id] = formatStatValue(stats[field.id]);
+          });
+          return row;
+        });
+      }
+
+      function collectibleEntryOffset(area) {
+        return CONSTANTS.GC_COLLECTIBLE_TABLE_OFFSET + (area.entryIndex * CONSTANTS.GC_COLLECTIBLE_ENTRY_SIZE);
+      }
+
+      function collectibleSlotByteBit(slotIndex) {
+        const wordIndex = slotIndex < 32 ? 0 : 1;
+        const bitInWord = slotIndex - (wordIndex * 32);
+        return {
+          byteIndex: (wordIndex * 4) + (3 - Math.floor(bitInWord / 8)),
+          bitMask: 1 << (bitInWord % 8)
+        };
+      }
+
+      function readCollectibleMaskBytes(container, area) {
+        const bytes = new Uint8Array(CONSTANTS.GC_COLLECTIBLE_MASK_LENGTH);
+        if (!supportsGameCubeGameplayFields(container)) {
+          return bytes;
+        }
+        const start = collectibleEntryOffset(area) + CONSTANTS.GC_COLLECTIBLE_MASK_OFFSET;
+        bytes.set(container.core.bytes.slice(start, start + CONSTANTS.GC_COLLECTIBLE_MASK_LENGTH));
+        return bytes;
+      }
+
+      function countBits(value) {
+        let bits = value & 0xff;
+        let count = 0;
+        while (bits) {
+          count += bits & 1;
+          bits >>>= 1;
+        }
+        return count;
+      }
+
+      function countMaskBits(bytes) {
+        let total = 0;
+        for (let i = 0; i < bytes.length; i += 1) {
+          total += countBits(bytes[i]);
+        }
+        return total;
+      }
+
+      function readCollectibleSlot(container, area, slotIndex) {
+        if (!supportsGameCubeGameplayFields(container)) {
+          return false;
+        }
+        const bit = collectibleSlotByteBit(slotIndex);
+        const start = collectibleEntryOffset(area) + CONSTANTS.GC_COLLECTIBLE_MASK_OFFSET;
+        return (byteAt(container.core.bytes, start + bit.byteIndex) & bit.bitMask) !== 0;
+      }
+
+      function readCollectibleArea(container, area) {
+        const offset = collectibleEntryOffset(area);
+        const maskBytes = readCollectibleMaskBytes(container, area);
+        const slots = [];
+        for (let slotIndex = 0; slotIndex < area.total; slotIndex += 1) {
+          slots.push(readCollectibleSlot(container, area, slotIndex));
+        }
+        return {
+          id: area.id,
+          peak: area.peak,
+          label: area.label,
+          entryIndex: area.entryIndex,
+          total: area.total,
+          offset,
+          absoluteOffset: container && container.core ? container.core.offset + offset : offset,
+          count: supportsGameCubeGameplayFields(container) ? u32le(container.core.bytes, offset) : 0,
+          slotCount: slots.filter(Boolean).length,
+          maskPopcount: countMaskBits(maskBytes),
+          maskHex: bytesToHex(maskBytes, CONSTANTS.GC_COLLECTIBLE_MASK_LENGTH),
+          slots
+        };
+      }
+
+      function readAllCollectibleAreas(container) {
+        return GC_COLLECTIBLE_AREAS.map((area) => readCollectibleArea(container, area));
+      }
+
+      function readRawCollectibleEntries(container) {
+        const entries = [];
+        if (!supportsGameCubeGameplayFields(container)) {
+          return entries;
+        }
+        for (let index = 0; index < CONSTANTS.GC_COLLECTIBLE_ENTRY_COUNT; index += 1) {
+          const offset = CONSTANTS.GC_COLLECTIBLE_TABLE_OFFSET + (index * CONSTANTS.GC_COLLECTIBLE_ENTRY_SIZE);
+          const mask = container.core.bytes.slice(
+            offset + CONSTANTS.GC_COLLECTIBLE_MASK_OFFSET,
+            offset + CONSTANTS.GC_COLLECTIBLE_MASK_OFFSET + CONSTANTS.GC_COLLECTIBLE_MASK_LENGTH
+          );
+          const namedArea = GC_COLLECTIBLE_AREAS.find((area) => area.entryIndex === index);
+          entries.push({
+            index,
+            name: namedArea ? namedArea.label : null,
+            peak: namedArea ? namedArea.peak : null,
+            offset,
+            absoluteOffset: container.core.offset + offset,
+            count: u32le(container.core.bytes, offset),
+            maskPopcount: countMaskBits(mask),
+            maskHex: bytesToHex(mask, CONSTANTS.GC_COLLECTIBLE_MASK_LENGTH)
+          });
+        }
+        return entries;
+      }
+
+      function emptyGameCubeCollectiblesDraft() {
+        const draft = {};
+        GC_COLLECTIBLE_AREAS.forEach((area) => {
+          draft[area.id] = Array.from({ length: area.total }, () => false);
+        });
+        return draft;
+      }
+
+      function gameCubeCollectiblesDraft(container) {
+        if (!supportsGameCubeGameplayFields(container)) {
+          return emptyGameCubeCollectiblesDraft();
+        }
+        const draft = {};
+        GC_COLLECTIBLE_AREAS.forEach((area) => {
+          draft[area.id] = readCollectibleArea(container, area).slots.slice();
+        });
+        return draft;
+      }
+
+      function countCheckedSlots(slots) {
+        let count = 0;
+        for (let i = 0; i < slots.length; i += 1) {
+          if (slots[i]) {
+            count += 1;
+          }
+        }
+        return count;
+      }
+
+      function normalizeCollectibleSlots(slots, total) {
+        const normalized = [];
+        for (let i = 0; i < total; i += 1) {
+          normalized.push(Boolean(slots && slots[i]));
+        }
+        return normalized;
+      }
+
+      function writeCollectibleArea(coreBytes, area, slots) {
+        const offset = collectibleEntryOffset(area);
+        const normalized = normalizeCollectibleSlots(slots, area.total);
+        writeU32le(coreBytes, offset, countCheckedSlots(normalized));
+        for (let slotIndex = 0; slotIndex < normalized.length; slotIndex += 1) {
+          const bit = collectibleSlotByteBit(slotIndex);
+          const byteOffset = offset + CONSTANTS.GC_COLLECTIBLE_MASK_OFFSET + bit.byteIndex;
+          if (normalized[slotIndex]) {
+            coreBytes[byteOffset] = byteAt(coreBytes, byteOffset) | bit.bitMask;
+          } else {
+            coreBytes[byteOffset] = byteAt(coreBytes, byteOffset) & (~bit.bitMask & 0xff);
+          }
+        }
+      }
+
+      function currentGameCubeEventRiderIndex(container) {
+        const riderIndex = readCoreRiderId(container);
+        return riderIndex >= 0 && riderIndex < CONSTANTS.RIDER_SLOT_COUNT ? riderIndex : 0;
+      }
+
+      function eventRecordOffset(riderIndex, eventRecord) {
+        return CONSTANTS.GC_EVENT_RECORD_TABLE_OFFSET +
+          (riderIndex * CONSTANTS.RIDER_SLOT_STRIDE) +
+          (eventRecord.recordIndex * CONSTANTS.GC_EVENT_RECORD_SIZE);
+      }
+
+      function formatTimeSeconds(totalSeconds) {
+        const value = Math.max(0, Number(totalSeconds) || 0);
+        const minutes = Math.floor(value / 60);
+        const seconds = value % 60;
+        return minutes + ":" + String(seconds).padStart(2, "0");
+      }
+
+      function parseTimeDraft(value) {
+        const text = String(value == null ? "" : value).trim();
+        if (/^\d+:\d{1,2}$/.test(text)) {
+          const parts = text.split(":");
+          const minutes = Number.parseInt(parts[0], 10);
+          const seconds = Number.parseInt(parts[1], 10);
+          if (seconds >= 60) {
+            return NaN;
+          }
+          return (minutes * 60) + seconds;
+        }
+        return parseIntegerDraft(text);
+      }
+
+      function parseGameCubeEventValueDraft(eventRecord, value) {
+        return eventRecord.type === "time" ? parseTimeDraft(value) : parseIntegerDraft(value);
+      }
+
+      function formatGameCubeEventValue(eventRecord, value) {
+        return eventRecord.type === "time" ? formatTimeSeconds(value) : String(value >>> 0);
+      }
+
+      function readGameCubeEventRecord(container, riderIndex, eventRecord) {
+        const offset = eventRecordOffset(riderIndex, eventRecord);
+        const value = supportsGameCubeGameplayFields(container) ? u32be(container.core.bytes, offset) : 0;
+        return {
+          id: eventRecord.id,
+          peak: eventRecord.peak,
+          category: eventRecord.category,
+          label: eventRecord.label,
+          type: eventRecord.type,
+          confidence: eventRecord.confidence,
+          recordIndex: eventRecord.recordIndex,
+          riderIndex,
+          offset,
+          absoluteOffset: container && container.core ? container.core.offset + offset : offset,
+          value,
+          displayValue: formatGameCubeEventValue(eventRecord, value),
+          statusHex: supportsGameCubeGameplayFields(container)
+            ? bytesToHex(container.core.bytes.slice(offset + CONSTANTS.GC_EVENT_STATUS_OFFSET, offset + CONSTANTS.GC_EVENT_RECORD_SIZE), 4)
+            : ""
+        };
+      }
+
+      function readAllGameCubeEventRecords(container, riderIndex) {
+        const index = Number.isInteger(riderIndex) ? riderIndex : currentGameCubeEventRiderIndex(container);
+        return GC_EVENT_RECORDS.map((eventRecord) => readGameCubeEventRecord(container, index, eventRecord));
+      }
+
+      function emptyGameCubeEventsDraft() {
+        const draft = {};
+        GC_EVENT_RECORDS.forEach((eventRecord) => {
+          draft[eventRecord.id] = "";
+        });
+        return draft;
+      }
+
+      function gameCubeEventsDraft(container, riderIndex) {
+        if (!supportsGameCubeGameplayFields(container)) {
+          return emptyGameCubeEventsDraft();
+        }
+        const draft = {};
+        const index = Number.isInteger(riderIndex) ? riderIndex : currentGameCubeEventRiderIndex(container);
+        GC_EVENT_RECORDS.forEach((eventRecord) => {
+          const record = readGameCubeEventRecord(container, index, eventRecord);
+          draft[eventRecord.id] = record.displayValue;
+        });
+        return draft;
+      }
+
+      function writeGameCubeEventRecord(coreBytes, riderIndex, eventRecord, value) {
+        const offset = eventRecordOffset(riderIndex, eventRecord);
+        writeU32be(coreBytes, offset, value);
+      }
+
+      function parseStatRawDraft(value) {
+        const text = String(value == null ? "" : value).trim();
+        if (!/^\d+(\.\d+)?$/.test(text)) {
+          return NaN;
+        }
+        const number = Number(text);
+        if (!Number.isFinite(number)) {
+          return NaN;
+        }
+        const raw = Math.round(number * CONSTANTS.RIDER_STAT_VALUE_SCALE);
+        if (raw < 0 || raw > CONSTANTS.RIDER_STAT_MAX_RAW) {
+          return NaN;
+        }
+        if (Math.abs((raw / CONSTANTS.RIDER_STAT_VALUE_SCALE) - number) > 0.000001) {
+          return NaN;
+        }
+        return raw;
+      }
+
+      function countNonZero(bytes) {
+        let count = 0;
+        for (let i = 0; i < bytes.length; i += 1) {
+          if (bytes[i] !== 0) {
+            count += 1;
+          }
+        }
+        return count;
+      }
+
+      function findAsciiAll(bytes, text) {
+        const needle = [];
+        for (let i = 0; i < text.length; i += 1) {
+          needle.push(text.charCodeAt(i));
+        }
+        const positions = [];
+        for (let i = 0; i <= bytes.length - needle.length; i += 1) {
+          let matched = true;
+          for (let j = 0; j < needle.length; j += 1) {
+            if (bytes[i + j] !== needle[j]) {
+              matched = false;
+              break;
+            }
+          }
+          if (matched) {
+            positions.push(i);
+          }
+        }
+        return positions;
+      }
+
+      function bitReverseByte(value) {
+        let output = 0;
+        for (let i = 0; i < 8; i += 1) {
+          output = (output << 1) | ((value >> i) & 1);
+        }
+        return output;
+      }
+
+      function bitReverseBytes(bytes) {
+        const output = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i += 1) {
+          output[i] = bitReverseByte(bytes[i]);
+        }
+        return output;
+      }
+
+      function swap16Bytes(bytes) {
+        const output = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i += 2) {
+          output[i] = byteAt(bytes, i + 1);
+          output[i + 1] = byteAt(bytes, i);
+        }
+        return output;
+      }
+
+      function printableStrings(bytes, minLength, limit) {
+        const results = [];
+        const end = Math.min(bytes.length, limit || bytes.length);
+        let start = -1;
+        let value = "";
+        for (let i = 0; i < end; i += 1) {
+          const b = bytes[i];
+          if (b >= 32 && b <= 126) {
+            if (start === -1) {
+              start = i;
+            }
+            value += String.fromCharCode(b);
+          } else {
+            if (value.length >= minLength) {
+              results.push({ offset: start, value });
+            }
+            start = -1;
+            value = "";
+          }
+        }
+        if (value.length >= minLength) {
+          results.push({ offset: start, value });
+        }
+        return results;
+      }
+
+      function regionFromGameId(gameId) {
+        if (!gameId) {
+          return "Unknown";
+        }
+        if (gameId.includes("SLUS")) {
+          return "North America";
+        }
+        if (gameId.includes("SLES")) {
+          return "Europe/PAL";
+        }
+        return "Unknown";
+      }
+
+      function regionFromGameCubeCode(code) {
+        if (!code || code.length < 4) {
+          return "Unknown";
+        }
+        if (code[3] === "E") {
+          return "North America";
+        }
+        if (code[3] === "P") {
+          return "Europe/PAL";
+        }
+        return "Unknown";
+      }
+
+      function extensionFromName(fileName) {
+        const match = /\.([^.\\\/]+)$/.exec(fileName || "");
+        return match ? match[1].toLowerCase() : "";
+      }
+
+      function baseName(fileName) {
+        return (fileName || "save").replace(/\.[^.]*$/, "");
+      }
+
+      function addFileSuffix(fileName, suffix) {
+        const name = fileName || "save.bin";
+        const dot = name.lastIndexOf(".");
+        if (dot <= 0) {
+          return name + suffix;
+        }
+        return name.slice(0, dot) + suffix + name.slice(dot);
+      }
+
+      function coreFileName(fileName, edited) {
+        const cleanBase = baseName(fileName || "save");
+        return cleanBase + (edited ? ".edited-core.ssx3core" : ".core.ssx3core");
+      }
+
+      function containerBase(kind, label, bytes, fileName) {
+        return {
+          kind,
+          label,
+          fileName: fileName || "",
+          originalBytes: copyBytes(bytes),
+          fileSize: bytes.length,
+          platform: "Unknown",
+          region: "Unknown",
+          titleId: "",
+          saveTitle: "",
+          profileName: "",
+          support: "metadata",
+          canEditFields: false,
+          canExportEdited: false,
+          exportBlocker: "Edited export is not available for this format yet.",
+          core: null,
+          wrapper: {},
+          records: [],
+          warnings: []
+        };
+      }
+
+      function parseXbox(bytes, fileName) {
+        const container = containerBase("xbox-data", "Xbox Data.ssx", bytes, fileName);
+        container.platform = "Xbox";
+        container.support = "core";
+        container.canEditFields = true;
+        container.exportBlocker = "Xbox saves include a 20-byte signature trailer. Edited export is disabled until signing is implemented.";
+        container.core = {
+          offset: 0,
+          length: CONSTANTS.CORE_SIZE,
+          bytes: bytes.slice(0, CONSTANTS.CORE_SIZE),
+          byteOrder: "little-endian core fields",
+          valueEndian: "little"
+        };
+        container.profileName = asciiZ(container.core.bytes, 0, CONSTANTS.PROFILE_FIELD_LEN);
+        container.wrapper = {
+          coreOffset: 0,
+          coreLength: CONSTANTS.CORE_SIZE,
+          signatureOffset: CONSTANTS.CORE_SIZE,
+          signatureLength: CONSTANTS.XBOX_SIGNATURE_SIZE,
+          signatureHex: bytesToHex(bytes.slice(CONSTANTS.CORE_SIZE), CONSTANTS.XBOX_SIGNATURE_SIZE),
+          signatureNonZeroBytes: countNonZero(bytes.slice(CONSTANTS.CORE_SIZE))
+        };
+        return container;
+      }
+
+      function parseRawCore(bytes, fileName) {
+        const container = containerBase("raw-core", "Raw SSX 3 core payload", bytes, fileName);
+        container.platform = "Unknown";
+        container.support = "core";
+        container.canEditFields = true;
+        container.exportBlocker = "Raw core saves still need the internal integrity bytes to be mapped before edited export is enabled.";
+        container.core = {
+          offset: 0,
+          length: CONSTANTS.CORE_SIZE,
+          bytes: bytes.slice(0, CONSTANTS.CORE_SIZE),
+          byteOrder: "little-endian core fields",
+          valueEndian: "little"
+        };
+        container.profileName = asciiZ(container.core.bytes, 0, CONSTANTS.PROFILE_FIELD_LEN);
+        container.wrapper = {
+          coreOffset: 0,
+          coreLength: CONSTANTS.CORE_SIZE
+        };
+        return container;
+      }
+
+      function looksLikeGci(bytes) {
+        if (bytes.length < CONSTANTS.GC_HEADER_SIZE + CONSTANTS.GC_CORE_FILE_OFFSET + CONSTANTS.CORE_SIZE) {
+          return false;
+        }
+        const gameCode = asciiFixed(bytes, 0, 4);
+        const maker = asciiFixed(bytes, 4, 2);
+        const internalName = asciiZ(bytes, 8, 32);
+        return /^GXB[A-Z0-9]$/.test(gameCode) && maker === "69" && /\.ssx$/i.test(internalName);
+      }
+
+      function parseGameCubeGci(bytes, fileName) {
+        const container = containerBase("gamecube-gci", "GameCube GCI", bytes, fileName);
+        const gameCode = asciiFixed(bytes, 0, 4);
+        const maker = asciiFixed(bytes, 4, 2);
+        const internalName = asciiZ(bytes, 8, 32);
+        const coreOffset = CONSTANTS.GC_HEADER_SIZE + CONSTANTS.GC_CORE_FILE_OFFSET;
+        const commentLine1 = asciiZ(bytes, CONSTANTS.GC_HEADER_SIZE, CONSTANTS.GC_COMMENT_LINE_LEN);
+        const commentLine2 = asciiZ(bytes, CONSTANTS.GC_HEADER_SIZE + 0x20, CONSTANTS.GC_COMMENT_LINE_LEN);
+        const coreBytes = bytes.slice(coreOffset, coreOffset + CONSTANTS.CORE_SIZE);
+        const storedChecksum = u32be(coreBytes, CONSTANTS.CORE_TAIL_VALUE_OFFSET) & 0xffff;
+        const calculatedChecksum = ssxCoreChecksum(coreBytes);
+        container.platform = "GameCube";
+        container.region = regionFromGameCubeCode(gameCode);
+        container.titleId = gameCode + maker;
+        container.saveTitle = commentLine1 || "SSX 3";
+        container.support = "core";
+        container.canEditFields = true;
+        container.canExportEdited = storedChecksum === calculatedChecksum;
+        container.canExportMetadataEdited = true;
+        container.exportBlocker = storedChecksum === calculatedChecksum
+          ? ""
+          : "GameCube source checksum mismatch; edited core export is disabled.";
+        container.core = {
+          offset: coreOffset,
+          fileDataOffset: CONSTANTS.GC_CORE_FILE_OFFSET,
+          length: CONSTANTS.CORE_SIZE,
+          bytes: coreBytes,
+          byteOrder: "mixed: ASCII plus GameCube-specific field codecs",
+          valueEndian: "big",
+          integrity: {
+            algorithm: "CRC-16 reflected poly 0xa001, init 0x0000, xor 0x0185, range 0x0000..0x9b5c",
+            stored: storedChecksum,
+            calculated: calculatedChecksum,
+            ok: storedChecksum === calculatedChecksum
+          }
+        };
+        container.profileName = asciiZ(container.core.bytes, 0, CONSTANTS.PROFILE_FIELD_LEN) || commentLine2;
+        container.wrapper = {
+          gciHeaderLength: CONSTANTS.GC_HEADER_SIZE,
+          gameCode,
+          maker,
+          internalName,
+          commentLine1,
+          commentLine2,
+          commentLine1Offset: CONSTANTS.GC_HEADER_SIZE,
+          commentLine2Offset: CONSTANTS.GC_HEADER_SIZE + 0x20,
+          fileDataLength: bytes.length - CONSTANTS.GC_HEADER_SIZE,
+          coreOffset,
+          coreFileDataOffset: CONSTANTS.GC_CORE_FILE_OFFSET,
+          preCoreIntegrityOffset: coreOffset - 4,
+          preCoreIntegrityHex: bytesToHex(bytes.slice(coreOffset - 4, coreOffset), 4),
+          coreTailHex: bytesToHex(bytes.slice(coreOffset + CONSTANTS.CORE_SIZE - 8, coreOffset + CONSTANTS.CORE_SIZE), 8)
+        };
+        return container;
+      }
+
+      function parseXportRecords(bytes) {
+        const records = [];
+        for (let offset = 0; offset + CONSTANTS.XPORT_RECORD_SIZE <= bytes.length; offset += 1) {
+          if (u16le(bytes, offset) !== CONSTANTS.XPORT_RECORD_SIZE) {
+            continue;
+          }
+          const name = asciiZ(bytes, offset + 2, 64);
+          if (!/^[A-Za-z0-9_.-]{3,64}$/.test(name)) {
+            continue;
+          }
+          const size = u32le(bytes, offset + 0x42);
+          const dataOffset = offset + CONSTANTS.XPORT_RECORD_SIZE;
+          const plausibleSize = size <= bytes.length && (dataOffset + size <= bytes.length || size < 16);
+          if (!plausibleSize) {
+            continue;
+          }
+          records.push({
+            offset,
+            recordLength: CONSTANTS.XPORT_RECORD_SIZE,
+            name,
+            size,
+            dataOffset,
+            dataEnd: dataOffset + size,
+            modeOrType: u32le(bytes, offset + 0x5e)
+          });
+        }
+        return records;
+      }
+
+      function parseXport(bytes, fileName) {
+        const container = containerBase("ps2-xport", "PS2 XPort/SharkPort", bytes, fileName);
+        const strings = printableStrings(bytes, 4, 0x400);
+        const records = parseXportRecords(bytes);
+        const coreRecord = records.find((record) => GAME_DATA_ID_RE.test(record.name) && record.size === CONSTANTS.CORE_SIZE) || null;
+        const rootRecord = records.find((record) => GAME_DATA_ID_RE.test(record.name)) || null;
+        const titleString = strings.find((item) => item.value.startsWith("SSX 3"));
+        const payloadStart = records.length ? Math.min.apply(null, records.map((record) => record.offset)) : null;
+        const checksumOffset = bytes.length >= 4 ? bytes.length - 4 : null;
+        const storedChecksum = checksumOffset !== null ? u32le(bytes, checksumOffset) : null;
+        const calculatedChecksum = payloadStart !== null && checksumOffset !== null && checksumOffset > payloadStart
+          ? xportChecksum(bytes, payloadStart, checksumOffset)
+          : null;
+        container.platform = "PlayStation 2";
+        container.titleId = coreRecord ? coreRecord.name : rootRecord ? rootRecord.name : "";
+        container.region = regionFromGameId(container.titleId);
+        container.saveTitle = titleString ? titleString.value : "";
+        container.records = records;
+        container.wrapper = {
+          magic: asciiZ(bytes, 4, 32),
+          recordsFound: records.length,
+          strings: strings.slice(0, 12),
+          coreRecordOffset: coreRecord ? coreRecord.offset : null,
+          coreDataOffset: coreRecord ? coreRecord.dataOffset : null,
+          coreDataEnd: coreRecord ? coreRecord.dataEnd : null,
+          trailingBytesAfterCore: coreRecord ? Math.max(0, bytes.length - coreRecord.dataEnd) : null,
+          trailingHexAfterCore: coreRecord ? bytesToHex(bytes.slice(coreRecord.dataEnd, Math.min(bytes.length, coreRecord.dataEnd + 16)), 16) : "",
+          checksum: {
+            payloadStart,
+            checksumOffset,
+            declaredPayloadLength: payloadStart !== null && payloadStart >= 4 ? u32le(bytes, payloadStart - 4) : null,
+            stored: storedChecksum,
+            calculated: calculatedChecksum,
+            ok: storedChecksum !== null && calculatedChecksum !== null && storedChecksum === calculatedChecksum
+          }
+        };
+        if (coreRecord) {
+          container.support = "core";
+          container.canEditFields = true;
+          container.exportBlocker = "PS2 XPort wrapper checksum is mapped, but SSX 3 core integrity bytes are not mapped yet. Edited export is disabled.";
+          container.core = {
+            offset: coreRecord.dataOffset,
+            length: CONSTANTS.CORE_SIZE,
+            bytes: bytes.slice(coreRecord.dataOffset, coreRecord.dataEnd),
+            byteOrder: "little-endian core fields",
+            valueEndian: "little"
+          };
+          container.profileName = asciiZ(container.core.bytes, 0, CONSTANTS.PROFILE_FIELD_LEN);
+        } else {
+          container.support = "metadata";
+          container.exportBlocker = "No embedded SSX 3 game data record of size 0x9b61 was found.";
+          container.warnings.push("XPort wrapper detected without a supported SSX 3 data record.");
+        }
+        return container;
+      }
+
+      function parseMaxDrive(bytes, fileName) {
+        const container = containerBase("ps2-maxdrive", "PS2 Max Drive", bytes, fileName);
+        const gameId = asciiZ(bytes, 0x10, 32);
+        container.platform = "PlayStation 2";
+        container.titleId = gameId;
+        container.region = regionFromGameId(gameId);
+        container.saveTitle = asciiZ(bytes, 0x30, 32);
+        container.support = "metadata";
+        container.exportBlocker = "Max Drive payload decoding and re-encoding are deferred.";
+        container.wrapper = {
+          magic: asciiZ(bytes, 0, 12),
+          headerChecksumOrId: bytesToHex(bytes.slice(0x0c, 0x10), 4),
+          gameId,
+          saveTitle: container.saveTitle,
+          valueAt0x50LE: u32le(bytes, 0x50),
+          fileCountAt0x54LE: u32le(bytes, 0x54),
+          uncompressedLengthAt0x58LE: u32le(bytes, 0x58),
+          payloadOffset: 0x5c,
+          payloadPreviewHex: bytesToHex(bytes.slice(0x5c, 0x7c), 32)
+        };
+        return container;
+      }
+
+      function parseCodeBreaker(bytes, fileName) {
+        const container = containerBase("ps2-codebreaker", "PS2 CodeBreaker", bytes, fileName);
+        const gameId = asciiZ(bytes, 0x14, 32);
+        container.platform = "PlayStation 2";
+        container.titleId = gameId;
+        container.region = regionFromGameId(gameId);
+        container.saveTitle = asciiZ(bytes, 0x5c, 32);
+        container.support = "metadata";
+        container.exportBlocker = "CodeBreaker payload decoding and re-encoding are deferred.";
+        container.wrapper = {
+          magic: asciiFixed(bytes, 0, 4),
+          valueAt0x04LE: u32le(bytes, 0x04),
+          headerLengthAt0x08LE: u32le(bytes, 0x08),
+          uncompressedLengthAt0x0cLE: u32le(bytes, 0x0c),
+          storedFileLengthAt0x10LE: u32le(bytes, 0x10),
+          gameId,
+          saveTitle: container.saveTitle,
+          payloadOffset: 0x128,
+          payloadPreviewHex: bytesToHex(bytes.slice(0x128, 0x148), 32)
+        };
+        return container;
+      }
+
+      function parseUnknown(bytes, fileName) {
+        const container = containerBase("unknown", "Unknown file", bytes, fileName);
+        container.exportBlocker = "This file does not match a supported SSX 3 save wrapper.";
+        container.wrapper = {
+          extension: extensionFromName(fileName),
+          first64Hex: bytesToHex(bytes.slice(0, 64), 64),
+          strings: printableStrings(bytes, 4, 512).slice(0, 10)
+        };
+        return container;
+      }
+
+      function detectContainer(bytes, fileName) {
+        if (!(bytes instanceof Uint8Array)) {
+          bytes = new Uint8Array(bytes);
+        }
+        if (hasAscii(bytes, 0, "Ps2PowerSave")) {
+          return parseMaxDrive(bytes, fileName);
+        }
+        if (hasAscii(bytes, 0, "CFU\0")) {
+          return parseCodeBreaker(bytes, fileName);
+        }
+        if (hasAscii(bytes, 4, "SharkPortSave")) {
+          return parseXport(bytes, fileName);
+        }
+        if (looksLikeGci(bytes)) {
+          return parseGameCubeGci(bytes, fileName);
+        }
+        if (bytes.length === CONSTANTS.XBOX_TOTAL_SIZE) {
+          return parseXbox(bytes, fileName);
+        }
+        if (bytes.length === CONSTANTS.CORE_SIZE) {
+          return parseRawCore(bytes, fileName);
+        }
+        return parseUnknown(bytes, fileName);
+      }
+
+      function extractCoreSave(container) {
+        return container && container.core ? {
+          bytes: copyBytes(container.core.bytes),
+          offset: container.core.offset,
+          length: container.core.length,
+          byteOrder: container.core.byteOrder,
+          valueEndian: container.core.valueEndian
+        } : null;
+      }
+
+      function validateProfileName(value) {
+        const text = String(value || "");
+        if (text.length > CONSTANTS.PROFILE_NAME_MAX) {
+          return { ok: false, message: "Profile name is limited to 11 ASCII characters." };
+        }
+        for (let i = 0; i < text.length; i += 1) {
+          const code = text.charCodeAt(i);
+          if (code < 32 || code > 126) {
+            return { ok: false, message: "Profile name must use printable ASCII characters." };
+          }
+        }
+        return { ok: true, message: "" };
+      }
+
+      function validateAsciiText(value, maxLength, fieldLabel) {
+        const text = String(value || "");
+        if (text.length > maxLength) {
+          return { ok: false, message: fieldLabel + " is limited to " + maxLength + " ASCII characters." };
+        }
+        for (let i = 0; i < text.length; i += 1) {
+          const code = text.charCodeAt(i);
+          if (code < 32 || code > 126) {
+            return { ok: false, message: fieldLabel + " must use printable ASCII characters." };
+          }
+        }
+        return { ok: true, message: "" };
+      }
+
+      function writeAsciiZ(bytes, offset, length, value) {
+        for (let i = 0; i < length; i += 1) {
+          bytes[offset + i] = 0;
+        }
+        const text = String(value || "");
+        const max = Math.min(length - 1, text.length);
+        for (let i = 0; i < max; i += 1) {
+          bytes[offset + i] = text.charCodeAt(i) & 0xff;
+        }
+      }
+
+      function makeEditedCore(container, draft) {
+        if (!container || !container.core) {
+          return null;
+        }
+        const edited = copyBytes(container.core.bytes);
+        if (draft && Object.prototype.hasOwnProperty.call(draft, "profileName")) {
+          writeAsciiZ(edited, 0, CONSTANTS.PROFILE_FIELD_LEN, draft.profileName);
+        }
+        if (draft && Object.prototype.hasOwnProperty.call(draft, "currentRiderId")) {
+          const riderId = parseIntegerDraft(draft.currentRiderId);
+          if (Number.isInteger(riderId) && riderId >= 0 && riderId <= 255) {
+            edited[CONSTANTS.CORE_TAIL_RIDER_OFFSET] = riderId & 0xff;
+          }
+        }
+        if (supportsGameCubeGameplayFields(container) && draft) {
+          const money = parseIntegerDraft(draft.gameCubeMoney);
+          if (Number.isInteger(money) && money >= 0 && money <= 4294967295) {
+            writeU32be(edited, CONSTANTS.GC_MONEY_OFFSET, money);
+          }
+          if (Array.isArray(draft.gameCubeStats)) {
+            for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+              const row = draft.gameCubeStats[riderIndex] || {};
+              const rowOffset = riderStatRowOffset(riderIndex);
+              RIDER_STAT_FIELDS.forEach((field) => {
+                const raw = parseStatRawDraft(row[field.id]);
+                if (Number.isInteger(raw)) {
+                  edited[rowOffset + field.byteIndex] = raw & 0xff;
+                }
+              });
+            }
+          }
+          if (draft.gameCubeCollectibles) {
+            GC_COLLECTIBLE_AREAS.forEach((area) => {
+              writeCollectibleArea(edited, area, draft.gameCubeCollectibles[area.id]);
+            });
+          }
+          if (draft.gameCubeEvents && Number.isInteger(draft.gameCubeEventRiderIndex)) {
+            GC_EVENT_RECORDS.forEach((eventRecord) => {
+              const parsed = parseGameCubeEventValueDraft(eventRecord, draft.gameCubeEvents[eventRecord.id]);
+              if (Number.isInteger(parsed)) {
+                writeGameCubeEventRecord(edited, draft.gameCubeEventRiderIndex, eventRecord, parsed >>> 0);
+              }
+            });
+          }
+        }
+        if (container.kind === "gamecube-gci") {
+          writeCoreChecksum(edited, container.core.valueEndian);
+        }
+        return edited;
+      }
+
+      function hasGameCubeGameplayChanges(container, draft) {
+        if (!supportsGameCubeGameplayFields(container) || !draft) {
+          return false;
+        }
+        if (parseIntegerDraft(draft.gameCubeMoney) !== readGameCubeMoney(container)) {
+          return true;
+        }
+        if (Array.isArray(draft.gameCubeStats)) {
+          for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+            const row = draft.gameCubeStats[riderIndex] || {};
+            const rowOffset = riderStatRowOffset(riderIndex);
+            for (let statIndex = 0; statIndex < RIDER_STAT_FIELDS.length; statIndex += 1) {
+              const field = RIDER_STAT_FIELDS[statIndex];
+              if (parseStatRawDraft(row[field.id]) !== byteAt(container.core.bytes, rowOffset + field.byteIndex)) {
+                return true;
+              }
+            }
+          }
+        }
+        if (draft.gameCubeCollectibles) {
+          for (let areaIndex = 0; areaIndex < GC_COLLECTIBLE_AREAS.length; areaIndex += 1) {
+            const area = GC_COLLECTIBLE_AREAS[areaIndex];
+            const original = readCollectibleArea(container, area).slots;
+            const slots = normalizeCollectibleSlots(draft.gameCubeCollectibles[area.id], area.total);
+            for (let slotIndex = 0; slotIndex < area.total; slotIndex += 1) {
+              if (slots[slotIndex] !== original[slotIndex]) {
+                return true;
+              }
+            }
+          }
+        }
+        if (draft.gameCubeEvents && Number.isInteger(draft.gameCubeEventRiderIndex)) {
+          for (let eventIndex = 0; eventIndex < GC_EVENT_RECORDS.length; eventIndex += 1) {
+            const eventRecord = GC_EVENT_RECORDS[eventIndex];
+            const parsed = parseGameCubeEventValueDraft(eventRecord, draft.gameCubeEvents[eventRecord.id]);
+            const original = readGameCubeEventRecord(container, draft.gameCubeEventRiderIndex, eventRecord).value;
+            if (parsed !== original) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function hasCoreFieldChanges(container, draft) {
+        if (!container || !container.core || !draft) {
+          return false;
+        }
+        return draft.profileName !== container.profileName ||
+          parseIntegerDraft(draft.currentRiderId) !== readCoreRiderId(container) ||
+          hasGameCubeGameplayChanges(container, draft);
+      }
+
+      function hasGameCubeCommentChanges(container, draft) {
+        return Boolean(container &&
+          container.kind === "gamecube-gci" &&
+          draft &&
+          (draft.gameCubeCommentLine1 !== container.wrapper.commentLine1 ||
+            draft.gameCubeCommentLine2 !== container.wrapper.commentLine2));
+      }
+
+      function validateDraft(container, draft) {
+        const checks = [validateProfileName(draft.profileName)];
+        if (container && container.core) {
+          const riderId = parseIntegerDraft(draft.currentRiderId);
+          if (!Number.isInteger(riderId) || riderId < 0 || riderId > 255) {
+            checks.push({ ok: false, message: "Current Rider ID must be an integer from 0 to 255." });
+          }
+        }
+        if (container && container.kind === "gamecube-gci") {
+          checks.push(validateAsciiText(draft.gameCubeCommentLine1, CONSTANTS.GC_COMMENT_MAX, "GameCube comment line 1"));
+          checks.push(validateAsciiText(draft.gameCubeCommentLine2, CONSTANTS.GC_COMMENT_MAX, "GameCube comment line 2"));
+        }
+        if (supportsGameCubeGameplayFields(container)) {
+          const money = parseIntegerDraft(draft.gameCubeMoney);
+          if (!Number.isInteger(money) || money < 0 || money > 4294967295) {
+            checks.push({ ok: false, message: "Money must be an integer from 0 to 4294967295." });
+          }
+          if (!Array.isArray(draft.gameCubeStats)) {
+            checks.push({ ok: false, message: "Rider stats are not initialized." });
+          } else {
+            for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+              const row = draft.gameCubeStats[riderIndex] || {};
+              for (let statIndex = 0; statIndex < RIDER_STAT_FIELDS.length; statIndex += 1) {
+                const field = RIDER_STAT_FIELDS[statIndex];
+                if (!Number.isInteger(parseStatRawDraft(row[field.id]))) {
+                  checks.push({
+                    ok: false,
+                    message: "Rider " + riderIndex + " " + field.label + " must be from 0.0 to 11.0 in 0.2 increments."
+                  });
+                }
+              }
+            }
+          }
+          if (!draft.gameCubeCollectibles) {
+            checks.push({ ok: false, message: "GameCube collectibles are not initialized." });
+          } else {
+            for (let areaIndex = 0; areaIndex < GC_COLLECTIBLE_AREAS.length; areaIndex += 1) {
+              const area = GC_COLLECTIBLE_AREAS[areaIndex];
+              const slots = draft.gameCubeCollectibles[area.id];
+              if (!Array.isArray(slots) || slots.length !== area.total) {
+                checks.push({ ok: false, message: area.label + " collectibles are not initialized." });
+                continue;
+              }
+              for (let slotIndex = 0; slotIndex < slots.length; slotIndex += 1) {
+                if (typeof slots[slotIndex] !== "boolean") {
+                  checks.push({ ok: false, message: area.label + " collectible slots must be checked or unchecked." });
+                  break;
+                }
+              }
+            }
+          }
+          if (!Number.isInteger(draft.gameCubeEventRiderIndex) ||
+            draft.gameCubeEventRiderIndex < 0 ||
+            draft.gameCubeEventRiderIndex >= CONSTANTS.RIDER_SLOT_COUNT) {
+            checks.push({ ok: false, message: "Event record rider index is invalid." });
+          }
+          if (!draft.gameCubeEvents) {
+            checks.push({ ok: false, message: "GameCube event records are not initialized." });
+          } else {
+            for (let eventIndex = 0; eventIndex < GC_EVENT_RECORDS.length; eventIndex += 1) {
+              const eventRecord = GC_EVENT_RECORDS[eventIndex];
+              const parsed = parseGameCubeEventValueDraft(eventRecord, draft.gameCubeEvents[eventRecord.id]);
+              if (!Number.isInteger(parsed) || parsed < 0 || parsed > 4294967295) {
+                checks.push({
+                  ok: false,
+                  message: eventRecord.label + " " + eventRecord.type + " must be a non-negative integer" +
+                    (eventRecord.type === "time" ? " or mm:ss value." : ".")
+                });
+              } else if (eventRecord.type === "time" && parsed > CONSTANTS.GC_EVENT_TIME_MAX_SECONDS) {
+                checks.push({
+                  ok: false,
+                  message: eventRecord.label + " time is too large."
+                });
+              }
+            }
+          }
+        }
+        return checks.find((check) => !check.ok) || { ok: true, message: "" };
+      }
+
+      function canExportEditedDraft(container, draft) {
+        if (!container || !draft) {
+          return false;
+        }
+        if (hasCoreFieldChanges(container, draft)) {
+          return Boolean(container.canExportEdited);
+        }
+        if (hasGameCubeCommentChanges(container, draft)) {
+          return Boolean(container.canExportMetadataEdited);
+        }
+        return Boolean(container.canExportEdited);
+      }
+
+      function writeContainer(container, editedCore, options) {
+        const edited = options && options.edited;
+        if (!edited) {
+          return copyBytes(container.originalBytes);
+        }
+        const draft = options && options.draft ? options.draft : {};
+        const coreChanged = hasCoreFieldChanges(container, draft);
+        const gcCommentChanged = hasGameCubeCommentChanges(container, draft);
+        if (coreChanged && !container.canExportEdited) {
+          throw new Error(container.exportBlocker || "Edited export is disabled.");
+        }
+        if (coreChanged && (!editedCore || editedCore.length !== CONSTANTS.CORE_SIZE)) {
+          throw new Error("Edited core payload has the wrong size.");
+        }
+        const output = copyBytes(container.originalBytes);
+        if (container.kind === "raw-core") {
+          return copyBytes(editedCore);
+        }
+        if (container.kind === "xbox-data" || container.kind === "ps2-xport") {
+          output.set(editedCore, container.core.offset);
+          return output;
+        }
+        if (container.kind === "gamecube-gci") {
+          if (coreChanged) {
+            writeCoreChecksum(editedCore, container.core.valueEndian);
+            output.set(editedCore, container.core.offset);
+          }
+          if (gcCommentChanged) {
+            writeAsciiZ(output, CONSTANTS.GC_HEADER_SIZE, CONSTANTS.GC_COMMENT_LINE_LEN, draft.gameCubeCommentLine1);
+            writeAsciiZ(output, CONSTANTS.GC_HEADER_SIZE + 0x20, CONSTANTS.GC_COMMENT_LINE_LEN, draft.gameCubeCommentLine2);
+          }
+          return output;
+        }
+        throw new Error("Edited export is not implemented for this wrapper.");
+      }
+
+      function profilePatchPreview(container, draft) {
+        if (!container || !container.core || !draft) {
+          return [];
+        }
+        const rows = [];
+        if (hasCoreFieldChanges(container, draft)) {
+          const edited = makeEditedCore(container, draft);
+          if (edited) {
+            const original = container.core.bytes;
+            const ranges = [
+              [0, CONSTANTS.PROFILE_FIELD_LEN],
+              [CONSTANTS.CORE_TAIL_RIDER_OFFSET, 1],
+              [CONSTANTS.CORE_TAIL_VALUE_OFFSET, 4]
+            ];
+            if (supportsGameCubeGameplayFields(container)) {
+              ranges.push([CONSTANTS.GC_MONEY_OFFSET, 4]);
+              for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+                ranges.push([riderStatRowOffset(riderIndex), RIDER_STAT_FIELDS.length]);
+              }
+              GC_COLLECTIBLE_AREAS.forEach((area) => {
+                ranges.push([collectibleEntryOffset(area), CONSTANTS.GC_COLLECTIBLE_ENTRY_SIZE]);
+              });
+              if (Number.isInteger(draft.gameCubeEventRiderIndex)) {
+                GC_EVENT_RECORDS.forEach((eventRecord) => {
+                  ranges.push([eventRecordOffset(draft.gameCubeEventRiderIndex, eventRecord), CONSTANTS.GC_EVENT_RECORD_SIZE]);
+                });
+              }
+            }
+            ranges.forEach((range) => {
+              const start = range[0];
+              const length = range[1];
+              const max = Math.min(start + length, original.length, edited.length);
+              for (let i = start; i < max; i += 1) {
+                if (original[i] !== edited[i]) {
+                  rows.push({
+                    scope: corePatchScope(i),
+                    offset: container.core.offset + i,
+                    oldValue: original[i],
+                    newValue: edited[i]
+                  });
+                }
+              }
+            });
+          }
+        }
+        if (container.kind === "gamecube-gci") {
+          if (container.wrapper.commentLine1 !== draft.gameCubeCommentLine1) {
+            rows.push({
+              scope: "gci comment line 1",
+              offset: CONSTANTS.GC_HEADER_SIZE,
+              oldValue: container.wrapper.commentLine1,
+              newValue: draft.gameCubeCommentLine1
+            });
+          }
+          if (container.wrapper.commentLine2 !== draft.gameCubeCommentLine2) {
+            rows.push({
+              scope: "gci comment line 2",
+              offset: CONSTANTS.GC_HEADER_SIZE + 0x20,
+              oldValue: container.wrapper.commentLine2,
+              newValue: draft.gameCubeCommentLine2
+            });
+          }
+        }
+        return rows;
+      }
+
+      function corePatchScope(coreOffset) {
+        if (coreOffset < CONSTANTS.PROFILE_FIELD_LEN) {
+          return "core profile";
+        }
+        if (coreOffset >= CONSTANTS.GC_MONEY_OFFSET && coreOffset < CONSTANTS.GC_MONEY_OFFSET + 4) {
+          return "money";
+        }
+        for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+          const rowOffset = riderStatRowOffset(riderIndex);
+          if (coreOffset >= rowOffset && coreOffset < rowOffset + RIDER_STAT_FIELDS.length) {
+            return "rider " + riderIndex + " stats";
+          }
+        }
+        for (let areaIndex = 0; areaIndex < GC_COLLECTIBLE_AREAS.length; areaIndex += 1) {
+          const area = GC_COLLECTIBLE_AREAS[areaIndex];
+          const offset = collectibleEntryOffset(area);
+          if (coreOffset >= offset && coreOffset < offset + CONSTANTS.GC_COLLECTIBLE_ENTRY_SIZE) {
+            return area.label + " collectibles";
+          }
+        }
+        for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+          for (let eventIndex = 0; eventIndex < GC_EVENT_RECORDS.length; eventIndex += 1) {
+            const eventRecord = GC_EVENT_RECORDS[eventIndex];
+            const offset = eventRecordOffset(riderIndex, eventRecord);
+            if (coreOffset >= offset && coreOffset < offset + CONSTANTS.GC_EVENT_RECORD_SIZE) {
+              return "rider " + riderIndex + " " + eventRecord.label + " " + eventRecord.type;
+            }
+          }
+        }
+        if (coreOffset >= CONSTANTS.CORE_TAIL_RIDER_OFFSET && coreOffset < CONSTANTS.CORE_TAIL_VALUE_OFFSET + 4) {
+          return "core tail";
+        }
+        return "core";
+      }
+
+      function coreDiagnostics(container) {
+        if (!container || !container.core) {
+          return null;
+        }
+        const core = container.core.bytes;
+        const markerPositions = findAsciiAll(core, "7777777");
+        const riderSlots = [];
+        for (let i = 0; i < CONSTANTS.RIDER_SLOT_COUNT; i += 1) {
+          const offset = CONSTANTS.RIDER_SLOT_MARKER_OFFSET + (i * CONSTANTS.RIDER_SLOT_STRIDE);
+          if (offset >= core.length) {
+            continue;
+          }
+          riderSlots.push({
+            index: i,
+            markerOffset: offset,
+            markerAbsoluteOffset: container.core.offset + offset,
+            markerText: asciiZ(core, offset, 16),
+            markerHex: bytesToHex(core.slice(offset, Math.min(core.length, offset + 16)), 16),
+            stats: supportsGameCubeGameplayFields(container) ? readRiderStats(container, i) : null
+          });
+        }
+        const diagnostics = {
+          profileName: asciiZ(core, 0, CONSTANTS.PROFILE_FIELD_LEN),
+          profileBytesHex: bytesToHex(core.slice(0, CONSTANTS.PROFILE_FIELD_LEN), CONSTANTS.PROFILE_FIELD_LEN),
+          currentRiderId: readCoreRiderId(container),
+          tailValue: readCoreTailValue(container),
+          tailValueEndian: container.core.valueEndian,
+          coreChecksum: {
+            stored: readCoreTailValue(container) & 0xffff,
+            calculated: ssxCoreChecksum(core),
+            ok: (readCoreTailValue(container) & 0xffff) === ssxCoreChecksum(core)
+          },
+          tailBytesHex: bytesToHex(core.slice(CONSTANTS.CORE_TAIL_RIDER_OFFSET, CONSTANTS.CORE_TAIL_RIDER_OFFSET + 5), 5),
+          coreLength: core.length,
+          nonZeroBytes: countNonZero(core),
+          marker7777777Positions: markerPositions,
+          riderSlotStride: CONSTANTS.RIDER_SLOT_STRIDE,
+          riderSlots,
+          tail64Hex: bytesToHex(core.slice(Math.max(0, core.length - 64)), 64)
+        };
+        if (container.kind === "gamecube-gci") {
+          diagnostics.gameCube = {
+            commentLine1: container.wrapper.commentLine1,
+            commentLine2: container.wrapper.commentLine2,
+            money: readGameCubeMoney(container),
+            collectibles: readAllCollectibleAreas(container),
+            collectibleEntries: readRawCollectibleEntries(container),
+            eventRiderIndex: currentGameCubeEventRiderIndex(container),
+            eventRecords: readAllGameCubeEventRecords(container, currentGameCubeEventRiderIndex(container)),
+            preCoreIntegrityOffset: container.wrapper.preCoreIntegrityOffset,
+            preCoreIntegrityHex: container.wrapper.preCoreIntegrityHex,
+            trailingIntegrityHex: bytesToHex(core.slice(Math.max(0, core.length - 8)), 8),
+            flagWordRegion: {
+              coreOffset: 0x124,
+              rawHex: bytesToHex(core.slice(0x124, 0x144), 32),
+              byteBitReversedHex: bytesToHex(bitReverseBytes(core.slice(0x124, 0x144)), 32)
+            },
+            tableRegion: {
+              coreOffset: 0x29c,
+              rawHex: bytesToHex(core.slice(0x29c, 0x2bc), 32),
+              swapped16Hex: bytesToHex(swap16Bytes(core.slice(0x29c, 0x2bc)), 32)
+            }
+          };
+        }
+        if (container.kind === "ps2-xport" && container.wrapper.checksum) {
+          diagnostics.xport = container.wrapper.checksum;
+        }
+        return diagnostics;
+      }
+
+      const Core = Object.freeze({
+        constants: CONSTANTS,
+        detectContainer,
+        extractCoreSave,
+        writeContainer,
+        makeEditedCore,
+        validateProfileName,
+        validateDraft,
+        canExportEditedDraft,
+        coreDiagnostics,
+        ssxCoreChecksum,
+        writeCoreChecksum,
+        readCoreRiderId,
+        readCoreTailValue,
+        readGameCubeMoney,
+        readRiderStats,
+        readAllCollectibleAreas,
+        readRawCollectibleEntries,
+        readAllGameCubeEventRecords,
+        fieldRegistry: FIELD_REGISTRY,
+        bytesToHex
+      });
+
+      const root = typeof window !== "undefined" ? window : globalThis;
+      root.SSX3EditorCore = Core;
+
+      if (typeof document === "undefined") {
+        return;
+      }
+
+      const state = {
+        file: null,
+        bytes: null,
+        container: null,
+        draft: {
+          profileName: "",
+          currentRiderId: "",
+          tailValue: "",
+          gameCubeMoney: "",
+          gameCubeStats: emptyRiderStatsDraft(),
+          gameCubeCollectibles: emptyGameCubeCollectiblesDraft(),
+          gameCubeEventRiderIndex: 0,
+          gameCubeEvents: emptyGameCubeEventsDraft(),
+          gameCubeCommentLine1: "",
+          gameCubeCommentLine2: ""
+        },
+        activeTab: "editor"
+      };
+
+      const els = {};
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function formatBytes(length) {
+        return length.toLocaleString("en-US") + " bytes";
+      }
+
+      function supportBadge(container) {
+        if (!container) {
+          return '<span class="badge">Waiting</span>';
+        }
+        if (container.support === "core") {
+          return '<span class="badge good">Core parsed</span>';
+        }
+        if (container.kind === "unknown") {
+          return '<span class="badge bad">Unknown</span>';
+        }
+        return '<span class="badge warn">Metadata only</span>';
+      }
+
+      function exportBadge(container, dirty) {
+        if (!container) {
+          return '<span class="badge">No export</span>';
+        }
+        if (!dirty) {
+          return '<span class="badge good">Unchanged export</span>';
+        }
+        if (canExportEditedDraft(container, state.draft)) {
+          return '<span class="badge good">Edited export</span>';
+        }
+        return '<span class="badge warn">Edited export blocked</span>';
+      }
+
+      function integrityStatusText(container) {
+        if (!container || !container.core) {
+          return "N/A";
+        }
+        if (container.kind === "gamecube-gci" && container.core.integrity) {
+          return container.core.integrity.ok
+            ? "CRC OK; edited export recalculates it"
+            : "CRC mismatch in source file";
+        }
+        return "Unresolved; edited wrapped export disabled";
+      }
+
+      function fieldRows(rows) {
+        return '<dl class="summary-list">' + rows.map((row) => {
+          return '<dt>' + escapeHtml(row[0]) + '</dt><dd>' + escapeHtml(row[1]) + '</dd>';
+        }).join("") + '</dl>';
+      }
+
+      function currentDirty() {
+        return Boolean(state.container && (
+          hasCoreFieldChanges(state.container, state.draft) ||
+          hasGameCubeCommentChanges(state.container, state.draft)
+        ));
+      }
+
+      function currentProfileValidation() {
+        return validateDraft(state.container, state.draft);
+      }
+
+      function renderStatus() {
+        const dirty = currentDirty();
+        const container = state.container;
+        const badges = [
+          supportBadge(container),
+          exportBadge(container, dirty)
+        ];
+        if (container && container.region && container.region !== "Unknown") {
+          badges.push('<span class="badge">' + escapeHtml(container.region) + '</span>');
+        }
+        if (container && container.kind === "gamecube-gci" && container.core && container.core.integrity) {
+          badges.push(container.core.integrity.ok
+            ? '<span class="badge good">Checksum OK</span>'
+            : '<span class="badge bad">Checksum mismatch</span>');
+        }
+        if (dirty) {
+          badges.push('<span class="badge warn">Dirty</span>');
+        }
+        els.statusPanel.innerHTML = '<div class="status-row">' + badges.join("") + '</div>';
+      }
+
+      function renderSummary() {
+        const container = state.container;
+        if (!container) {
+          els.summaryPanel.innerHTML = '<div class="empty">No save file selected.</div>';
+          return;
+        }
+        const rows = [
+          ["File", container.fileName || "Untitled"],
+          ["Size", formatBytes(container.fileSize)],
+          ["Format", container.label],
+          ["Platform", container.platform],
+          ["Region", container.region],
+          ["Title ID", container.titleId || "Unknown"],
+          ["Save Title", container.saveTitle || "Unknown"]
+        ];
+        if (container.core) {
+          rows.push(["Core Offset", hexValue(container.core.offset, 0)]);
+          rows.push(["Core Length", hexValue(container.core.length, 0) + " / " + container.core.length]);
+        }
+        if (container.kind === "gamecube-gci") {
+          rows.push(["Money", readGameCubeMoney(container).toLocaleString("en-US")]);
+          if (container.core && container.core.integrity) {
+            rows.push([
+              "Core Checksum",
+              hexValue(container.core.integrity.stored, 4) + " / " + (container.core.integrity.ok ? "OK" : "Mismatch")
+            ]);
+          }
+          rows.push(["GC Comment 1", container.wrapper.commentLine1 || "Blank"]);
+          rows.push(["GC Comment 2", container.wrapper.commentLine2 || "Blank"]);
+        }
+        els.summaryPanel.innerHTML = fieldRows(rows);
+      }
+
+      function renderEditor() {
+        const container = state.container;
+        if (!container) {
+          els.editorTab.innerHTML = '<div class="empty">No parsed save data.</div>';
+          return;
+        }
+        if (!container.core) {
+          els.editorTab.innerHTML =
+            '<div class="field-grid">' +
+              readonlyField("Detected Format", container.label) +
+              readonlyField("Title ID", container.titleId || "Unknown") +
+              readonlyField("Save Title", container.saveTitle || "Unknown") +
+              readonlyField("Export Status", container.exportBlocker) +
+            '</div>' +
+            '<p class="note warn">This wrapper is detected, but the SSX 3 payload is not decoded in this version.</p>';
+          return;
+        }
+
+        const validation = currentProfileValidation();
+        const dirty = currentDirty();
+        const exportReady = canExportEditedDraft(container, state.draft);
+        const patchRows = profilePatchPreview(container, state.draft);
+        const patchTable = patchRows.length ? renderPatchTable(patchRows) : "";
+        const noteClass = validation.ok ? (dirty && !exportReady ? "warn" : "") : "bad";
+        let note = "No field changes.";
+        if (!validation.ok) {
+          note = validation.message;
+        } else if (dirty && exportReady) {
+          note = hasCoreFieldChanges(container, state.draft)
+            ? "Edited GameCube export is available. The SSX 3 core checksum will be recalculated."
+            : "Edited export is available for the current metadata-only changes.";
+        } else if (hasCoreFieldChanges(container, state.draft)) {
+          note = container.exportBlocker + " Download Edited Core is raw analysis output until integrity bytes are mapped.";
+        } else if (dirty) {
+          note = container.exportBlocker;
+        }
+        const gameCubeFields = container.kind === "gamecube-gci"
+          ? '<div class="field">' +
+              '<label for="gameCubeCommentLine1Input">Memory Card Line 1</label>' +
+              '<input id="gameCubeCommentLine1Input" type="text" maxlength="' + CONSTANTS.GC_COMMENT_MAX + '" value="' + escapeHtml(state.draft.gameCubeCommentLine1) + '">' +
+            '</div>' +
+            '<div class="field">' +
+              '<label for="gameCubeCommentLine2Input">Memory Card Line 2</label>' +
+              '<input id="gameCubeCommentLine2Input" type="text" maxlength="' + CONSTANTS.GC_COMMENT_MAX + '" value="' + escapeHtml(state.draft.gameCubeCommentLine2) + '">' +
+            '</div>'
+          : "";
+        const coreTailFields =
+          '<div class="field">' +
+            '<label for="currentRiderIdInput">Current Rider ID</label>' +
+            '<input id="currentRiderIdInput" type="text" inputmode="numeric" value="' + escapeHtml(state.draft.currentRiderId) + '">' +
+          '</div>';
+        const gameCubeGameplayFields = renderGameCubeGameplayEditor(container);
+
+        els.editorTab.innerHTML =
+          '<div class="field-grid">' +
+            '<div class="field">' +
+              '<label for="profileNameInput">In-game Profile Name</label>' +
+              '<input id="profileNameInput" type="text" maxlength="' + CONSTANTS.PROFILE_NAME_MAX + '" value="' + escapeHtml(state.draft.profileName) + '">' +
+            '</div>' +
+            coreTailFields +
+            gameCubeFields +
+            readonlyField("Original Profile", container.profileName || "Blank") +
+            readonlyField("Original Rider ID", readCoreRiderId(container)) +
+            readonlyField("Tail Integrity Candidate", readCoreTailValue(container) + " (" + container.core.valueEndian + "-endian)") +
+            readonlyField("Integrity Status", integrityStatusText(container)) +
+            readonlyField("Platform", container.platform) +
+            readonlyField("Region", container.region) +
+            readonlyField("Core Offset", hexValue(container.core.offset, 0)) +
+            readonlyField("Core Codec", container.core.byteOrder || "Unknown") +
+          '</div>' +
+          gameCubeGameplayFields +
+          '<div class="footer-status">' +
+            '<p class="note ' + noteClass + '">' + escapeHtml(note) + '</p>' +
+          '</div>' +
+          patchTable;
+      }
+
+      function renderGameCubeGameplayEditor(container) {
+        if (!supportsGameCubeGameplayFields(container)) {
+          return "";
+        }
+        const currentRider = readCoreRiderId(container);
+        const draftStats = Array.isArray(state.draft.gameCubeStats) ? state.draft.gameCubeStats : emptyRiderStatsDraft();
+        const draftCollectibles = state.draft.gameCubeCollectibles || emptyGameCubeCollectiblesDraft();
+        const eventRiderIndex = Number.isInteger(state.draft.gameCubeEventRiderIndex)
+          ? state.draft.gameCubeEventRiderIndex
+          : currentGameCubeEventRiderIndex(container);
+        const draftEvents = state.draft.gameCubeEvents || emptyGameCubeEventsDraft();
+        const header = '<tr><th>Index</th>' + RIDER_STAT_FIELDS.map((field) => {
+          return '<th>' + escapeHtml(field.label) + '</th>';
+        }).join("") + '</tr>';
+        const rows = [];
+        for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
+          const row = draftStats[riderIndex] || {};
+          rows.push(
+            '<tr class="' + (riderIndex === currentRider ? "current-row" : "") + '">' +
+              '<td class="mono">' + riderIndex + (riderIndex === currentRider ? " current" : "") + '</td>' +
+              RIDER_STAT_FIELDS.map((field) => {
+                const id = "gcStatInput-" + riderIndex + "-" + field.id;
+                return '<td>' +
+                  '<input id="' + id + '" type="text" inputmode="decimal" data-gc-stat-index="' + riderIndex + '" data-gc-stat-id="' + field.id + '" value="' + escapeHtml(row[field.id]) + '">' +
+                '</td>';
+              }).join("") +
+            '</tr>'
+          );
+        }
+        const eventRows = GC_EVENT_RECORDS.map((eventRecord) => {
+          const original = readGameCubeEventRecord(container, eventRiderIndex, eventRecord);
+          const id = "gcEventInput-" + eventRecord.id;
+          return '<tr class="' + (eventRecord.confidence === "candidate" ? "candidate" : "") + '">' +
+            '<td>' + escapeHtml(eventRecord.peak) + '</td>' +
+            '<td>' + escapeHtml(eventRecord.category) + '</td>' +
+            '<td>' + escapeHtml(eventRecord.label) + '</td>' +
+            '<td>' +
+              '<input id="' + id + '" type="text" inputmode="' + (eventRecord.type === "time" ? "numeric" : "numeric") + '" data-gc-event-id="' + escapeHtml(eventRecord.id) + '" value="' + escapeHtml(draftEvents[eventRecord.id]) + '">' +
+            '</td>' +
+            '<td>' + escapeHtml(original.displayValue) + '</td>' +
+            '<td class="mono">' + escapeHtml(original.statusHex) + '</td>' +
+            '<td>' + escapeHtml(eventRecord.confidence) + '</td>' +
+          '</tr>';
+        }).join("");
+        const collectibleRows = GC_COLLECTIBLE_AREAS.map((area) => {
+          const original = readCollectibleArea(container, area);
+          const slots = normalizeCollectibleSlots(draftCollectibles[area.id], area.total);
+          const checked = countCheckedSlots(slots);
+          return '<tr>' +
+            '<td>' + escapeHtml(area.peak) + '</td>' +
+            '<td>' + escapeHtml(area.label) + '</td>' +
+            '<td class="collectible-count">' + checked + " / " + area.total + '</td>' +
+            '<td>' + renderCollectibleSlotGrid(area, slots) + '</td>' +
+            '<td class="collectible-count">' + original.count + " / " + area.total + '</td>' +
+          '</tr>';
+        }).join("");
+        return '<div class="editor-section">' +
+          '<h2 class="section-title">GameCube Gameplay</h2>' +
+          '<div class="field-grid">' +
+            '<div class="field">' +
+              '<label for="gameCubeMoneyInput">Money</label>' +
+              '<input id="gameCubeMoneyInput" type="text" inputmode="numeric" value="' + escapeHtml(state.draft.gameCubeMoney) + '">' +
+            '</div>' +
+            readonlyField("Original Money", readGameCubeMoney(container).toLocaleString("en-US")) +
+          '</div>' +
+          '<div class="table-wrap stats-table" style="margin-top: 14px;">' +
+            '<table>' +
+              '<thead>' + header + '</thead>' +
+              '<tbody>' + rows.join("") + '</tbody>' +
+            '</table>' +
+          '</div>' +
+          '<h2 class="section-title" style="margin-top: 16px;">Rider ' + eventRiderIndex + ' Event Records</h2>' +
+          '<div class="table-wrap event-table">' +
+            '<table>' +
+              '<thead><tr><th>Peak</th><th>Type</th><th>Event</th><th>Value</th><th>Original</th><th>Status</th><th>Map</th></tr></thead>' +
+              '<tbody>' + eventRows + '</tbody>' +
+            '</table>' +
+          '</div>' +
+          '<h2 class="section-title" style="margin-top: 16px;">GameCube Collectibles</h2>' +
+          '<div class="table-wrap collectible-table">' +
+            '<table>' +
+              '<thead><tr><th>Peak</th><th>Area</th><th>Count</th><th>Slots</th><th>Original</th></tr></thead>' +
+              '<tbody>' + collectibleRows + '</tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>';
+      }
+
+      function renderCollectibleSlotGrid(area, slots) {
+        const inputs = [];
+        for (let slotIndex = 0; slotIndex < area.total; slotIndex += 1) {
+          const id = "gcCollectible-" + area.id + "-" + slotIndex;
+          inputs.push(
+            '<label class="slot-toggle">' +
+              '<input id="' + id + '" type="checkbox" data-gc-collectible-area="' + escapeHtml(area.id) + '" data-gc-collectible-slot="' + slotIndex + '"' + (slots[slotIndex] ? " checked" : "") + '>' +
+              '<span>' + (slotIndex + 1) + '</span>' +
+            '</label>'
+          );
+        }
+        return '<div class="slot-grid">' + inputs.join("") + '</div>';
+      }
+
+      function readonlyField(label, value) {
+        return '<div class="field"><div class="label">' + escapeHtml(label) + '</div><div class="field-value">' + escapeHtml(value) + '</div></div>';
+      }
+
+      function renderPatchTable(rows) {
+        return '<div class="changed">' +
+          '<div class="table-wrap">' +
+            '<table>' +
+              '<thead><tr><th>Scope</th><th>Offset</th><th>Old</th><th>New</th></tr></thead>' +
+              '<tbody>' + rows.map((row) => {
+                const oldValue = typeof row.oldValue === "number" ? hexValue(row.oldValue, 2) : row.oldValue;
+                const newValue = typeof row.newValue === "number" ? hexValue(row.newValue, 2) : row.newValue;
+                return '<tr>' +
+                  '<td>' + escapeHtml(row.scope) + '</td>' +
+                  '<td class="mono">' + escapeHtml(hexValue(row.offset, 0)) + '</td>' +
+                  '<td class="mono">' + escapeHtml(oldValue) + '</td>' +
+                  '<td class="mono">' + escapeHtml(newValue) + '</td>' +
+                '</tr>';
+              }).join("") + '</tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>';
+      }
+
+      function renderDiagnostics() {
+        const container = state.container;
+        const diagnostics = coreDiagnostics(container);
+        if (!diagnostics) {
+          els.diagnosticsTab.innerHTML = '<div class="empty">No diagnostics available.</div>';
+          return;
+        }
+        const markerText = diagnostics.marker7777777Positions.length
+          ? diagnostics.marker7777777Positions.map((offset) => hexValue(offset, 0)).join(", ")
+          : "None";
+        const summaryRows = [
+          ["Profile Bytes", diagnostics.profileBytesHex],
+          ["Core Tail Bytes", diagnostics.tailBytesHex],
+          ["Current Rider ID", diagnostics.currentRiderId],
+          ["Tail Value", diagnostics.tailValue + " (" + diagnostics.tailValueEndian + "-endian)"],
+          ["Core CRC Candidate", "stored " + hexValue(diagnostics.coreChecksum.stored, 4) + ", calculated " + hexValue(diagnostics.coreChecksum.calculated, 4)],
+          ["Core CRC Status", diagnostics.coreChecksum.ok ? "OK" : "Mismatch"],
+          ["GameCube Money", diagnostics.gameCube ? diagnostics.gameCube.money : "N/A"],
+          ["Non-zero Core Bytes", diagnostics.nonZeroBytes + " / " + diagnostics.coreLength],
+          ["7777777 Markers", markerText],
+          ["Rider Slot Stride", hexValue(diagnostics.riderSlotStride, 0)]
+        ];
+        if (diagnostics.xport) {
+          summaryRows.push(
+            ["XPort Payload Start", hexValue(diagnostics.xport.payloadStart, 0)],
+            ["XPort Checksum Offset", hexValue(diagnostics.xport.checksumOffset, 0)],
+            ["XPort Checksum", "stored " + hexValue(diagnostics.xport.stored, 8) + ", calculated " + hexValue(diagnostics.xport.calculated, 8)],
+            ["XPort Checksum Status", diagnostics.xport.ok ? "OK" : "Mismatch"]
+          );
+        }
+        const summary = fieldRows(summaryRows);
+        const gameCubeCodec = diagnostics.gameCube
+          ? '<div class="table-wrap" style="margin-top: 14px;">' +
+              '<table>' +
+                '<thead><tr><th>GameCube Area</th><th>Offset</th><th>Raw</th><th>Decoded View</th></tr></thead>' +
+                '<tbody>' +
+                  '<tr><td>Pre-core integrity</td><td class="mono">' + hexValue(diagnostics.gameCube.preCoreIntegrityOffset, 0) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.preCoreIntegrityHex) + '</td><td>read-only</td></tr>' +
+                  '<tr><td>Tail integrity</td><td class="mono">' + hexValue(CONSTANTS.CORE_TAIL_VALUE_OFFSET, 0) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.trailingIntegrityHex) + '</td><td>CRC-16 recalculated on export</td></tr>' +
+                  '<tr><td>Bit-reversed flags</td><td class="mono">' + hexValue(diagnostics.gameCube.flagWordRegion.coreOffset, 0) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.flagWordRegion.rawHex) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.flagWordRegion.byteBitReversedHex) + '</td></tr>' +
+                  '<tr><td>16-bit tables</td><td class="mono">' + hexValue(diagnostics.gameCube.tableRegion.coreOffset, 0) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.tableRegion.rawHex) + '</td><td class="mono">' + escapeHtml(diagnostics.gameCube.tableRegion.swapped16Hex) + '</td></tr>' +
+                '</tbody>' +
+              '</table>' +
+            '</div>'
+          : "";
+        const collectibleTable = diagnostics.gameCube
+          ? '<div class="table-wrap" style="margin-top: 14px;">' +
+              '<table>' +
+                '<thead><tr><th>Peak</th><th>Area</th><th>Core Offset</th><th>Count</th><th>Mask</th></tr></thead>' +
+                '<tbody>' + diagnostics.gameCube.collectibles.map((area) => {
+                  return '<tr>' +
+                    '<td>' + escapeHtml(area.peak) + '</td>' +
+                    '<td>' + escapeHtml(area.label) + '</td>' +
+                    '<td class="mono">' + hexValue(area.offset, 0) + '</td>' +
+                    '<td>' + area.count + ' / ' + area.total + ' (slots ' + area.slotCount + ', mask bits ' + area.maskPopcount + ')</td>' +
+                    '<td class="mono">' + escapeHtml(area.maskHex) + '</td>' +
+                  '</tr>';
+                }).join("") + '</tbody>' +
+              '</table>' +
+            '</div>'
+          : "";
+        const eventTable = diagnostics.gameCube
+          ? '<div class="table-wrap" style="margin-top: 14px;">' +
+              '<table>' +
+                '<thead><tr><th>Rider</th><th>Peak</th><th>Event</th><th>Core Offset</th><th>Value</th><th>Status</th><th>Map</th></tr></thead>' +
+                '<tbody>' + diagnostics.gameCube.eventRecords.map((record) => {
+                  return '<tr>' +
+                    '<td>' + record.riderIndex + '</td>' +
+                    '<td>' + escapeHtml(record.peak) + '</td>' +
+                    '<td>' + escapeHtml(record.label) + '</td>' +
+                    '<td class="mono">' + hexValue(record.offset, 0) + '</td>' +
+                    '<td>' + escapeHtml(record.displayValue) + '</td>' +
+                    '<td class="mono">' + escapeHtml(record.statusHex) + '</td>' +
+                    '<td>' + escapeHtml(record.confidence) + '</td>' +
+                  '</tr>';
+                }).join("") + '</tbody>' +
+              '</table>' +
+            '</div>'
+          : "";
+        const slotTable =
+          '<div class="table-wrap" style="margin-top: 14px;">' +
+            '<table>' +
+              '<thead><tr><th>Index</th><th>Core Offset</th><th>Absolute Offset</th><th>Stats</th><th>Marker Bytes</th></tr></thead>' +
+              '<tbody>' + diagnostics.riderSlots.map((slot) => {
+                const statText = slot.stats
+                  ? RIDER_STAT_FIELDS.map((field) => field.label + " " + formatStatValue(slot.stats[field.id])).join(", ")
+                  : slot.markerText || "Blank";
+                return '<tr>' +
+                  '<td>' + slot.index + '</td>' +
+                  '<td class="mono">' + hexValue(slot.markerOffset, 0) + '</td>' +
+                  '<td class="mono">' + hexValue(slot.markerAbsoluteOffset, 0) + '</td>' +
+                  '<td>' + escapeHtml(statText) + '</td>' +
+                  '<td class="mono">' + escapeHtml(slot.markerHex) + '</td>' +
+                '</tr>';
+              }).join("") + '</tbody>' +
+            '</table>' +
+          '</div>';
+        els.diagnosticsTab.innerHTML = summary + gameCubeCodec + collectibleTable + eventTable + slotTable;
+      }
+
+      function technicalReport() {
+        if (!state.container) {
+          return {};
+        }
+        const container = state.container;
+        return {
+          fileName: container.fileName,
+          fileSize: container.fileSize,
+          detectedFormat: container.label,
+          kind: container.kind,
+          platform: container.platform,
+          region: container.region,
+          titleId: container.titleId,
+          saveTitle: container.saveTitle,
+          support: container.support,
+          canEditFields: container.canEditFields,
+          canExportEdited: container.canExportEdited,
+          canExportMetadataEdited: Boolean(container.canExportMetadataEdited),
+          exportBlocker: container.exportBlocker,
+          profileName: container.profileName,
+          core: container.core ? {
+            offset: container.core.offset,
+            fileDataOffset: container.core.fileDataOffset,
+            length: container.core.length,
+            byteOrder: container.core.byteOrder,
+            first32Hex: bytesToHex(container.core.bytes.slice(0, 32), 32),
+            last32Hex: bytesToHex(container.core.bytes.slice(Math.max(0, container.core.bytes.length - 32)), 32),
+            currentRiderId: readCoreRiderId(container),
+            tailValue: readCoreTailValue(container),
+            tailValueEndian: container.core.valueEndian,
+            gameCubeMoney: supportsGameCubeGameplayFields(container) ? readGameCubeMoney(container) : null,
+            riderStats: supportsGameCubeGameplayFields(container) ? readAllRiderStats(container) : null,
+            gameCubeCollectibles: supportsGameCubeGameplayFields(container) ? readAllCollectibleAreas(container) : null,
+            gameCubeEventRecords: supportsGameCubeGameplayFields(container)
+              ? readAllGameCubeEventRecords(container, currentGameCubeEventRiderIndex(container))
+              : null
+          } : null,
+          wrapper: container.wrapper,
+          records: container.records.map((record) => ({
+            name: record.name,
+            offset: record.offset,
+            size: record.size,
+            dataOffset: record.dataOffset,
+            dataEnd: record.dataEnd,
+            modeOrType: record.modeOrType
+          })),
+          diagnostics: coreDiagnostics(container),
+          warnings: container.warnings
+        };
+      }
+
+      function renderTechnical() {
+        els.technicalTab.innerHTML = '<pre>' + escapeHtml(JSON.stringify(technicalReport(), null, 2)) + '</pre>';
+      }
+
+      function renderTabs() {
+        els.tabs.forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.tab === state.activeTab);
+        });
+        els.tabContents.forEach((section) => {
+          section.classList.toggle("active", section.id === "tab-" + state.activeTab);
+        });
+      }
+
+      function renderActions() {
+        const container = state.container;
+        const dirty = currentDirty();
+        const coreChanged = hasCoreFieldChanges(container, state.draft);
+        const validation = currentProfileValidation();
+        const exportReady = canExportEditedDraft(container, state.draft);
+        els.loadedName.textContent = container ? (container.fileName || "Loaded save") : "No file loaded";
+        els.downloadOriginal.disabled = !container;
+        els.downloadCore.disabled = !container || !container.core;
+        els.downloadEditedCore.disabled = !container || !container.core || !coreChanged || !validation.ok;
+        els.downloadEditedCore.title = container && container.core
+          ? (container.kind === "gamecube-gci"
+            ? "Downloads the raw 0x9b61 SSX 3 payload with recalculated core checksum, without the GameCube GCI wrapper."
+            : "Downloads a raw 0x9b61 SSX 3 payload for analysis. This is not a console-ready save until integrity bytes are mapped.")
+          : "";
+        els.resetEdits.disabled = !container || !dirty;
+        els.downloadEdited.disabled = !container || !dirty || !validation.ok || !exportReady;
+        els.downloadEdited.title = container && dirty && !exportReady ? container.exportBlocker : "";
+      }
+
+      function render() {
+        renderTabs();
+        renderStatus();
+        renderSummary();
+        renderEditor();
+        renderDiagnostics();
+        renderTechnical();
+        renderActions();
+      }
+
+      async function loadFile(file) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const container = detectContainer(bytes, file.name);
+        state.file = file;
+        state.bytes = bytes;
+        state.container = container;
+        state.draft.profileName = container.profileName || "";
+        state.draft.currentRiderId = container.core ? String(readCoreRiderId(container)) : "";
+        state.draft.tailValue = container.core ? String(readCoreTailValue(container)) : "";
+        state.draft.gameCubeMoney = supportsGameCubeGameplayFields(container) ? String(readGameCubeMoney(container)) : "";
+        state.draft.gameCubeStats = gameCubeStatsDraft(container);
+        state.draft.gameCubeCollectibles = gameCubeCollectiblesDraft(container);
+        state.draft.gameCubeEventRiderIndex = supportsGameCubeGameplayFields(container) ? currentGameCubeEventRiderIndex(container) : 0;
+        state.draft.gameCubeEvents = gameCubeEventsDraft(container, state.draft.gameCubeEventRiderIndex);
+        state.draft.gameCubeCommentLine1 = container.kind === "gamecube-gci" ? container.wrapper.commentLine1 || "" : "";
+        state.draft.gameCubeCommentLine2 = container.kind === "gamecube-gci" ? container.wrapper.commentLine2 || "" : "";
+        render();
+      }
+
+      function downloadBytes(bytes, fileName) {
+        const blob = new Blob([bytes], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadOriginal() {
+        if (!state.container) {
+          return;
+        }
+        const bytes = writeContainer(state.container, null, { edited: false });
+        downloadBytes(bytes, addFileSuffix(state.container.fileName || "save.bin", ".unchanged"));
+      }
+
+      function downloadCore() {
+        if (!state.container || !state.container.core) {
+          return;
+        }
+        downloadBytes(state.container.core.bytes, coreFileName(state.container.fileName, false));
+      }
+
+      function downloadEditedCore() {
+        if (!state.container || !state.container.core) {
+          return;
+        }
+        const validation = currentProfileValidation();
+        if (!validation.ok) {
+          return;
+        }
+        const editedCore = makeEditedCore(state.container, state.draft);
+        downloadBytes(editedCore, coreFileName(state.container.fileName, true));
+      }
+
+      function downloadEdited() {
+        if (!state.container || !state.container.core) {
+          return;
+        }
+        const validation = currentProfileValidation();
+        if (!validation.ok) {
+          return;
+        }
+        const editedCore = makeEditedCore(state.container, state.draft);
+        const bytes = writeContainer(state.container, editedCore, { edited: true, draft: state.draft });
+        downloadBytes(bytes, addFileSuffix(state.container.fileName || "save.bin", ".edited"));
+      }
+
+      function resetEdits() {
+        if (!state.container) {
+          return;
+        }
+        state.draft.profileName = state.container.profileName || "";
+        state.draft.currentRiderId = state.container.core ? String(readCoreRiderId(state.container)) : "";
+        state.draft.tailValue = state.container.core ? String(readCoreTailValue(state.container)) : "";
+        state.draft.gameCubeMoney = supportsGameCubeGameplayFields(state.container) ? String(readGameCubeMoney(state.container)) : "";
+        state.draft.gameCubeStats = gameCubeStatsDraft(state.container);
+        state.draft.gameCubeCollectibles = gameCubeCollectiblesDraft(state.container);
+        state.draft.gameCubeEventRiderIndex = supportsGameCubeGameplayFields(state.container) ? currentGameCubeEventRiderIndex(state.container) : 0;
+        state.draft.gameCubeEvents = gameCubeEventsDraft(state.container, state.draft.gameCubeEventRiderIndex);
+        state.draft.gameCubeCommentLine1 = state.container.kind === "gamecube-gci" ? state.container.wrapper.commentLine1 || "" : "";
+        state.draft.gameCubeCommentLine2 = state.container.kind === "gamecube-gci" ? state.container.wrapper.commentLine2 || "" : "";
+        render();
+      }
+
+      function bindEvents() {
+        els.chooseFile.addEventListener("click", () => els.fileInput.click());
+        els.fileInput.addEventListener("change", () => {
+          const file = els.fileInput.files && els.fileInput.files[0];
+          if (file) {
+            loadFile(file).catch(showLoadError);
+          }
+        });
+        els.dropzone.addEventListener("click", () => els.fileInput.click());
+        els.dropzone.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            els.fileInput.click();
+          }
+        });
+        els.dropzone.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          els.dropzone.classList.add("dragging");
+        });
+        els.dropzone.addEventListener("dragleave", () => {
+          els.dropzone.classList.remove("dragging");
+        });
+        els.dropzone.addEventListener("drop", (event) => {
+          event.preventDefault();
+          els.dropzone.classList.remove("dragging");
+          const file = event.dataTransfer.files && event.dataTransfer.files[0];
+          if (file) {
+            loadFile(file).catch(showLoadError);
+          }
+        });
+        els.downloadOriginal.addEventListener("click", downloadOriginal);
+        els.downloadCore.addEventListener("click", downloadCore);
+        els.downloadEditedCore.addEventListener("click", downloadEditedCore);
+        els.downloadEdited.addEventListener("click", () => {
+          try {
+            downloadEdited();
+          } catch (error) {
+            alert(error.message);
+          }
+        });
+        els.resetEdits.addEventListener("click", resetEdits);
+        els.tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            state.activeTab = tab.dataset.tab;
+            renderTabs();
+          });
+        });
+        document.addEventListener("input", (event) => {
+          const target = event.target;
+          if (!target) {
+            return;
+          }
+          const inputId = target.id;
+          if (inputId === "profileNameInput") {
+            state.draft.profileName = target.value;
+          } else if (inputId === "currentRiderIdInput") {
+            state.draft.currentRiderId = target.value;
+          } else if (inputId === "gameCubeMoneyInput") {
+            state.draft.gameCubeMoney = target.value;
+          } else if (target.dataset && target.dataset.gcStatIndex && target.dataset.gcStatId) {
+            const riderIndex = Number.parseInt(target.dataset.gcStatIndex, 10);
+            const statId = target.dataset.gcStatId;
+            if (!Array.isArray(state.draft.gameCubeStats)) {
+              state.draft.gameCubeStats = emptyRiderStatsDraft();
+            }
+            if (riderIndex >= 0 && riderIndex < CONSTANTS.RIDER_SLOT_COUNT) {
+              state.draft.gameCubeStats[riderIndex][statId] = target.value;
+            }
+          } else if (target.dataset && target.dataset.gcEventId) {
+            const eventId = target.dataset.gcEventId;
+            const eventRecord = GC_EVENT_RECORDS.find((record) => record.id === eventId);
+            if (!state.draft.gameCubeEvents) {
+              state.draft.gameCubeEvents = emptyGameCubeEventsDraft();
+            }
+            if (eventRecord) {
+              state.draft.gameCubeEvents[eventRecord.id] = target.value;
+            }
+          } else if (inputId === "gameCubeCommentLine1Input") {
+            state.draft.gameCubeCommentLine1 = target.value;
+          } else if (inputId === "gameCubeCommentLine2Input") {
+            state.draft.gameCubeCommentLine2 = target.value;
+          } else {
+            return;
+          }
+          const cursor = target.selectionStart;
+          const length = target.value.length;
+          render();
+          const input = document.getElementById(inputId);
+          if (input) {
+            input.focus();
+            const position = cursor == null ? length : cursor;
+            input.setSelectionRange(position, position);
+          }
+        });
+        document.addEventListener("change", (event) => {
+          const target = event.target;
+          if (!target || !target.dataset || !target.dataset.gcCollectibleArea) {
+            return;
+          }
+          const areaId = target.dataset.gcCollectibleArea;
+          const slotIndex = Number.parseInt(target.dataset.gcCollectibleSlot, 10);
+          const area = GC_COLLECTIBLE_AREAS.find((item) => item.id === areaId);
+          if (!area || !Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= area.total) {
+            return;
+          }
+          if (!state.draft.gameCubeCollectibles) {
+            state.draft.gameCubeCollectibles = emptyGameCubeCollectiblesDraft();
+          }
+          if (!Array.isArray(state.draft.gameCubeCollectibles[area.id])) {
+            state.draft.gameCubeCollectibles[area.id] = Array.from({ length: area.total }, () => false);
+          }
+          state.draft.gameCubeCollectibles[area.id][slotIndex] = Boolean(target.checked);
+          render();
+          const input = document.getElementById(target.id);
+          if (input) {
+            input.focus();
+          }
+        });
+      }
+
+      function showLoadError(error) {
+        state.file = null;
+        state.bytes = null;
+        state.container = null;
+        state.draft.profileName = "";
+        state.draft.currentRiderId = "";
+        state.draft.tailValue = "";
+        state.draft.gameCubeMoney = "";
+        state.draft.gameCubeStats = emptyRiderStatsDraft();
+        state.draft.gameCubeCollectibles = emptyGameCubeCollectiblesDraft();
+        state.draft.gameCubeEventRiderIndex = 0;
+        state.draft.gameCubeEvents = emptyGameCubeEventsDraft();
+        state.draft.gameCubeCommentLine1 = "";
+        state.draft.gameCubeCommentLine2 = "";
+        render();
+        alert(error.message || String(error));
+      }
+
+      function collectElements() {
+        els.loadedName = document.getElementById("loadedName");
+        els.chooseFile = document.getElementById("chooseFile");
+        els.fileInput = document.getElementById("fileInput");
+        els.downloadOriginal = document.getElementById("downloadOriginal");
+        els.downloadCore = document.getElementById("downloadCore");
+        els.downloadEditedCore = document.getElementById("downloadEditedCore");
+        els.downloadEdited = document.getElementById("downloadEdited");
+        els.resetEdits = document.getElementById("resetEdits");
+        els.dropzone = document.getElementById("dropzone");
+        els.statusPanel = document.getElementById("statusPanel");
+        els.summaryPanel = document.getElementById("summaryPanel");
+        els.editorTab = document.getElementById("tab-editor");
+        els.diagnosticsTab = document.getElementById("tab-diagnostics");
+        els.technicalTab = document.getElementById("tab-technical");
+        els.tabs = Array.from(document.querySelectorAll(".tab"));
+        els.tabContents = Array.from(document.querySelectorAll(".tab-content"));
+      }
+
+      function init() {
+        collectElements();
+        bindEvents();
+        render();
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    }());
+  </script>
+</body>
+</html>
