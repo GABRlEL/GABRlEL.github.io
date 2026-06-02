@@ -227,8 +227,8 @@
 <body>
   <div class="container">
     <h1>
-      <code class="inline">Settingpad</code>
-      <small>decrypt · edit · encrypt - Credits to Wiibrew, Consolemods, GaryOderNichts/vWii-Decaffeinator and GPT 5.1-Thinking</small>
+      <code class="inline">Settingpad v1.1</code>
+      <small>Credits to Wiibrew, Consolemods, GaryOderNichts/vWii-Decaffeinator, GPT 5.1-Thinking, Codex 5.5-Medium and Hi5Glaceon_</small>
     </h1>
 
     <!-- 1. Load existing encrypted file -->
@@ -319,19 +319,15 @@
         </label>
         <select id="presetRegionSelect"
           style="min-width:140px; padding:4px 8px; border-radius:999px; border:1px solid #4b5563; background:#020617; color:#e5e7eb; font-size:0.85rem;">
-          <option value="JPN">JPN (Japan)</option>
-          <option value="USA">USA (North America)</option>
-          <option value="EUR" selected>EUR (Europe)</option>
-          <option value="AUS">AUS (Australia)</option>
-          <option value="BRA">BRA (Brazil)</option>
-          <option value="LTN">LTN (Latin America)</option>
-          <option value="TWN">TWN (Taiwan)</option>
-          <option value="ROC">ROC (Taiwan / ROC)</option>
-          <option value="HKG">HKG (Hong Kong)</option>
-          <option value="ASI">ASI (Asia generic)</option>
-          <option value="KOR">KOR (Korea)</option>
-          <option value="SAF">SAF (South Africa)</option>
         </select>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.8rem; color:#9ca3af; margin:0;">
+          <input type="checkbox" id="familyEditionPreset">
+          Family Edition
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.8rem; color:#9ca3af; margin:0;">
+          <input type="checkbox" id="wiiMiniPreset">
+          Wii Mini
+        </label>
         <button type="button" class="secondary" id="applyPresetBtn">Apply preset</button>
       </div>
     </fieldset>
@@ -366,125 +362,142 @@
         area: ["JPN", "USA", "EUR", "AUS", "BRA", "TWN", "ROC", "KOR", "HKG", "ASI", "LTN", "SAF"],
         video: ["NTSC", "PAL", "MPAL"],
         game: ["JP", "US", "EU", "KR", "CN"],
-        code: ["LU", "LAH", "LEH", "LEF", "LJ", "LFJ", "LKM"],
+        code: ["LU", "LB", "LJF", "LJH", "LJM", "LEF", "LEH", "LEM", "LAH", "LKH", "LKM", "LTF", "LTH", "LSH", "LMH", "HW", "HEF", "KU", "KB", "KEF", "KEH", "KEM", "KAF", "KAM", "KSH", "KMH"],
         model: [
           "RVL-001(EUR)",
           "RVL-001(USA)",
           "RVL-001(JPN)",
           "RVL-001(AUS)",
           "RVL-001(KOR)",
+          "RVL-101(EUR)",
+          "RVL-101(USA)",
+          "RVL-101(AUS)",
+          "RVL-101(ASI)",
+          "RVL-101(HKG)",
+          "RVL-101(UAE)",
+          "RVL-201(EUR)",
+          "RVL-201(USA)",
           "RVL-001",
           "RVT-001"
         ]
       };
 
-      // Region presets based on common real-world combos
+      const REGION_OPTION_LABELS = {
+        JPN: "JPN (Japan)",
+        USA: "USA (North America)",
+        EUR: "EUR (Europe)",
+        MDE: "MDE (Middle East)",
+        AUS: "AUS (Australia)",
+        BRA: "BRA (Brazil)",
+        LTN: "LTN (Latin America)",
+        TWN: "TWN (Taiwan)",
+        ROC: "ROC (Taiwan / ROC)",
+        HKG: "HKG (Hong Kong)",
+        ASI: "ASI (Asia generic)",
+        KOR: "KOR (Korea)",
+        SAF: "SAF (South Africa)"
+      };
+
+      const REGION_OPTION_ORDER = ["USA", "BRA", "LTN", "JPN", "EUR", "SAF", "AUS", "KOR", "TWN", "ASI", "HKG", "MDE"];
+
+      function variant(area, model, prefix) {
+        return { area: area, model: model, prefix: prefix };
+      }
+
+      // Region presets based on prefixesv2.csv, plus LAH/RVL-001(AUS)/AUS.
       const REGION_PRESETS = {
-        JPN: {
-          area: "JPN",
-          models: ["RVL-001(JPN)"],
-          video: "NTSC",
-          game: "JP",
-          codePrefixes: ["LFJ", "LJ"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
         USA: {
-          area: "USA",
-          models: ["RVL-001(USA)"],
           video: "NTSC",
           game: "US",
-          codePrefixes: ["LU", "LB"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
-        EUR: {
-          area: "EUR",
-          models: ["RVL-001(EUR)"],
-          video: "PAL",
-          game: "EU",
-          codePrefixes: ["LEH"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
-        AUS: {
-          area: "AUS",
-          models: ["RVL-001(AUS)"],
-          video: "PAL",
-          game: "EU",
-          codePrefixes: ["LEH"],
+          normalVariants: [variant("USA", "RVL-001(USA)", "LU"), variant("USA", "RVL-001(USA)", "LB")],
+          miniVariants: [variant("USA", "RVL-201(USA)", "HW")],
+          familyVariants: [variant("USA", "RVL-101(USA)", "KU"), variant("USA", "RVL-101(USA)", "KB")],
           dvd: "0",
           mpch: "0x7FFE"
         },
         BRA: {
-          area: "BRA",
-          models: ["RVL-001(USA)"],
           video: "MPAL",
           game: "US",
-          codePrefixes: ["LU"],
+          normalVariants: [variant("BRA", "RVL-001(USA)", "LU"), variant("BRA", "RVL-001(USA)", "LB")],
+          familyVariants: [variant("BRA", "RVL-101(USA)", "KU"), variant("BRA", "RVL-101(USA)", "KB")],
           dvd: "0",
           mpch: "0x7FFE"
         },
         LTN: {
-          area: "LTN",
-          models: ["RVL-001(USA)"],
           video: "NTSC",
           game: "US",
-          codePrefixes: ["LU"],
+          normalVariants: [variant("LTN", "RVL-001(USA)", "LU"), variant("LTN", "RVL-001(USA)", "LB")],
+          familyVariants: [variant("LTN", "RVL-101(USA)", "KU"), variant("LTN", "RVL-101(USA)", "KB")],
           dvd: "0",
           mpch: "0x7FFE"
         },
-        TWN: {
-          area: "TWN",
-          models: ["RVL-001(JPN)"],
+        JPN: {
           video: "NTSC",
           game: "JP",
-          codePrefixes: ["LFJ"],
+          normalVariants: [variant("JPN", "RVL-001(JPN)", "LJF"), variant("JPN", "RVL-001(JPN)", "LJH"), variant("JPN", "RVL-001(JPN)", "LJM")],
           dvd: "0",
           mpch: "0x7FFE"
         },
-        ROC: {
-          area: "ROC",
-          models: ["RVL-001(JPN)"],
-          video: "NTSC",
-          game: "JP",
-          codePrefixes: ["LFJ"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
-        HKG: {
-          area: "HKG",
-          models: ["RVL-001(JPN)"],
-          video: "NTSC",
-          game: "JP",
-          codePrefixes: ["LFJ"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
-        ASI: {
-          area: "ASI",
-          models: ["RVL-001(USA)", "RVL-001(JPN)"],
-          video: "NTSC",
-          game: "US",
-          codePrefixes: ["LU"],
-          dvd: "0",
-          mpch: "0x7FFE"
-        },
-        KOR: {
-          area: "KOR",
-          models: ["RVL-001(KOR)"],
-          video: "NTSC",
-          game: "KR",
-          codePrefixes: ["LKM"],
+        EUR: {
+          video: "PAL",
+          game: "EU",
+          normalVariants: [variant("EUR", "RVL-001(EUR)", "LEF"), variant("EUR", "RVL-001(EUR)", "LEH"), variant("EUR", "RVL-001(EUR)", "LEM")],
+          miniVariants: [variant("EUR", "RVL-201(EUR)", "HEF")],
+          familyVariants: [variant("EUR", "RVL-101(EUR)", "KEF"), variant("EUR", "RVL-101(EUR)", "KEH"), variant("EUR", "RVL-101(EUR)", "KEM")],
           dvd: "0",
           mpch: "0x7FFE"
         },
         SAF: {
-          area: "SAF",
-          models: ["RVL-001(EUR)"],
           video: "PAL",
           game: "EU",
-          codePrefixes: ["LEH"],
+          normalVariants: [variant("SAF", "RVL-001(EUR)", "LEF"), variant("SAF", "RVL-001(EUR)", "LEH"), variant("SAF", "RVL-001(EUR)", "LEM")],
+          miniVariants: [variant("SAF", "RVL-201(EUR)", "HEF")],
+          familyVariants: [variant("SAF", "RVL-101(EUR)", "KEF"), variant("SAF", "RVL-101(EUR)", "KEH"), variant("SAF", "RVL-101(EUR)", "KEM")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        AUS: {
+          video: "PAL",
+          game: "EU",
+          normalVariants: [variant("AUS", "RVL-001(AUS)", "LAH")],
+          familyVariants: [variant("AUS", "RVL-101(AUS)", "KAF"), variant("AUS", "RVL-101(AUS)", "KAM")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        KOR: {
+          video: "NTSC",
+          game: "KR",
+          normalVariants: [variant("KOR", "RVL-001(KOR)", "LKH"), variant("KOR", "RVL-001(KOR)", "LKM")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        TWN: {
+          video: "NTSC",
+          game: "JP",
+          normalVariants: [variant("JPN", "RVL-001(JPN)", "LTF"), variant("JPN", "RVL-001(JPN)", "LTH")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        ASI: {
+          video: "NTSC",
+          game: "US",
+          normalVariants: [variant("USA", "RVL-001(USA)", "LSH")],
+          familyVariants: [variant("ASI", "RVL-101(ASI)", "KSH"), variant("USA", "RVL-101(USA)", "KSH")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        HKG: {
+          video: "NTSC",
+          game: "US",
+          familyVariants: [variant("HKG", "RVL-101(HKG)", "KSH")],
+          dvd: "0",
+          mpch: "0x7FFE"
+        },
+        MDE: {
+          video: "NTSC",
+          game: "US",
+          normalVariants: [variant("USA", "RVL-001(USA)", "LMH")],
+          familyVariants: [variant("ASI", "RVL-101(UAE)", "KMH"), variant("USA", "RVL-101(USA)", "KMH")],
           dvd: "0",
           mpch: "0x7FFE"
         }
@@ -498,6 +511,52 @@
         // 9-digit numeric serial, zero-padded
         const n = Math.floor(Math.random() * 1000000000);
         return String(n).padStart(9, "0");
+      }
+
+      function generateWiiMiniSerial() {
+        return String(1 + Math.floor(Math.random() * 2)) + generateRandomSerial().slice(1);
+      }
+
+      function getPresetMode() {
+        if (wiiMiniPreset && wiiMiniPreset.checked) return "mini";
+        if (familyEditionPreset && familyEditionPreset.checked) return "family";
+        return "normal";
+      }
+
+      function getModeVariants(cfg) {
+        const mode = getPresetMode();
+        if (mode === "mini") return cfg.miniVariants || [];
+        if (mode === "family") return cfg.familyVariants || [];
+        return cfg.normalVariants || [];
+      }
+
+      function refreshPresetRegionOptions() {
+        if (!presetRegionSelect) return;
+
+        const previousValue = presetRegionSelect.value || "EUR";
+
+        presetRegionSelect.innerHTML = "";
+        REGION_OPTION_ORDER.forEach(function (areaCode) {
+          const cfg = REGION_PRESETS[areaCode];
+          if (!cfg || getModeVariants(cfg).length === 0) {
+            return;
+          }
+
+          const option = document.createElement("option");
+          option.value = areaCode;
+          option.textContent = REGION_OPTION_LABELS[areaCode] || areaCode;
+          presetRegionSelect.appendChild(option);
+        });
+
+        const optionValues = Array.from(presetRegionSelect.options).map(function (option) {
+          return option.value;
+        });
+
+        if (optionValues.includes(previousValue)) {
+          presetRegionSelect.value = previousValue;
+        } else if (optionValues.includes("EUR")) {
+          presetRegionSelect.value = "EUR";
+        }
       }
 
       // --- DOM refs ---
@@ -517,6 +576,8 @@
 
       const presetRegionSelect = document.getElementById("presetRegionSelect");
       const applyPresetBtn = document.getElementById("applyPresetBtn");
+      const familyEditionPreset = document.getElementById("familyEditionPreset");
+      const wiiMiniPreset = document.getElementById("wiiMiniPreset");
 
       const plaintextArea = document.getElementById("plaintextArea");
       const fromFieldsBtn = document.getElementById("fromFieldsBtn");
@@ -787,17 +848,37 @@
         applyPresetBtn.addEventListener("click", function () {
           const areaCode = presetRegionSelect.value || "EUR";
           const cfg = REGION_PRESETS[areaCode] || REGION_PRESETS["EUR"];
+          const variants = getModeVariants(cfg);
+          const selectedVariant = pickRandom(variants);
 
-          areaInput.value  = cfg.area;
-          modelInput.value = pickRandom(cfg.models);
+          areaInput.value  = selectedVariant.area;
+          modelInput.value = selectedVariant.model;
           dvdInput.value   = cfg.dvd;
           mpchInput.value  = cfg.mpch;
-          codeInput.value  = pickRandom(cfg.codePrefixes);
-          sernoInput.value = generateRandomSerial();
+          codeInput.value  = selectedVariant.prefix;
+          sernoInput.value = getPresetMode() === "mini" ? generateWiiMiniSerial() : generateRandomSerial();
           videoInput.value = cfg.video;
           gameInput.value  = cfg.game;
 
           syncFromFields();
+        });
+      }
+
+      if (familyEditionPreset) {
+        familyEditionPreset.addEventListener("change", function () {
+          if (familyEditionPreset.checked && wiiMiniPreset) {
+            wiiMiniPreset.checked = false;
+          }
+          refreshPresetRegionOptions();
+        });
+      }
+
+      if (wiiMiniPreset) {
+        wiiMiniPreset.addEventListener("change", function () {
+          if (wiiMiniPreset.checked && familyEditionPreset) {
+            familyEditionPreset.checked = false;
+          }
+          refreshPresetRegionOptions();
         });
       }
 
@@ -909,6 +990,7 @@
 
       // Initialize byte counter & combo dropdowns
       updateByteInfo();
+      refreshPresetRegionOptions();
       setupComboDropdowns();
     })();
   </script>
