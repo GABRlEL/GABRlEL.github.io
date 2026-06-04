@@ -629,6 +629,7 @@
         GC_COMMENT_LINE_LEN: 32,
         GC_COMMENT_MAX: 31,
         GC_MONEY_OFFSET: 0x3968,
+        GC_TOTAL_MONEY_OFFSET: 0x396c,
         CORE_TAIL_RIDER_OFFSET: 0x9b5c,
         CORE_TAIL_VALUE_OFFSET: 0x9b5d,
         CORE_CHECKSUM_POLY: 0xa001,
@@ -714,6 +715,16 @@
           id: "gameCubeMoney",
           label: "Money",
           coreOffset: CONSTANTS.GC_MONEY_OFFSET,
+          length: 4,
+          min: 0,
+          max: 4294967295,
+          codec: "u32be",
+          platform: "GameCube"
+        },
+        {
+          id: "gameCubeTotalMoney",
+          label: "Total Money Earned",
+          coreOffset: CONSTANTS.GC_TOTAL_MONEY_OFFSET,
           length: 4,
           min: 0,
           max: 4294967295,
@@ -909,6 +920,10 @@
 
       function readGameCubeMoney(container) {
         return supportsGameCubeGameplayFields(container) ? u32be(container.core.bytes, CONSTANTS.GC_MONEY_OFFSET) : 0;
+      }
+
+      function readGameCubeTotalMoney(container) {
+        return supportsGameCubeGameplayFields(container) ? u32be(container.core.bytes, CONSTANTS.GC_TOTAL_MONEY_OFFSET) : 0;
       }
 
       function riderStatRowOffset(index) {
@@ -1730,6 +1745,10 @@
           if (Number.isInteger(money) && money >= 0 && money <= 4294967295) {
             writeU32be(edited, CONSTANTS.GC_MONEY_OFFSET, money);
           }
+          const totalMoney = parseIntegerDraft(draft.gameCubeTotalMoney);
+          if (Number.isInteger(totalMoney) && totalMoney >= 0 && totalMoney <= 4294967295) {
+            writeU32be(edited, CONSTANTS.GC_TOTAL_MONEY_OFFSET, totalMoney);
+          }
           if (Array.isArray(draft.gameCubeStats)) {
             for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
               const row = draft.gameCubeStats[riderIndex] || {};
@@ -1767,6 +1786,9 @@
           return false;
         }
         if (parseIntegerDraft(draft.gameCubeMoney) !== readGameCubeMoney(container)) {
+          return true;
+        }
+        if (parseIntegerDraft(draft.gameCubeTotalMoney) !== readGameCubeTotalMoney(container)) {
           return true;
         }
         if (Array.isArray(draft.gameCubeStats)) {
@@ -1839,6 +1861,10 @@
           const money = parseIntegerDraft(draft.gameCubeMoney);
           if (!Number.isInteger(money) || money < 0 || money > 4294967295) {
             checks.push({ ok: false, message: "Money must be an integer from 0 to 4294967295." });
+          }
+          const totalMoney = parseIntegerDraft(draft.gameCubeTotalMoney);
+          if (!Number.isInteger(totalMoney) || totalMoney < 0 || totalMoney > 4294967295) {
+            checks.push({ ok: false, message: "Total money earned must be an integer from 0 to 4294967295." });
           }
           if (!Array.isArray(draft.gameCubeStats)) {
             checks.push({ ok: false, message: "Rider stats are not initialized." });
@@ -1968,6 +1994,7 @@
             ];
             if (supportsGameCubeGameplayFields(container)) {
               ranges.push([CONSTANTS.GC_MONEY_OFFSET, 4]);
+              ranges.push([CONSTANTS.GC_TOTAL_MONEY_OFFSET, 4]);
               for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
                 ranges.push([riderStatRowOffset(riderIndex), RIDER_STAT_FIELDS.length]);
               }
@@ -2024,6 +2051,9 @@
         }
         if (coreOffset >= CONSTANTS.GC_MONEY_OFFSET && coreOffset < CONSTANTS.GC_MONEY_OFFSET + 4) {
           return "money";
+        }
+        if (coreOffset >= CONSTANTS.GC_TOTAL_MONEY_OFFSET && coreOffset < CONSTANTS.GC_TOTAL_MONEY_OFFSET + 4) {
+          return "total money earned";
         }
         for (let riderIndex = 0; riderIndex < CONSTANTS.RIDER_SLOT_COUNT; riderIndex += 1) {
           const rowOffset = riderStatRowOffset(riderIndex);
@@ -2098,6 +2128,7 @@
             commentLine1: container.wrapper.commentLine1,
             commentLine2: container.wrapper.commentLine2,
             money: readGameCubeMoney(container),
+            totalMoneyEarned: readGameCubeTotalMoney(container),
             collectibles: readAllCollectibleAreas(container),
             collectibleEntries: readRawCollectibleEntries(container),
             eventRiderIndex: currentGameCubeEventRiderIndex(container),
@@ -2138,6 +2169,7 @@
         readCoreRiderId,
         readCoreTailValue,
         readGameCubeMoney,
+        readGameCubeTotalMoney,
         readRiderStats,
         readAllCollectibleAreas,
         readRawCollectibleEntries,
@@ -2162,6 +2194,7 @@
           currentRiderId: "",
           tailValue: "",
           gameCubeMoney: "",
+          gameCubeTotalMoney: "",
           gameCubeStats: emptyRiderStatsDraft(),
           gameCubeCollectibles: emptyGameCubeCollectiblesDraft(),
           gameCubeEventRiderIndex: 0,
@@ -2436,7 +2469,12 @@
               '<label for="gameCubeMoneyInput">Money</label>' +
               '<input id="gameCubeMoneyInput" type="text" inputmode="numeric" value="' + escapeHtml(state.draft.gameCubeMoney) + '">' +
             '</div>' +
+            '<div class="field">' +
+              '<label for="gameCubeTotalMoneyInput">Total Money Earned</label>' +
+              '<input id="gameCubeTotalMoneyInput" type="text" inputmode="numeric" value="' + escapeHtml(state.draft.gameCubeTotalMoney) + '">' +
+            '</div>' +
             readonlyField("Original Money", readGameCubeMoney(container).toLocaleString("en-US")) +
+            readonlyField("Original Total Money Earned", readGameCubeTotalMoney(container).toLocaleString("en-US")) +
           '</div>' +
           '<div class="table-wrap stats-table" style="margin-top: 14px;">' +
             '<table>' +
@@ -2517,6 +2555,7 @@
           ["Core CRC Candidate", "stored " + hexValue(diagnostics.coreChecksum.stored, 4) + ", calculated " + hexValue(diagnostics.coreChecksum.calculated, 4)],
           ["Core CRC Status", diagnostics.coreChecksum.ok ? "OK" : "Mismatch"],
           ["GameCube Money", diagnostics.gameCube ? diagnostics.gameCube.money : "N/A"],
+          ["GameCube Total Money Earned", diagnostics.gameCube ? diagnostics.gameCube.totalMoneyEarned : "N/A"],
           ["Non-zero Core Bytes", diagnostics.nonZeroBytes + " / " + diagnostics.coreLength],
           ["7777777 Markers", markerText],
           ["Rider Slot Stride", hexValue(diagnostics.riderSlotStride, 0)]
@@ -2629,6 +2668,7 @@
             tailValue: readCoreTailValue(container),
             tailValueEndian: container.core.valueEndian,
             gameCubeMoney: supportsGameCubeGameplayFields(container) ? readGameCubeMoney(container) : null,
+            gameCubeTotalMoney: supportsGameCubeGameplayFields(container) ? readGameCubeTotalMoney(container) : null,
             riderStats: supportsGameCubeGameplayFields(container) ? readAllRiderStats(container) : null,
             gameCubeCollectibles: supportsGameCubeGameplayFields(container) ? readAllCollectibleAreas(container) : null,
             gameCubeEventRecords: supportsGameCubeGameplayFields(container)
@@ -2702,6 +2742,7 @@
         state.draft.currentRiderId = container.core ? String(readCoreRiderId(container)) : "";
         state.draft.tailValue = container.core ? String(readCoreTailValue(container)) : "";
         state.draft.gameCubeMoney = supportsGameCubeGameplayFields(container) ? String(readGameCubeMoney(container)) : "";
+        state.draft.gameCubeTotalMoney = supportsGameCubeGameplayFields(container) ? String(readGameCubeTotalMoney(container)) : "";
         state.draft.gameCubeStats = gameCubeStatsDraft(container);
         state.draft.gameCubeCollectibles = gameCubeCollectiblesDraft(container);
         state.draft.gameCubeEventRiderIndex = supportsGameCubeGameplayFields(container) ? currentGameCubeEventRiderIndex(container) : 0;
@@ -2771,6 +2812,7 @@
         state.draft.currentRiderId = state.container.core ? String(readCoreRiderId(state.container)) : "";
         state.draft.tailValue = state.container.core ? String(readCoreTailValue(state.container)) : "";
         state.draft.gameCubeMoney = supportsGameCubeGameplayFields(state.container) ? String(readGameCubeMoney(state.container)) : "";
+        state.draft.gameCubeTotalMoney = supportsGameCubeGameplayFields(state.container) ? String(readGameCubeTotalMoney(state.container)) : "";
         state.draft.gameCubeStats = gameCubeStatsDraft(state.container);
         state.draft.gameCubeCollectibles = gameCubeCollectiblesDraft(state.container);
         state.draft.gameCubeEventRiderIndex = supportsGameCubeGameplayFields(state.container) ? currentGameCubeEventRiderIndex(state.container) : 0;
@@ -2839,6 +2881,8 @@
             state.draft.currentRiderId = target.value;
           } else if (inputId === "gameCubeMoneyInput") {
             state.draft.gameCubeMoney = target.value;
+          } else if (inputId === "gameCubeTotalMoneyInput") {
+            state.draft.gameCubeTotalMoney = target.value;
           } else if (target.dataset && target.dataset.gcStatIndex && target.dataset.gcStatId) {
             const riderIndex = Number.parseInt(target.dataset.gcStatIndex, 10);
             const statId = target.dataset.gcStatId;
@@ -2908,6 +2952,7 @@
         state.draft.currentRiderId = "";
         state.draft.tailValue = "";
         state.draft.gameCubeMoney = "";
+        state.draft.gameCubeTotalMoney = "";
         state.draft.gameCubeStats = emptyRiderStatsDraft();
         state.draft.gameCubeCollectibles = emptyGameCubeCollectiblesDraft();
         state.draft.gameCubeEventRiderIndex = 0;

@@ -1,0 +1,1487 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dice A Million Save Editor</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1e8;
+      --panel: #fffdf7;
+      --panel-2: #f9f5eb;
+      --ink: #212126;
+      --muted: #69665d;
+      --line: #d9d1bf;
+      --line-strong: #b9ad94;
+      --accent: #287c74;
+      --accent-2: #b3472d;
+      --accent-soft: #dcefeb;
+      --warn: #8c5a00;
+      --danger: #9d2631;
+      --ok: #23734f;
+      --shadow: 0 10px 28px rgba(58, 45, 20, .12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); }
+    body { padding: 22px; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { max-width: 1360px; margin: 0 auto; }
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.1; letter-spacing: 0; }
+    .sub { margin: 0; color: var(--muted); font-size: 14px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .btn {
+      border: 1px solid var(--line-strong);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 7px;
+      min-height: 38px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 1px 0 rgba(255,255,255,.7) inset;
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .btn.danger { border-color: #c79a9f; color: var(--danger); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .icon { width: 17px; height: 17px; display: inline-block; flex: 0 0 auto; }
+    .file-panel {
+      margin-bottom: 16px;
+    }
+    .file-toggle {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      min-height: 42px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: var(--shadow);
+      text-align: left;
+    }
+    .file-toggle strong { font-size: 14px; }
+    .file-toggle span { color: var(--muted); font-size: 13px; }
+    .file-toggle .chev { color: var(--accent); font-weight: 800; font-size: 16px; }
+    .file-panel.expanded .file-toggle {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom-color: transparent;
+    }
+    .side, .main, .notice, .modal-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .side {
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(220px, 1.1fr) minmax(0, 2fr);
+      align-items: stretch;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    .file-panel:not(.expanded) .side {
+      display: none;
+    }
+    .drop {
+      margin: 12px;
+      padding: 12px;
+      min-height: 86px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 2px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .drop.drag { border-color: var(--accent); background: var(--accent-soft); }
+    .drop strong { display: block; font-size: 16px; margin-bottom: 6px; }
+    .drop span { color: var(--muted); font-size: 13px; }
+    .file-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      align-content: stretch;
+      border-left: 1px solid var(--line);
+    }
+    .hidden { display: none !important; }
+    .file-row, .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-top: 1px solid var(--line);
+      padding: 11px 12px;
+      font-size: 13px;
+    }
+    .file-meta .file-row:nth-child(-n+2) { border-top: 0; }
+    .file-row b, .stat-row b { font-weight: 650; }
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      padding: 3px 8px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 12px;
+    }
+    .status { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; min-height: 42px; }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.bad { color: var(--danger); }
+    .file-alert {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .file-alert.backup { color: var(--muted); background: #fbf8f0; }
+    .file-alert.warn { color: var(--warn); background: #fff7df; }
+    .file-alert.bad { color: var(--danger); background: #fff0f1; }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbf8f0;
+      border-radius: 8px 8px 0 0;
+    }
+    .tab-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 247, .72);
+    }
+    .tab-heading {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 0 7px;
+      white-space: nowrap;
+    }
+    .tab {
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 7px;
+      padding: 8px 10px;
+      color: var(--muted);
+      min-height: 36px;
+    }
+    .tab.active { color: var(--ink); background: var(--panel); border-color: var(--line); }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto auto;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+    }
+    .search, .input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: white;
+      color: var(--ink);
+      min-height: 38px;
+      padding: 8px 10px;
+    }
+    textarea { min-height: 420px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 12px; line-height: 1.45; }
+    .content { padding: 12px; }
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 86px;
+    }
+    .metric .num { font-size: 24px; font-weight: 750; line-height: 1.1; }
+    .metric .label { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: white; }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; font-size: 13px; }
+    th { background: #f7f2e6; color: #49453d; font-weight: 700; position: sticky; top: 0; z-index: 1; }
+    tr:last-child td { border-bottom: 0; }
+    tr.changed td:first-child { border-left: 4px solid var(--accent); }
+    td.name { min-width: 220px; font-weight: 650; }
+    td.name small { display: block; color: var(--muted); font-weight: 500; margin-top: 2px; }
+    .mini {
+      min-height: 34px;
+      padding: 6px 8px;
+      border-radius: 7px;
+      border: 1px solid var(--line-strong);
+      background: white;
+      width: 100%;
+    }
+    .num-input { width: 96px; }
+    .check-cell { text-align: center; width: 76px; }
+    .check-cell input { width: 18px; height: 18px; }
+    .bulk {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .bulk .btn { min-height: 34px; padding: 0 10px; }
+    .empty {
+      padding: 30px 18px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      gap: 10px;
+    }
+    .setting {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: white;
+      display: grid;
+      grid-template-columns: 1fr minmax(120px, 190px);
+      gap: 10px;
+      align-items: center;
+    }
+    .setting label { font-weight: 650; font-size: 13px; }
+    .setting small { display: block; color: var(--muted); font-weight: 500; margin-top: 2px; }
+    .notice { padding: 12px; margin-bottom: 12px; box-shadow: none; color: var(--muted); }
+    .raw-actions { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 18, 14, .42);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      z-index: 20;
+    }
+    .modal-panel { max-width: 720px; width: min(720px, 100%); padding: 18px; }
+    .modal-panel h2 { margin: 0 0 8px; font-size: 20px; }
+    .modal-panel p, .modal-panel li { color: var(--muted); line-height: 1.45; }
+    .modal-panel ul { padding-left: 20px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: 460px;
+      background: #25231f;
+      color: white;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 14px 36px rgba(0,0,0,.22);
+      z-index: 30;
+      font-size: 13px;
+    }
+    @media (max-width: 980px) {
+      body { padding: 12px; }
+      .topbar, .file-panel, .side { grid-template-columns: 1fr; }
+      .actions { justify-content: stretch; }
+      .actions .btn { flex: 1 1 auto; justify-content: center; }
+      .file-meta { grid-template-columns: 1fr; border-left: 0; border-top: 1px solid var(--line); }
+      .file-meta .file-row:nth-child(-n+2) { border-top: 1px solid var(--line); }
+      .overview, .settings-grid { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+      table { min-width: 760px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div>
+        <h1>Dice A Million Save Editor</h1>
+        <p class="sub">Load profile files like `data_1.sav`, `run_1.sav`, and `config_1.sav` through `*_3.sav`. Unknown fields are preserved.</p>
+        <p class="sub">Back up the profile folder before replacing any save files.</p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="helpBtn" title="Help">
+          <span class="icon" aria-hidden="true">?</span> Help
+        </button>
+        <button class="btn" id="resetBtn" disabled title="Reload the current files from memory">
+          <span class="icon" aria-hidden="true">↺</span> Reset edits
+        </button>
+        <button class="btn danger" id="clearBtn" disabled title="Unload all loaded files">
+          <span class="icon" aria-hidden="true">×</span> Clear loaded
+        </button>
+        <button class="btn primary" id="saveDataBtn" disabled title="Download edited data save">
+          <span class="icon" aria-hidden="true">⇩</span> Save data
+        </button>
+        <button class="btn primary" id="saveRunBtn" disabled title="Download edited run save">
+          <span class="icon" aria-hidden="true">⇩</span> Save run
+        </button>
+        <button class="btn" id="saveConfigBtn" disabled title="Download edited config save">
+          <span class="icon" aria-hidden="true">⇩</span> Save config
+        </button>
+      </div>
+    </div>
+
+    <div class="file-panel expanded" id="filePanel">
+      <button class="file-toggle" id="filePanelToggle" type="button" aria-expanded="true">
+        <strong>Save files</strong>
+        <span id="filePanelSummary">No files loaded</span>
+        <span class="chev" id="filePanelChevron" aria-hidden="true">⌃</span>
+      </button>
+      <aside class="side">
+        <label class="drop" id="dropZone">
+          <input class="hidden" id="fileInput" type="file" multiple accept=".sav,.json">
+          <span>
+            <strong>Drop save files here</strong>
+            <span>or click to choose `data_#.sav`, `run_#.sav`, or `config_#.sav`</span>
+          </span>
+        </label>
+        <div class="file-meta">
+          <div class="file-row"><b>Progress file</b><span class="pill" id="dataFilePill">not loaded</span></div>
+          <div class="file-row"><b>Current run file</b><span class="pill" id="runFilePill">not loaded</span></div>
+          <div class="file-row"><b>Settings file</b><span class="pill" id="configFilePill">not loaded</span></div>
+          <div class="stat-row"><b>Modified fields</b><span class="pill" id="dirtyPill">0</span></div>
+          <div class="stat-row"><b>Compression</b><span class="pill" id="compressionPill">waiting</span></div>
+          <div class="file-alert backup" id="backupNote">Back up the profile folder before replacing save files.</div>
+          <div class="file-alert bad hidden" id="debugNotice"></div>
+          <div class="file-alert warn hidden" id="versionNotice"></div>
+          <div class="file-alert bad hidden" id="profileNotice"></div>
+          <div class="status" id="status">Ready.</div>
+        </div>
+      </aside>
+    </div>
+
+      <main class="main">
+        <nav class="tabs" id="tabs"></nav>
+        <div class="toolbar">
+          <input class="search" id="searchBox" placeholder="Search current view">
+          <select id="stateFilter" title="State filter">
+            <option value="">All states</option>
+            <option value="locked">Locked</option>
+            <option value="unseen">Unseen</option>
+            <option value="seen">Seen</option>
+            <option value="new">New</option>
+            <option value="unlocked">Unlocked</option>
+          </select>
+          <select id="changedFilter" title="Changed filter">
+            <option value="">All fields</option>
+            <option value="changed">Changed only</option>
+          </select>
+        </div>
+        <section class="content" id="content">
+          <div class="empty">Load a `data_#.sav` file to start editing progression.</div>
+        </section>
+      </main>
+  </div>
+
+  <div class="modal hidden" id="helpModal" role="dialog" aria-modal="true">
+    <div class="modal-panel">
+      <h2>Editing Notes</h2>
+      <ul>
+        <li>Make a copy of your save folder before replacing game files.</li>
+        <li>`data_#.sav` and `run_#.sav` are compressed JSON. This editor decompresses them, edits values, then downloads compressed replacements.</li>
+        <li>Collection states commonly use `locked`, `unseen`, and `seen`. This editor also offers `unlocked` for fields that already use it.</li>
+        <li>Numeric fields are kept as numbers. Blank numeric inputs are saved as `0`.</li>
+        <li>`run_#.sav` stores the active run for that profile. The Run tabs expose common fields; use Raw JSON for nested values not shown there.</li>
+        <li>Use the Raw tab for keys that are not shown in grouped views.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="btn primary" id="closeHelpBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var BUILT_FOR_VERSION = "1.0.26";
+
+    var GROUPS = [
+      { id: "overview", label: "Overview", kind: "overview", section: "Progress Data" },
+      { id: "dicelist", label: "Dice", titlePrefix: "dice", section: "Progress Data" },
+      { id: "ringlist", label: "Rings", titlePrefix: "ring", section: "Progress Data" },
+      { id: "cardlist", label: "Cards", titlePrefix: "card", section: "Progress Data" },
+      { id: "charlist", label: "Hands", titlePrefix: "char", section: "Progress Data" },
+      { id: "bosslist", label: "Bosses", titlePrefix: "boss", section: "Progress Data" },
+      { id: "challengelist", label: "Challenges", titlePrefix: "challenge", section: "Progress Data" },
+      { id: "tutoriallist", label: "Tutorials", titlePrefix: "tutorial", section: "Progress Data" },
+      { id: "curselist", label: "Curses", titlePrefix: "curse", section: "Progress Data" },
+      { id: "enchantlist", label: "Enchantments", titlePrefix: "enchant", section: "Progress Data" },
+      { id: "runOverview", label: "Overview", kind: "runOverview", section: "Current Run" },
+      { id: "runGeneral", label: "Stats", kind: "runGeneral", section: "Current Run" },
+      { id: "runDice", label: "Dice", kind: "runList", runPath: "dice", section: "Current Run" },
+      { id: "runRings", label: "Rings", kind: "runList", runPath: "rings", section: "Current Run" },
+      { id: "runDeck", label: "Deck", kind: "runList", runPath: "deck", section: "Current Run" },
+      { id: "runDestroyed", label: "Destroyed Dice", kind: "runList", runPath: "destroyed_dice", section: "Current Run" },
+      { id: "runBosses", label: "Bosses", kind: "runList", runPath: "avaliable_boss", section: "Current Run" },
+      { id: "runAvailableRings", label: "Available Rings", kind: "runList", runPath: "avaliable_ring", section: "Current Run" },
+      { id: "settings", label: "Settings", kind: "settings", section: "Config" },
+      { id: "raw", label: "Raw JSON", kind: "raw", section: "Raw" }
+    ];
+
+    var CONFIG_HINTS = {
+      infostats: "Show information stats",
+      numbermode: "Number display mode",
+      debug_com: "Debug mode disables achievements for this profile",
+      scoremode: "Score display mode",
+      tutorial_enabled: "Tutorial prompts",
+      vortex_unlocked: "Vortex availability",
+      bg_type: "Background",
+      bg_spd: "Background speed",
+      skipanim: "Skip animations",
+      parity_check: "Parity helper",
+      shake_enabled: "Screen shake",
+      custom_cursor: "Custom cursor",
+      particles: "Particles",
+      vsync_on: "VSync",
+      confirmscore: "Confirm score selection",
+      windowsize: "Window size",
+      bgeffect: "Background effects",
+      bglist_randomonlyfavs: "Random background uses favorites",
+      lang: "Language index",
+      animtime: "Animation time",
+      filter: "Filter mode",
+      mastervol: "Master volume",
+      snd_value: "Sound volume",
+      mus_value: "Music volume",
+      autosel: "Auto select",
+      showlocked: "Show locked entries",
+      noflashbang: "Reduce bright flashes",
+      noflashing: "Disable flashing effects",
+      muteonbg: "Mute in background",
+      fs: "Fullscreen",
+      version: "Save version"
+    };
+
+    var ENCHANT_OPTIONS = [
+      { id: "none", label: "None" },
+      { id: "loyalty", label: "Loyalty" },
+      { id: "eternal", label: "Eternal" },
+      { id: "wealth", label: "Wealth" },
+      { id: "laconism", label: "Laconism" },
+      { id: "echo", label: "Echo" },
+      { id: "perennial", label: "Perennial" },
+      { id: "fragile", label: "Fragile" },
+      { id: "negative", label: "Negative" },
+      { id: "explosive", label: "Explosive" },
+      { id: "weak", label: "Weak" },
+      { id: "deciduous", label: "Deciduous" },
+      { id: "parasite", label: "Parasite" },
+      { id: "gilded", label: "Gilded" }
+    ];
+
+    var state = {
+      data: null,
+      run: null,
+      config: null,
+      originalData: null,
+      originalRun: null,
+      originalConfig: null,
+      dataName: "",
+      runName: "",
+      configName: "",
+      warnedConfigVersion: "",
+      debugWarning: "",
+      versionWarning: "",
+      profileWarning: "",
+      activeTab: "overview",
+      filePanelOpen: true,
+      search: "",
+      stateFilter: "",
+      changedFilter: "",
+      rawTarget: "data"
+    };
+
+    var el = {};
+    var zlibSupported = typeof CompressionStream !== "undefined" && typeof DecompressionStream !== "undefined";
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    function init() {
+      ["filePanel", "filePanelToggle", "filePanelSummary", "filePanelChevron", "dropZone", "fileInput", "dataFilePill", "runFilePill", "configFilePill", "dirtyPill", "compressionPill", "debugNotice", "versionNotice", "profileNotice", "status", "tabs", "content", "searchBox", "stateFilter", "changedFilter", "saveDataBtn", "saveRunBtn", "saveConfigBtn", "resetBtn", "clearBtn", "helpBtn", "helpModal", "closeHelpBtn", "toast"].forEach(function (id) {
+        el[id] = document.getElementById(id);
+      });
+
+      el.compressionPill.textContent = zlibSupported ? "browser OK" : "unsupported";
+      if (!zlibSupported) {
+        setStatus("This browser does not expose CompressionStream/DecompressionStream. Use a current Chromium, Edge, or Firefox build.", "bad");
+      }
+
+      renderTabs();
+      bindEvents();
+      render();
+    }
+
+    function bindEvents() {
+      el.filePanelToggle.addEventListener("click", function () {
+        setFilePanelOpen(!state.filePanelOpen);
+      });
+      el.fileInput.addEventListener("change", function (event) { loadFiles(event.target.files); });
+      ["dragenter", "dragover"].forEach(function (name) {
+        el.dropZone.addEventListener(name, function (event) {
+          event.preventDefault();
+          el.dropZone.classList.add("drag");
+        });
+      });
+      ["dragleave", "drop"].forEach(function (name) {
+        el.dropZone.addEventListener(name, function (event) {
+          event.preventDefault();
+          el.dropZone.classList.remove("drag");
+        });
+      });
+      el.dropZone.addEventListener("drop", function (event) { loadFiles(event.dataTransfer.files); });
+      el.searchBox.addEventListener("input", function () { state.search = el.searchBox.value.trim().toLowerCase(); render(); });
+      el.stateFilter.addEventListener("change", function () { state.stateFilter = el.stateFilter.value; render(); });
+      el.changedFilter.addEventListener("change", function () { state.changedFilter = el.changedFilter.value; render(); });
+      el.saveDataBtn.addEventListener("click", saveData);
+      el.saveRunBtn.addEventListener("click", saveRun);
+      el.saveConfigBtn.addEventListener("click", saveConfig);
+      el.resetBtn.addEventListener("click", resetEdits);
+      el.clearBtn.addEventListener("click", clearLoadedFiles);
+      window.addEventListener("beforeunload", function (event) {
+        if (!countDirty()) return;
+        event.preventDefault();
+        event.returnValue = "";
+      });
+      el.helpBtn.addEventListener("click", function () { el.helpModal.classList.remove("hidden"); });
+      el.closeHelpBtn.addEventListener("click", function () { el.helpModal.classList.add("hidden"); });
+      el.helpModal.addEventListener("click", function (event) {
+        if (event.target === el.helpModal) el.helpModal.classList.add("hidden");
+      });
+    }
+
+    function renderTabs() {
+      el.tabs.innerHTML = "";
+      ["Progress Data", "Current Run", "Config", "Raw"].forEach(function (sectionName) {
+        var sectionGroups = GROUPS.filter(function (group) { return group.section === sectionName; });
+        if (!sectionGroups.length) return;
+        var section = document.createElement("div");
+        section.className = "tab-section";
+        var heading = document.createElement("span");
+        heading.className = "tab-heading";
+        heading.textContent = sectionName;
+        section.appendChild(heading);
+        sectionGroups.forEach(function (group) {
+          var btn = document.createElement("button");
+          btn.className = "tab" + (state.activeTab === group.id ? " active" : "");
+          btn.textContent = group.label;
+          btn.addEventListener("click", function () {
+            state.activeTab = group.id;
+            renderTabs();
+            render();
+          });
+          section.appendChild(btn);
+        });
+        el.tabs.appendChild(section);
+      });
+    }
+
+    async function loadFiles(files) {
+      if (!files || !files.length) return;
+      var loaded = [];
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        try {
+          var bytes = new Uint8Array(await file.arrayBuffer());
+          var parsed = await parseSaveFile(file.name, bytes);
+          if (parsed.type === "data") {
+            state.data = parsed.value;
+            state.originalData = clone(parsed.value);
+            state.dataName = file.name;
+            loaded.push("progress");
+          } else if (parsed.type === "run") {
+            state.run = parsed.value;
+            state.originalRun = clone(parsed.value);
+            state.runName = file.name;
+            loaded.push("current run");
+          } else {
+            state.config = parsed.value;
+            state.originalConfig = clone(parsed.value);
+            state.configName = file.name;
+            warnIfConfigIsNewer(state.config);
+            loaded.push("settings");
+          }
+        } catch (err) {
+          toast("Could not load " + file.name + ": " + err.message);
+        }
+      }
+      updateChrome();
+      render();
+      if (loaded.length) {
+        setStatus("Loaded " + loaded.join(" and ") + "." + (state.profileWarning ? " Mixed profile warning is shown above." : ""), state.profileWarning ? "warn" : "ok");
+        setFilePanelOpen(false);
+      }
+    }
+
+    async function parseSaveFile(name, bytes) {
+      var text;
+      var lower = name.toLowerCase();
+      if (lower.indexOf("config") !== -1 || looksLikeJson(bytes)) {
+        text = decodeUtf8(bytes);
+        var plainValue = JSON.parse(text);
+        return { type: lower.indexOf("run") !== -1 || looksLikeRun(plainValue) ? "run" : "config", value: plainValue };
+      }
+      if (!zlibSupported) throw new Error("zlib save support is unavailable in this browser");
+      text = await inflateToText(bytes);
+      var value = JSON.parse(text);
+      return { type: lower.indexOf("run") !== -1 || looksLikeRun(value) ? "run" : "data", value: value };
+    }
+
+    function looksLikeRun(value) {
+      return !!(value && typeof value === "object" && value.general && Array.isArray(value.dice) && Array.isArray(value.rings));
+    }
+
+    function looksLikeJson(bytes) {
+      for (var i = 0; i < bytes.length; i++) {
+        var b = bytes[i];
+        if (b === 9 || b === 10 || b === 13 || b === 32) continue;
+        return b === 123 || b === 91;
+      }
+      return false;
+    }
+
+    async function inflateToText(bytes) {
+      var blob = new Blob([bytes]);
+      var stream = blob.stream().pipeThrough(new DecompressionStream("deflate"));
+      var out = await new Response(stream).arrayBuffer();
+      return decodeUtf8(new Uint8Array(out));
+    }
+
+    async function deflateText(text) {
+      if (!zlibSupported) throw new Error("zlib save support is unavailable in this browser");
+      var blob = new Blob([new TextEncoder().encode(text)]);
+      var stream = blob.stream().pipeThrough(new CompressionStream("deflate"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    function decodeUtf8(bytes) {
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function updateChrome() {
+      el.dataFilePill.textContent = state.dataName || "not loaded";
+      el.runFilePill.textContent = state.runName || "not loaded";
+      el.configFilePill.textContent = state.configName || "not loaded";
+      setSaveButtonLabel(el.saveDataBtn, "Save " + (state.dataName || "data"));
+      setSaveButtonLabel(el.saveRunBtn, "Save " + (state.runName || "run"));
+      setSaveButtonLabel(el.saveConfigBtn, "Save " + (state.configName || "config"));
+      el.saveDataBtn.disabled = !state.data || !zlibSupported;
+      el.saveRunBtn.disabled = !state.run || !zlibSupported;
+      el.saveConfigBtn.disabled = !state.config;
+      el.resetBtn.disabled = !state.data && !state.run && !state.config;
+      el.clearBtn.disabled = !state.data && !state.run && !state.config;
+      el.dirtyPill.textContent = String(countDirty());
+      updateDebugWarning();
+      updateProfileWarning();
+      updatePersistentWarnings();
+      updateFilePanelSummary();
+    }
+
+    function setSaveButtonLabel(button, label) {
+      button.innerHTML = '<span class="icon" aria-hidden="true">⇩</span> ' + escapeHtml(label);
+    }
+
+    function setFilePanelOpen(open) {
+      state.filePanelOpen = !!open;
+      el.filePanel.classList.toggle("expanded", state.filePanelOpen);
+      el.filePanelToggle.setAttribute("aria-expanded", state.filePanelOpen ? "true" : "false");
+      el.filePanelChevron.textContent = state.filePanelOpen ? "⌃" : "⌄";
+    }
+
+    function updateFilePanelSummary() {
+      var loaded = [];
+      if (state.dataName) loaded.push("data");
+      if (state.runName) loaded.push("run");
+      if (state.configName) loaded.push("config");
+      var dirty = countDirty();
+      var summary = loaded.length ? loaded.join(" + ") + " loaded" : "No files loaded";
+      if (dirty) summary += " · " + dirty + " modified";
+      if (state.debugWarning) summary += " · debug mode";
+      if (state.profileWarning) summary += " · profile mismatch";
+      if (state.versionWarning) summary += " · version warning";
+      el.filePanelSummary.textContent = summary;
+    }
+
+    function updatePersistentWarnings() {
+      setNotice(el.debugNotice, state.debugWarning);
+      setNotice(el.versionNotice, state.versionWarning);
+      setNotice(el.profileNotice, state.profileWarning);
+    }
+
+    function setNotice(noticeEl, message) {
+      noticeEl.textContent = message || "";
+      noticeEl.classList.toggle("hidden", !message);
+    }
+
+    function updateDebugWarning() {
+      state.debugWarning = state.config && isTruthyConfigFlag(state.config.debug_com)
+        ? "Debug mode is enabled in the loaded config. Achievements are disabled for this profile while this is on."
+        : "";
+    }
+
+    function isTruthyConfigFlag(value) {
+      return value === true || value === 1 || value === 1.0 || value === "1" || value === "true";
+    }
+
+    function updateProfileWarning() {
+      var files = [
+        { type: "data", name: state.dataName },
+        { type: "run", name: state.runName },
+        { type: "config", name: state.configName }
+      ].map(function (file) {
+        return { type: file.type, profile: getProfileNumber(file.name), name: file.name };
+      }).filter(function (file) {
+        return file.profile !== "";
+      });
+
+      var profiles = {};
+      files.forEach(function (file) { profiles[file.profile] = true; });
+      var profileList = Object.keys(profiles);
+      if (profileList.length <= 1) {
+        state.profileWarning = "";
+        return;
+      }
+      state.profileWarning = "Mixed profile files are loaded: " + files.map(function (file) {
+        return file.type + " profile " + file.profile;
+      }).join(", ") + ". Save files from different profiles may not belong together.";
+    }
+
+    function getProfileNumber(name) {
+      var match = String(name || "").match(/^(?:data|run|config)_(\d+)\.sav$/i);
+      return match ? match[1] : "";
+    }
+
+    function warnIfConfigIsNewer(config) {
+      if (!config || typeof config.version !== "string") {
+        state.versionWarning = "";
+        return;
+      }
+      if (compareVersions(config.version, BUILT_FOR_VERSION) <= 0) {
+        state.versionWarning = "";
+        return;
+      }
+      state.versionWarning = "Version warning: this editor was built for Dice A Million " + BUILT_FOR_VERSION + ", but the loaded config reports version " + config.version + ". Proceed with caution.";
+      if (state.warnedConfigVersion === config.version) return;
+      state.warnedConfigVersion = config.version;
+      window.alert(
+        "This save file editor was built for Dice A Million " + BUILT_FOR_VERSION +
+        ", but the loaded config reports version " + config.version +
+        ". The editor may be outdated for this save. Proceed with caution."
+      );
+    }
+
+    function compareVersions(a, b) {
+      var pa = parseVersionParts(a);
+      var pb = parseVersionParts(b);
+      var len = Math.max(pa.length, pb.length);
+      for (var i = 0; i < len; i++) {
+        var av = pa[i] || 0;
+        var bv = pb[i] || 0;
+        if (av > bv) return 1;
+        if (av < bv) return -1;
+      }
+      return 0;
+    }
+
+    function parseVersionParts(version) {
+      var match = String(version).match(/\d+(?:\.\d+)*/);
+      if (!match) return [0];
+      return match[0].split(".").map(function (part) {
+        return Number(part) || 0;
+      });
+    }
+
+    function countDirty() {
+      var count = 0;
+      count += diffCount(state.data, state.originalData);
+      count += diffCount(state.run, state.originalRun);
+      count += diffCount(state.config, state.originalConfig);
+      return count;
+    }
+
+    function diffCount(current, original) {
+      if (!current || !original) return 0;
+      var keys = Object.keys(current);
+      var count = 0;
+      keys.forEach(function (key) {
+        if (JSON.stringify(current[key]) !== JSON.stringify(original[key])) count++;
+      });
+      return count;
+    }
+
+    function render() {
+      updateChrome();
+      var group = GROUPS.filter(function (item) { return item.id === state.activeTab; })[0] || GROUPS[0];
+      el.stateFilter.classList.toggle("hidden", group.kind === "settings" || group.kind === "raw" || group.kind === "overview" || group.kind === "runOverview" || group.kind === "runGeneral");
+      el.changedFilter.classList.toggle("hidden", group.kind === "raw");
+
+      if (group.kind === "overview") return renderOverview();
+      if (group.kind === "runOverview") return renderRunOverview();
+      if (group.kind === "runGeneral") return renderRunGeneral();
+      if (group.kind === "runList") return renderRunList(group);
+      if (group.kind === "settings") return renderSettings();
+      if (group.kind === "raw") return renderRaw();
+      return renderGroup(group);
+    }
+
+    function renderOverview() {
+      if (!state.data) {
+        el.content.innerHTML = '<div class="empty">Load a `data_#.sav` file to start editing progression.</div>';
+        return;
+      }
+      var metrics = GROUPS.filter(function (group) { return group.titlePrefix; }).map(function (group) {
+        var items = collectItems(group.id);
+        var unlocked = items.filter(function (item) { return item.state !== "locked"; }).length;
+        var seen = items.filter(function (item) { return item.state === "seen" || item.state === "unlocked" || Number(item.state) > 0; }).length;
+        return '<div class="metric"><div class="num">' + seen + '/' + items.length + '</div><div class="label">' + escapeHtml(group.label) + ' seen or active<br>' + unlocked + ' not locked</div></div>';
+      }).join("");
+      var totals = summarizeNumbers();
+      el.content.innerHTML =
+        '<div class="overview">' +
+        metrics +
+        '<div class="metric"><div class="num">' + totals.rolls + '</div><div class="label">Total dice rolls in save</div></div>' +
+        '<div class="metric"><div class="num">' + totals.takes + '</div><div class="label">Total dice/ring takes</div></div>' +
+        '<div class="metric"><div class="num">' + totals.wins + '</div><div class="label">Total wins recorded</div></div>' +
+        '<div class="metric"><div class="num">' + Object.keys(state.data).length + '</div><div class="label">Progress keys preserved</div></div>' +
+        '</div>' +
+        '<div class="notice">Use the tabs above to edit grouped values. The Raw JSON tab can edit every stored key directly.</div>';
+    }
+
+    function renderRunOverview() {
+      if (!state.run) {
+        el.content.innerHTML = '<div class="empty">Load a `run_#.sav` file to edit the current run.</div>';
+        return;
+      }
+      var general = state.run.general || {};
+      var currentBoss = Array.isArray(general.boss) ? general.boss.map(function (entry) {
+        return entry && entry.ide ? prettyName(entry.ide) : null;
+      }).filter(Boolean).join(", ") : "";
+      el.content.innerHTML =
+        '<div class="overview">' +
+        metric("State", state.run.state || "unknown", "Current run screen/state") +
+        metric("Character", general.char || "unknown", "Active hand") +
+        metric("Floor", formatNumber(general.flor || 0) + "-" + formatNumber(general.flor_local_level || 0), "Run floor and local level") +
+        metric("Score", formatNumber(general.total_score || 0), "Total score") +
+        metric("Rolls", formatNumber(general.rolls || 0) + "/" + formatNumber(general.rolls_max || 0), "Current roll count") +
+        metric("Dice", (state.run.dice || []).length, "Current dice pool") +
+        metric("Rings", (state.run.rings || []).length + "/" + formatNumber(general.maxrings || 0), "Equipped rings") +
+        metric("Deck", (state.run.deck || []).length, "Cards or stored dice in deck") +
+        '</div>' +
+        '<div class="notice">Current boss choices: ' + escapeHtml(currentBoss || "none") + '. Use Run Stats for scalar values and the run list tabs for nested item arrays.</div>';
+    }
+
+    function metric(label, value, note) {
+      return '<div class="metric"><div class="num">' + escapeHtml(value) + '</div><div class="label">' + escapeHtml(label) + '<br>' + escapeHtml(note) + '</div></div>';
+    }
+
+    function renderRunGeneral() {
+      if (!state.run) {
+        el.content.innerHTML = '<div class="empty">Load a `run_#.sav` file to edit run stats.</div>';
+        return;
+      }
+      var rows = [];
+      Object.keys(state.run).forEach(function (key) {
+        if (isScalar(state.run[key])) rows.push({ path: key, label: key, value: state.run[key] });
+      });
+      Object.keys(state.run.general || {}).forEach(function (key) {
+        if (isScalar(state.run.general[key])) rows.push({ path: "general." + key, label: "general." + key, value: state.run.general[key] });
+      });
+      rows = rows.filter(function (row) {
+        if (state.search && row.label.toLowerCase().indexOf(state.search) === -1) return false;
+        if (state.changedFilter === "changed" && !runPathChanged(row.path)) return false;
+        return true;
+      });
+      var html = '<div class="settings-grid">';
+      rows.forEach(function (row) {
+        html += '<div class="setting"><div><label>' + escapeHtml(labelForSetting(row.label)) + '</label><small>' + escapeHtml(row.path) + '</small></div><div>' + renderRunScalarControl(row.path, row.value) + '</div></div>';
+      });
+      html += '</div>';
+      el.content.innerHTML = rows.length ? html : '<div class="empty">No matching run stats.</div>';
+      bindRunInputs();
+    }
+
+    function renderRunList(group) {
+      if (!state.run) {
+        el.content.innerHTML = '<div class="empty">Load a `run_#.sav` file to edit ' + escapeHtml(group.label.toLowerCase()) + '.</div>';
+        return;
+      }
+      var list = getRunPath(group.runPath);
+      if (!Array.isArray(list)) {
+        el.content.innerHTML = '<div class="empty">`' + escapeHtml(group.runPath) + '` is not an array in this run file.</div>';
+        return;
+      }
+      var rows = list.map(function (item, index) {
+        return { item: item, index: index, changed: runPathChanged(group.runPath + "." + index) };
+      }).filter(function (row) {
+        var item = row.item || {};
+        var hay = (item.ide || "") + " " + (item.elem_type || "") + " " + (item.status || "") + " " + (item.faces_desc || "");
+        if (state.search && hay.toLowerCase().indexOf(state.search) === -1) return false;
+        if (state.stateFilter && String(item.status) !== state.stateFilter) return false;
+        if (state.changedFilter === "changed" && !row.changed) return false;
+        return true;
+      });
+      var bulk = '<div class="bulk"><span>' + rows.length + ' shown / ' + list.length + ' total</span>' +
+        '<button class="btn" data-run-bulk-state="seen">Mark shown seen</button>' +
+        '<button class="btn" data-run-bulk-state="unseen">Mark shown unseen</button>' +
+        '<button class="btn" data-run-bulk-state="locked">Mark shown locked</button>' +
+        '</div>';
+      if (!rows.length) {
+        el.content.innerHTML = bulk + '<div class="empty">No matching run entries.</div>';
+        bindRunBulk(group, rows);
+        return;
+      }
+      var html = bulk + '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Status</th><th>Num</th><th>Priority</th><th>Times Rolled</th><th>Extra</th><th>Charges</th><th>Enchant</th><th>Hidden</th><th>Faces / Tags</th></tr></thead><tbody>';
+      rows.forEach(function (row) {
+        var item = row.item || {};
+        var base = group.runPath + "." + row.index;
+        html += '<tr class="' + (row.changed ? 'changed' : '') + '"><td class="name">' + escapeHtml(prettyName(item.ide || ("entry " + row.index))) + '<small>' + escapeHtml(base) + '</small></td>';
+        html += '<td>' + renderRunScalarControl(base + ".status", item.status) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".num", item.num) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".prio", item.prio) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".times_rolled", item.times_rolled) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".extra_value", item.extra_value) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".charges", item.charges) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".enchant.ide", item.enchant && item.enchant.ide) + '</td>';
+        html += '<td>' + renderRunScalarControl(base + ".hidden", item.hidden) + '</td>';
+        html += '<td><small>' + escapeHtml(item.faces_desc || "") + '<br>' + escapeHtml(Array.isArray(item.tag) ? item.tag.join(", ") : "") + '</small></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.content.innerHTML = html;
+      bindRunInputs();
+      bindRunBulk(group, rows);
+    }
+
+    function summarizeNumbers() {
+      var out = { rolls: 0, takes: 0, wins: 0 };
+      Object.keys(state.data || {}).forEach(function (key) {
+        var val = Number(state.data[key]) || 0;
+        if (/_rolls$/.test(key)) out.rolls += val;
+        if (/_takes$/.test(key)) out.takes += val;
+        if (/_wins$/.test(key)) out.wins += val;
+      });
+      return out;
+    }
+
+    function collectItems(prefix) {
+      var data = state.data || {};
+      var items = {};
+      Object.keys(data).forEach(function (key) {
+        if (key.indexOf(prefix + "_") !== 0) return;
+        var rest = key.slice(prefix.length + 1);
+        var field = "state";
+        var id = rest;
+        var known = ["takes", "rolls", "wins", "loses", "debts", "bosses", "bossrush", "finalboss", "score", "vortexlevel", "uses", "plus"];
+        for (var i = 0; i < known.length; i++) {
+          var suffix = "_" + known[i];
+          if (rest.endsWith(suffix)) {
+            id = rest.slice(0, -suffix.length);
+            field = known[i];
+            break;
+          }
+        }
+        var mark = rest.match(/^(.*)_(completionmarks_.+)$/);
+        if (mark) {
+          id = mark[1];
+          field = mark[2];
+        }
+        if (!items[id]) items[id] = { id: id, fields: {} };
+        items[id].fields[field] = key;
+      });
+      return Object.keys(items).map(function (id) {
+        var item = items[id];
+        item.state = data[item.fields.state];
+        item.changed = Object.keys(item.fields).some(function (field) {
+          return isChanged(item.fields[field], data, state.originalData);
+        });
+        return item;
+      });
+    }
+
+    function renderGroup(group) {
+      if (!state.data) {
+        el.content.innerHTML = '<div class="empty">Load a `data_#.sav` file to edit ' + escapeHtml(group.label.toLowerCase()) + '.</div>';
+        return;
+      }
+      var items = collectItems(group.id).filter(filterItem);
+      var allItems = collectItems(group.id);
+      var columns = getColumns(allItems);
+      var stateColumn = columns.indexOf("state") !== -1;
+      var textStateColumn = stateColumn && allItems.some(function (item) {
+        return item.fields.state && typeof state.data[item.fields.state] === "string";
+      });
+      var bulk = '<div class="bulk">' +
+        '<span>' + items.length + ' shown / ' + allItems.length + ' total</span>' +
+        (textStateColumn ? '<button class="btn" data-bulk-state="seen">Mark shown seen</button><button class="btn" data-bulk-state="unseen">Mark shown unseen</button><button class="btn" data-bulk-state="locked">Mark shown locked</button>' : '') +
+        '<button class="btn" data-zero-shown="1">Zero shown stats</button>' +
+        '</div>';
+      if (!items.length) {
+        el.content.innerHTML = bulk + '<div class="empty">No matching entries.</div>';
+        bindBulk(group, items, columns);
+        return;
+      }
+      var html = bulk + '<div class="table-wrap"><table><thead><tr><th>Name</th>';
+      columns.forEach(function (column) { html += '<th>' + labelForField(column) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      items.forEach(function (item) {
+        html += '<tr class="' + (item.changed ? 'changed' : '') + '"><td class="name">' + escapeHtml(prettyName(item.id)) + '<small>' + escapeHtml(group.id + "_" + item.id) + '</small></td>';
+        columns.forEach(function (field) {
+          var key = item.fields[field];
+          html += '<td>' + renderValueControl(key, field, state.data[key]) + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      el.content.innerHTML = html;
+      bindDataInputs();
+      bindBulk(group, items, columns);
+    }
+
+    function filterItem(item) {
+      if (state.search) {
+        var hay = (item.id + " " + prettyName(item.id) + " " + Object.keys(item.fields).join(" ")).toLowerCase();
+        if (hay.indexOf(state.search) === -1) return false;
+      }
+      if (state.stateFilter && String(item.state) !== state.stateFilter) return false;
+      if (state.changedFilter === "changed" && !item.changed) return false;
+      return true;
+    }
+
+    function getColumns(items) {
+      var preferred = ["state", "takes", "rolls", "uses", "wins", "loses", "debts", "bosses", "bossrush", "finalboss", "score", "vortexlevel", "plus", "completionmarks_face3", "completionmarks_face6", "completionmarks_bossrush"];
+      var found = {};
+      items.forEach(function (item) {
+        Object.keys(item.fields).forEach(function (field) { found[field] = true; });
+      });
+      var columns = preferred.filter(function (field) { return found[field]; });
+      Object.keys(found).sort().forEach(function (field) {
+        if (columns.indexOf(field) === -1) columns.push(field);
+      });
+      return columns;
+    }
+
+    function renderValueControl(key, field, value) {
+      if (!key) return "";
+      var type = typeof value;
+      var changed = isChanged(key, state.data, state.originalData) ? " data-changed='1'" : "";
+      if (field === "state" && type === "string") {
+        var options = ["locked", "unseen", "seen", "unlocked"];
+        var html = '<select class="mini data-input" data-key="' + escapeAttr(key) + '"' + changed + '>';
+        if (options.indexOf(value) === -1) html += '<option selected value="' + escapeAttr(value) + '">' + escapeHtml(value) + '</option>';
+        options.forEach(function (option) {
+          html += '<option value="' + option + '"' + (value === option ? " selected" : "") + '>' + option + '</option>';
+        });
+        return html + '</select>';
+      }
+      if (type === "number") {
+        return '<input class="mini num-input data-input" type="number" step="1" data-number="1" data-key="' + escapeAttr(key) + '" value="' + escapeAttr(formatNumber(value)) + '"' + changed + '>';
+      }
+      if (type === "boolean") {
+        return '<div class="check-cell"><input class="data-input" type="checkbox" data-bool="1" data-key="' + escapeAttr(key) + '"' + (value ? " checked" : "") + changed + '></div>';
+      }
+      return '<input class="mini data-input" data-key="' + escapeAttr(key) + '" value="' + escapeAttr(String(value)) + '"' + changed + '>';
+    }
+
+    function bindDataInputs() {
+      Array.prototype.forEach.call(el.content.querySelectorAll(".data-input"), function (input) {
+        input.addEventListener("change", function () {
+          var key = input.getAttribute("data-key");
+          if (input.hasAttribute("data-bool")) state.data[key] = input.checked;
+          else if (input.hasAttribute("data-number")) state.data[key] = parseNumber(input.value);
+          else state.data[key] = input.value;
+          render();
+        });
+      });
+    }
+
+    function bindBulk(group, items, columns) {
+      Array.prototype.forEach.call(el.content.querySelectorAll("[data-bulk-state]"), function (btn) {
+        btn.addEventListener("click", function () {
+          var value = btn.getAttribute("data-bulk-state");
+          items.forEach(function (item) {
+            if (item.fields.state && typeof state.data[item.fields.state] === "string") state.data[item.fields.state] = value;
+          });
+          render();
+        });
+      });
+      var zero = el.content.querySelector("[data-zero-shown]");
+      if (zero) {
+        zero.addEventListener("click", function () {
+          items.forEach(function (item) {
+            columns.forEach(function (field) {
+              if (field !== "state" && item.fields[field] && typeof state.data[item.fields[field]] === "number") {
+                state.data[item.fields[field]] = 0;
+              }
+            });
+          });
+          render();
+        });
+      }
+    }
+
+    function renderRunScalarControl(path, value) {
+      if (value === undefined) return "";
+      if (path.endsWith(".enchant.ide")) {
+        var enchantHtml = '<select class="mini run-input" data-path="' + escapeAttr(path) + '">';
+        var knownEnchant = ENCHANT_OPTIONS.some(function (option) { return option.id === value; });
+        if (!knownEnchant && value !== undefined && value !== "") {
+          enchantHtml += '<option selected value="' + escapeAttr(value) + '">' + escapeHtml(value) + '</option>';
+        }
+        ENCHANT_OPTIONS.forEach(function (option) {
+          enchantHtml += '<option value="' + escapeAttr(option.id) + '"' + (value === option.id ? " selected" : "") + '>' + escapeHtml(option.label) + '</option>';
+        });
+        return enchantHtml + '</select>';
+      }
+      if (typeof value === "string" && path.endsWith(".status")) {
+        var options = ["locked", "unseen", "seen", "new", "unlocked"];
+        var html = '<select class="mini run-input" data-path="' + escapeAttr(path) + '">';
+        if (options.indexOf(value) === -1) html += '<option selected value="' + escapeAttr(value) + '">' + escapeHtml(value) + '</option>';
+        options.forEach(function (option) {
+          html += '<option value="' + option + '"' + (value === option ? " selected" : "") + '>' + option + '</option>';
+        });
+        return html + '</select>';
+      }
+      if (typeof value === "boolean") {
+        return '<div class="check-cell"><input class="run-input" type="checkbox" data-bool="1" data-path="' + escapeAttr(path) + '"' + (value ? " checked" : "") + '></div>';
+      }
+      if (typeof value === "number") {
+        return '<input class="mini num-input run-input" type="number" step="any" data-number="1" data-path="' + escapeAttr(path) + '" value="' + escapeAttr(formatNumber(value)) + '">';
+      }
+      return '<input class="mini run-input" data-path="' + escapeAttr(path) + '" value="' + escapeAttr(String(value)) + '">';
+    }
+
+    function bindRunInputs() {
+      Array.prototype.forEach.call(el.content.querySelectorAll(".run-input"), function (input) {
+        input.addEventListener("change", function () {
+          var path = input.getAttribute("data-path");
+          var value = input.value;
+          if (input.hasAttribute("data-bool")) value = input.checked;
+          else if (input.hasAttribute("data-number")) value = parseNumber(input.value);
+          setRunPath(path, value);
+          render();
+        });
+      });
+    }
+
+    function bindRunBulk(group, rows) {
+      Array.prototype.forEach.call(el.content.querySelectorAll("[data-run-bulk-state]"), function (btn) {
+        btn.addEventListener("click", function () {
+          var value = btn.getAttribute("data-run-bulk-state");
+          rows.forEach(function (row) {
+            var path = group.runPath + "." + row.index + ".status";
+            if (typeof getRunPath(path) === "string") setRunPath(path, value);
+          });
+          render();
+        });
+      });
+    }
+
+    function isScalar(value) {
+      return value === null || ["string", "number", "boolean"].indexOf(typeof value) !== -1;
+    }
+
+    function getRunPath(path, source) {
+      var target = source || state.run;
+      if (!target) return undefined;
+      var parts = path.split(".");
+      for (var i = 0; i < parts.length; i++) {
+        if (target === undefined || target === null) return undefined;
+        var key = arrayIndexOrKey(parts[i]);
+        target = target[key];
+      }
+      return target;
+    }
+
+    function setRunPath(path, value) {
+      var target = state.run;
+      var parts = path.split(".");
+      for (var i = 0; i < parts.length - 1; i++) {
+        if (target === undefined || target === null) return;
+        target = target[arrayIndexOrKey(parts[i])];
+      }
+      if (target !== undefined && target !== null) target[arrayIndexOrKey(parts[parts.length - 1])] = value;
+    }
+
+    function runPathChanged(path) {
+      return JSON.stringify(getRunPath(path, state.run)) !== JSON.stringify(getRunPath(path, state.originalRun));
+    }
+
+    function arrayIndexOrKey(part) {
+      return /^\d+$/.test(part) ? Number(part) : part;
+    }
+
+    function renderSettings() {
+      if (!state.config) {
+        el.content.innerHTML = '<div class="empty">Load a `config_#.sav` file to edit game settings.</div>';
+        return;
+      }
+      var keys = Object.keys(state.config).filter(function (key) {
+        if (!state.search) return true;
+        return (key + " " + (CONFIG_HINTS[key] || "")).toLowerCase().indexOf(state.search) !== -1;
+      }).filter(function (key) {
+        return state.changedFilter !== "changed" || isChanged(key, state.config, state.originalConfig);
+      });
+      var html = '<div class="settings-grid">';
+      keys.forEach(function (key) {
+        html += '<div class="setting"><div><label>' + escapeHtml(labelForSetting(key)) + '</label><small>' + escapeHtml(key) + (CONFIG_HINTS[key] ? " · " + escapeHtml(CONFIG_HINTS[key]) : "") + '</small></div><div>' + renderConfigControl(key, state.config[key]) + '</div></div>';
+      });
+      html += '</div>';
+      el.content.innerHTML = keys.length ? html : '<div class="empty">No matching settings.</div>';
+      bindConfigInputs();
+    }
+
+    function renderConfigControl(key, value) {
+      if (key === "debug_com") {
+        return '<input class="config-input" type="checkbox" data-bool="1" data-key="' + escapeAttr(key) + '"' + (isTruthyConfigFlag(value) ? " checked" : "") + '>';
+      }
+      if (typeof value === "boolean") {
+        return '<input class="config-input" type="checkbox" data-bool="1" data-key="' + escapeAttr(key) + '"' + (value ? " checked" : "") + '>';
+      }
+      if (typeof value === "number") {
+        return '<input class="mini config-input" type="number" step="any" data-number="1" data-key="' + escapeAttr(key) + '" value="' + escapeAttr(formatNumber(value)) + '">';
+      }
+      return '<input class="mini config-input" data-key="' + escapeAttr(key) + '" value="' + escapeAttr(String(value)) + '">';
+    }
+
+    function bindConfigInputs() {
+      Array.prototype.forEach.call(el.content.querySelectorAll(".config-input"), function (input) {
+        input.addEventListener("change", function () {
+          var key = input.getAttribute("data-key");
+          if (input.hasAttribute("data-bool")) state.config[key] = input.checked;
+          else if (input.hasAttribute("data-number")) state.config[key] = parseNumber(input.value);
+          else state.config[key] = input.value;
+          if (key === "version") warnIfConfigIsNewer(state.config);
+          render();
+        });
+      });
+    }
+
+    function renderRaw() {
+      var hasData = !!state.data;
+      var hasRun = !!state.run;
+      var hasConfig = !!state.config;
+      if (!hasData && !hasRun && !hasConfig) {
+        el.content.innerHTML = '<div class="empty">Load a save file to edit raw JSON.</div>';
+        return;
+      }
+      if (state.rawTarget === "data" && !hasData) state.rawTarget = "config";
+      if (state.rawTarget === "run" && !hasRun) state.rawTarget = hasData ? "data" : "config";
+      if (state.rawTarget === "config" && !hasConfig) state.rawTarget = "data";
+      if (state.rawTarget === "data" && !hasData) state.rawTarget = hasRun ? "run" : "config";
+      var target = state.rawTarget === "config" ? state.config : (state.rawTarget === "run" ? state.run : state.data);
+      el.content.innerHTML =
+        '<div class="raw-actions">' +
+        '<select id="rawTarget" class="mini" style="max-width:220px">' +
+        (hasData ? '<option value="data"' + (state.rawTarget === "data" ? " selected" : "") + '>Progress data</option>' : '') +
+        (hasRun ? '<option value="run"' + (state.rawTarget === "run" ? " selected" : "") + '>Current run</option>' : '') +
+        (hasConfig ? '<option value="config"' + (state.rawTarget === "config" ? " selected" : "") + '>Settings config</option>' : '') +
+        '</select>' +
+        '<button class="btn primary" id="applyRawBtn">Apply raw JSON</button>' +
+        '</div>' +
+        '<textarea id="rawText" spellcheck="false">' + escapeHtml(JSON.stringify(target, null, 2)) + '</textarea>';
+      document.getElementById("rawTarget").addEventListener("change", function (event) {
+        state.rawTarget = event.target.value;
+        render();
+      });
+      document.getElementById("applyRawBtn").addEventListener("click", function () {
+        try {
+          var parsed = JSON.parse(document.getElementById("rawText").value);
+          if (state.rawTarget === "config") {
+            state.config = parsed;
+            warnIfConfigIsNewer(state.config);
+          }
+          else if (state.rawTarget === "run") state.run = parsed;
+          else state.data = parsed;
+          toast("Raw JSON applied.");
+          render();
+        } catch (err) {
+          toast("Raw JSON error: " + err.message);
+        }
+      });
+    }
+
+    async function saveData() {
+      if (!state.data) return;
+      try {
+        var json = JSON.stringify(state.data);
+        var bytes = await deflateText(json);
+        var name = state.dataName || "data_1.sav";
+        downloadBytes(bytes, name, "application/octet-stream");
+        state.originalData = clone(state.data);
+        updateChrome();
+        setStatus("Downloaded edited " + name + ".", "ok");
+      } catch (err) {
+        setStatus("Could not save data file: " + err.message, "bad");
+      }
+    }
+
+    async function saveRun() {
+      if (!state.run) return;
+      try {
+        var json = JSON.stringify(state.run);
+        var bytes = await deflateText(json);
+        var name = state.runName || "run_1.sav";
+        downloadBytes(bytes, name, "application/octet-stream");
+        state.originalRun = clone(state.run);
+        updateChrome();
+        setStatus("Downloaded edited " + name + ".", "ok");
+      } catch (err) {
+        setStatus("Could not save run file: " + err.message, "bad");
+      }
+    }
+
+    function saveConfig() {
+      if (!state.config) return;
+      var json = JSON.stringify(state.config, null, 2);
+      var name = state.configName || "config_1.sav";
+      downloadBytes(new TextEncoder().encode(json), name, "application/json");
+      state.originalConfig = clone(state.config);
+      updateChrome();
+      setStatus("Downloaded edited " + name + ".", "ok");
+    }
+
+    function downloadBytes(bytes, name, type) {
+      var blob = new Blob([bytes], { type: type });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+
+    function resetEdits() {
+      if (state.originalData) state.data = clone(state.originalData);
+      if (state.originalRun) state.run = clone(state.originalRun);
+      if (state.originalConfig) state.config = clone(state.originalConfig);
+      setStatus("Edits reset to the last loaded/downloaded state.", "ok");
+      render();
+    }
+
+    function clearLoadedFiles() {
+      var dirty = countDirty();
+      var message = dirty
+        ? "Clear all loaded files and discard " + dirty + " unsaved modified field(s)?"
+        : "Clear all loaded files from the editor?";
+      if (!window.confirm(message)) return;
+      state.data = null;
+      state.run = null;
+      state.config = null;
+      state.originalData = null;
+      state.originalRun = null;
+      state.originalConfig = null;
+      state.dataName = "";
+      state.runName = "";
+      state.configName = "";
+      state.warnedConfigVersion = "";
+      state.debugWarning = "";
+      state.versionWarning = "";
+      state.profileWarning = "";
+      state.rawTarget = "data";
+      state.activeTab = "overview";
+      state.search = "";
+      state.stateFilter = "";
+      state.changedFilter = "";
+      el.fileInput.value = "";
+      el.searchBox.value = "";
+      el.stateFilter.value = "";
+      el.changedFilter.value = "";
+      setFilePanelOpen(true);
+      renderTabs();
+      setStatus("Loaded files cleared.", "ok");
+      render();
+    }
+
+    function isChanged(key, current, original) {
+      if (!current || !original || !(key in current)) return false;
+      return JSON.stringify(current[key]) !== JSON.stringify(original[key]);
+    }
+
+    function labelForField(field) {
+      if (field === "state") return "State";
+      if (field.indexOf("completionmarks_") === 0) return "Mark " + field.replace("completionmarks_", "");
+      return field.replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function labelForSetting(key) {
+      if (key === "debug_com") return "Debug Mode Enabled & Achievements Disabled";
+      return key.replace(/^bgfav_/, "Background favorite ").replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function prettyName(id) {
+      return id.replace(/_/g, " ").replace(/([a-z])([0-9])/g, "$1 $2").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function formatNumber(value) {
+      if (!Number.isFinite(value)) return "0";
+      return String(value);
+    }
+
+    function parseNumber(value) {
+      var n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function setStatus(message, kind) {
+      el.status.textContent = message;
+      el.status.className = "status " + (kind || "");
+    }
+
+    function toast(message) {
+      el.toast.textContent = message;
+      el.toast.classList.remove("hidden");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(function () { el.toast.classList.add("hidden"); }, 3800);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function (ch) {
+        return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
+      });
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  }());
+  </script>
+</body>
+</html>
