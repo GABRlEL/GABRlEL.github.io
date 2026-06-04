@@ -65,3 +65,7 @@
 [Retro Rewind VR Calculator](https://gabrlel.github.io/rrvrcalc.html)
 
 [main.tweaks - Expansive main.dol patcher](https://gabrlel.github.io/main.html)
+
+[SSX 3 Save File Editor (Beta, focused on Gamecube version)](https://gabrlel.github.io/ssx3editor.html)
+
+[Dice A Million Save File Editor (Beta, focused on Steam version)](https://gabrlel.github.io/damsave.html)
