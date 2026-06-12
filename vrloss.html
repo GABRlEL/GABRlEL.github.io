@@ -488,7 +488,8 @@ function clamp(value, min, max) {
         return { status: "error", message: "fetch() not available in this browser." };
       }
 
-      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(fcDigits);
+      const prettyFc = formatFriendCodePretty(fcDigits);
+      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(prettyFc);
       try {
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
         if (!res.ok) {
@@ -518,7 +519,8 @@ function clamp(value, min, max) {
     let nameLookupBusy = false;
 
     function runNameLookup(fcDigits, cb) {
-      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(fcDigits);
+      const prettyFc = formatFriendCodePretty(fcDigits);
+      const url = "https://rwfc.net/api/leaderboard/player/" + encodeURIComponent(prettyFc);
       return fetch(url)
         .then((res) => {
           if (!res.ok) {
@@ -998,46 +1000,29 @@ function updateDerived(tr) {
           const active = !!activeCheckbox.checked;
 
 // PID: clamp to 0 .. 1,000,000,000 (and still fit in s32)
-let profileId = parseInt(profileInput.value, 10);
-if (!Number.isFinite(profileId)) profileId = 0;
-profileId = Math.round(clamp(profileId, 0, 1000000000));
+          let pid = parseInt(profileInput.value, 10) || 0;
+          pid = clamp(pid, 0, 1000000000);
 
-let vrEffective = parseFloat(vrInput.value.replace(",", "."));
-if (!Number.isFinite(vrEffective)) vrEffective = 0;
-vrEffective = clamp(vrEffective, -1000000, 1000000);
-vrEffective = Math.round(vrEffective);
-let vr = vrEffective / 100;
-vr = clamp(vr, -10000, 10000);
+// VR: store as float, but clamped to ±10,000
+          let vrEff = parseFloat(vrInput.value.replace(",", "."));
+          if (!Number.isFinite(vrEff)) vrEff = 0;
+          vrEff = clamp(vrEff, -1000000, 1000000);
+          const vr = vrEff / 100;
 
-let brEffective = parseFloat(brInput.value.replace(",", "."));
-if (!Number.isFinite(brEffective)) brEffective = 0;
-brEffective = clamp(brEffective, -1000000, 1000000);
-brEffective = Math.round(brEffective);
-let br = brEffective / 100;
-br = clamp(br, -10000, 10000);
+// BR: same as VR
+          let brEff = parseFloat(brInput.value.replace(",", "."));
+          if (!Number.isFinite(brEff)) brEff = 0;
+          brEff = clamp(brEff, -1000000, 1000000);
+          const br = brEff / 100;
 
-
-          let flagsText = (flagsInput.value || "").trim();
-          if (/^0x/i.test(flagsText)) {
-            flagsText = flagsText.slice(2);
-          }
-          let flags = parseInt(flagsText, 16);
-          if (!Number.isFinite(flags)) flags = 0;
-          flags >>>= 0;
-
-          // Bit 0 indicates "hasData"
-          if (active && profileId > 0) {
-            flags |= 0x1;
-          } else {
-            flags &= ~0x1;
-          }
+          let flags = parseInt((flagsInput.value || "").slice(2), 16) || 0;
+          flags = flags >>> 0; // ensure unsigned
 
           entries.push({
-            index: idx,
-            profileId: profileId,
+            profileId: pid,
             vr: vr,
             br: br,
-            flags: flags >>> 0
+            flags: flags
           });
         });
         return entries;
@@ -1045,141 +1030,126 @@ br = clamp(br, -10000, 10000);
 
       function buildBufferFromUI() {
         const entries = collectEntriesFromTable();
+        if (!entries.length) return null;
 
-        const count = Math.min(state.count || entries.length, entries.length);
-        const totalEntries = count;
-
-        const byteLength = 8 + totalEntries * 16;
-        const buffer = new ArrayBuffer(byteLength);
+        const count = entries.length;
+        const buffer = new ArrayBuffer(8 + count * 16);
         const view = new DataView(buffer);
 
-        // Magic "RRRT"
-        const magic = state.magic || "RRRT";
-        view.setUint8(0, magic.charCodeAt(0) || "R".charCodeAt(0));
-        view.setUint8(1, magic.charCodeAt(1) || "R".charCodeAt(0));
-        view.setUint8(2, magic.charCodeAt(2) || "R".charCodeAt(0));
-        view.setUint8(3, magic.charCodeAt(3) || "T".charCodeAt(0));
+        // Header
+        let pos = 0;
+        view.setUint8(pos++, "R".charCodeAt(0));
+        view.setUint8(pos++, "R".charCodeAt(0));
+        view.setUint8(pos++, "R".charCodeAt(0));
+        view.setUint8(pos++, "T".charCodeAt(0));
+        view.setUint16(pos, state.version || 0, false);
+        pos += 2;
+        view.setUint16(pos, count, false);
+        pos += 2;
 
-        const version = typeof state.version === "number" ? state.version : 1;
-        view.setUint16(4, version & 0xffff, false); // big-endian
-        view.setUint16(6, totalEntries & 0xffff, false);
-
-        for (let i = 0; i < totalEntries; i++) {
-          const e = entries[i];
-          const base = 8 + i * 16;
-          view.setInt32(base, e.profileId | 0, false);
-          view.setFloat32(base + 4, e.vr, false);
-          view.setFloat32(base + 8, e.br, false);
-          view.setUint32(base + 12, e.flags >>> 0, false);
-        }
+        // Entries
+        entries.forEach((e) => {
+          view.setInt32(pos, e.profileId, false);
+          pos += 4;
+          view.setFloat32(pos, e.vr, false);
+          pos += 4;
+          view.setFloat32(pos, e.br, false);
+          pos += 4;
+          view.setUint32(pos, e.flags >>> 0, false);
+          pos += 4;
+        });
 
         return buffer;
       }
 
-      function downloadBuffer(buffer, suggestedName) {
+      function downloadBuffer(buffer, filename) {
         const blob = new Blob([buffer], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
-
         const a = document.createElement("a");
         a.href = url;
-        a.download = suggestedName || "RRRating.pul";
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-
         URL.revokeObjectURL(url);
       }
 
-      function updateSummary() {
-        if (!state.entries || !state.entries.length) {
-          fileSummary.textContent = "No entries parsed.";
-          return;
-        }
-
-        const activeCount = state.entries.filter(isEntryActive).length;
-        const total = state.entries.length;
-
-        const magic = state.magic || "RRRT";
-        const version = state.version != null ? state.version : "?";
-        const count = state.count != null ? state.count : total;
-
-        let statusClass = "status-ok";
-        let statusText = "OK";
-
-        if (magic !== "RRRT") {
-          statusClass = "status-warn";
-          statusText = "Magic != RRRT (unexpected)";
-        } else if (version !== 1) {
-          statusClass = "status-warn";
-          statusText = "Version != 1";
-        }
-
-        fileSummary.innerHTML =
-          `<span class="${statusClass}">Status: ${statusText}</span>` +
-          `<span class="badge">magic: <span class="mono">${magic}</span></span>` +
-          `<span class="badge">version: <span class="mono">${version}</span></span>` +
-          `<span class="badge">header count: <span class="mono">${count}</span></span>` +
-          `<span class="badge">parsed entries: <span class="mono">${total}</span></span>` +
-          `<span class="badge">active entries: <span class="mono">${activeCount}</span></span>`;
-      }
-
       function addOrReuseSlot() {
+        // Find an empty slot or add a new entry
         const rows = entriesBody.querySelectorAll("tr");
-        if (!rows.length) return;
-
-        // First try to reuse an inactive + empty slot
-        for (const tr of rows) {
-          const activeCheckbox = tr.querySelector(".active-checkbox");
+        let emptyIndex = -1;
+        rows.forEach((tr, idx) => {
           const profileInput = tr.querySelector(".profile-id-input");
-          const flagsInput = tr.querySelector(".flags-input");
+          const pid = parseInt(profileInput.value, 10) || 0;
+          if (pid === 0 && emptyIndex === -1) {
+            emptyIndex = idx;
+          }
+        });
 
-          const active = !!activeCheckbox.checked;
-          const profileId = parseInt(profileInput.value, 10) || 0;
-          const flagsText = (flagsInput.value || "").trim();
-          const flagsVal = parseInt(flagsText.replace(/^0x/i, ""), 16) || 0;
+        if (emptyIndex !== -1) {
+          // Activate an empty slot
+          const row = rows[emptyIndex];
+          const activeCheckbox = row.querySelector(".active-checkbox");
+          const selCheckbox = row.querySelector(".row-select");
+          activeCheckbox.checked = true;
+          selCheckbox.checked = true;
+          toggleRowValidity(row);
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          // Add a new entry
+          const newEntry = {
+            index: state.entries.length,
+            profileId: 0,
+            vr: 0,
+            br: 0,
+            flags: 0
+          };
+          state.entries.push(newEntry);
+          renderTable();
+          updateSummary();
 
-          if (!active && profileId === 0 && flagsVal === 0) {
+          const rows = entriesBody.querySelectorAll("tr");
+          const lastRow = rows[rows.length - 1];
+          if (lastRow) {
+            const activeCheckbox = lastRow.querySelector(".active-checkbox");
+            const selCheckbox = lastRow.querySelector(".row-select");
             activeCheckbox.checked = true;
-            profileInput.focus();
-            toggleRowValidity(tr);
-            return;
+            selCheckbox.checked = true;
+            toggleRowValidity(lastRow);
+            lastRow.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         }
-
-        alert("No completely empty slot available to reuse (all " + rows.length + " slots are used).");
       }
 
       function clearSelectedRows() {
         const rows = entriesBody.querySelectorAll("tr");
-        let cleared = 0;
-
-        rows.forEach(tr => {
+        rows.forEach((tr) => {
           const selCheckbox = tr.querySelector(".row-select");
-          if (!selCheckbox || !selCheckbox.checked) return;
+          if (selCheckbox && selCheckbox.checked) {
+            const profileInput = tr.querySelector(".profile-id-input");
+            const vrInput = tr.querySelector(".vr-effective-input");
+            const brInput = tr.querySelector(".br-effective-input");
+            const activeCheckbox = tr.querySelector(".active-checkbox");
 
-          const activeCheckbox = tr.querySelector(".active-checkbox");
-          const profileInput = tr.querySelector(".profile-id-input");
-          const vrInput = tr.querySelector(".vr-effective-input");
-          const brInput = tr.querySelector(".br-effective-input");
-          const flagsInput = tr.querySelector(".flags-input");
+            profileInput.value = "0";
+            vrInput.value = "0";
+            brInput.value = "0";
+            activeCheckbox.checked = false;
 
-          activeCheckbox.checked = false;
-          profileInput.value = "0";
-          vrInput.value = "0";
-          brInput.value = "0";
-          flagsInput.value = "0x00000000";
-          selCheckbox.checked = false;
+            toggleRowValidity(tr);
+            updateFriendInfoForRow(tr);
 
-          toggleRowValidity(tr);
-          cleared++;
+            selCheckbox.checked = false;
+          }
         });
+      }
 
-        if (cleared > 0) {
-          updateSummary();
-        }
+      function updateSummary() {
+        const count = state.entries ? state.entries.length : 0;
+        const active = state.entries ? state.entries.filter(e => isEntryActive(e)).length : 0;
+        fileSummary.textContent = `Loaded ${count} entries (${active} active).`;
       }
     })();
   </script>
 </body>
 </html>
-
