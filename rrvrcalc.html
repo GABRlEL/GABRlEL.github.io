@@ -4,9 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Retro Rewind VR Calculator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --ink: #0f1d1f;
@@ -29,7 +26,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
       color: var(--ink);
       background:
         radial-gradient(circle at 10% 20%, rgba(242, 158, 76, 0.25), transparent 55%),
@@ -183,7 +180,7 @@
       font-size: 14px;
       background: var(--panel-strong);
       color: var(--ink);
-      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-family: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
     }
 
     .field input[type="number"].invalid {
@@ -268,7 +265,7 @@
       font-size: 18px;
       color: var(--ink);
       letter-spacing: 0.12em;
-      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-family: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
     }
 
     .hint {
@@ -311,7 +308,7 @@
       background: var(--panel-strong);
       color: var(--ink);
       caret-color: var(--ink);
-      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-family: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
       font-size: 12px;
     }
 
@@ -321,7 +318,7 @@
     }
 
     .num {
-      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-family: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
       letter-spacing: 0.08em;
     }
 
@@ -526,16 +523,14 @@
               EVENT DAY (2.0X)
             </span>
           </label>
-          <label class="field toggle">
-            <span>
-              <input id="itemRain" type="checkbox" />
-              SPECIAL MULTIPLIER (1.25X)
-            </span>
+          <label class="field">
+            <span>REMOTE MULTIPLIER</span>
+            <input id="remoteMultiplier" type="number" min="0" step="0.01" value="1" />
           </label>
           <label class="field toggle">
             <span>
               <input id="weekend" type="checkbox" />
-              WEEKEND MULTIPLIER (1.25X)
+              WEEKEND MULTIPLIER (1.5X)
             </span>
           </label>
           <label class="field toggle">
@@ -547,7 +542,7 @@
           <label class="field toggle">
             <span>
               <input id="betaBuild" type="checkbox" />
-              BETA BUILD (1.15X)
+              BETA BUILD (1.25X)
             </span>
           </label>
         </div>
@@ -565,7 +560,7 @@
             <strong id="totalMult" class="num">1.00</strong>
           </div>
         </div>
-        <div class="hint">MULTIPLIERS APPLY BEFORE CAPS AND VR RULES.</div>
+        <div class="hint">LOW-VR LOSS ADJUSTMENT APPLIES BEFORE MULTIPLIERS, CAPS, AND VR RULES.</div>
       </article>
 
       <article class="panel roster">
@@ -590,7 +585,7 @@
       <article class="panel trace">
         <details>
           <summary>CALC TRACE</summary>
-          <div class="hint">PAIR SUM -&gt; MULTIPLIER -&gt; CAPS -&gt; VR RULES -&gt; FINAL DELTA.</div>
+          <div class="hint">PAIR SUM -&gt; LOW-VR LOSS ADJUSTMENT -&gt; MULTIPLIER -&gt; CAPS -&gt; VR RULES -&gt; FINAL DELTA.</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -630,7 +625,7 @@
     const allDisconnectedInput = document.getElementById("allDisconnected");
 
     const eventDayInput = document.getElementById("eventDay");
-    const itemRainInput = document.getElementById("itemRain");
+    const remoteMultiplierInput = document.getElementById("remoteMultiplier");
     const weekendInput = document.getElementById("weekend");
     const battleBonusInput = document.getElementById("battleBonus");
     const betaBuildInput = document.getElementById("betaBuild");
@@ -710,10 +705,16 @@
     };
 
     const getLossCap = (rating) => {
-      if (rating <= 150.0) return -0.5;
       if (rating >= 500.0) return -2.09;
       const t = (rating - 150.0) / 350.0;
       return -0.5 + (-2.09 + 0.5) * t;
+    };
+
+    const getLowVrLossDivider = (rating) => {
+      if (rating >= 150.0) return 1.0;
+      if (rating <= 0.0) return 7.5;
+      const t = rating / 150.0;
+      return 7.5 - 6.5 * t;
     };
 
     const truncToCentis = (val) => Math.trunc(val * 100.0) / 100.0;
@@ -753,16 +754,17 @@
 
     const getMultiplier = (playerCount) => {
       let base = eventDayInput.checked ? 2.0 : 1.0;
-      if (itemRainInput.checked) base *= 1.25;
-      if (weekendInput.checked) base *= 1.25;
+      if (weekendInput.checked) base *= 1.5;
 
       const battleBonus = battleBonusInput.checked && playerCount > 5
         ? (playerCount - 5) * 0.166
         : 0.0;
 
+      const remoteRaw = parseFloat(remoteMultiplierInput.value);
+      const remoteMultiplier = Number.isFinite(remoteRaw) && remoteRaw >= 0.0 ? remoteRaw : 1.0;
       const total = betaBuildInput.checked
-        ? (base + battleBonus) * 1.15
-        : (base + battleBonus);
+        ? (base + battleBonus) * remoteMultiplier * 1.25
+        : (base + battleBonus) * remoteMultiplier;
 
       return { base, battleBonus, total };
     };
@@ -987,20 +989,30 @@
         const lossCap = getLossCap(oldRating);
         const gainCap = getGainCap(oldRating);
 
-        let delta = pairSums[i] * total;
+        let delta = pairSums[i];
+        let vrRule = "NONE";
+        let lowVrLossDivider = 1.0;
+        if (vrModeInput.checked && oldRating < 150.0 && delta < 0.0) {
+          lowVrLossDivider = getLowVrLossDivider(oldRating);
+          if (lowVrLossDivider > 1.0) {
+            delta /= lowVrLossDivider;
+            vrRule = `LOW VR LOSS /${fmt(lowVrLossDivider, 2)}`;
+          }
+        }
+
+        delta *= total;
         const afterMult = delta;
 
         delta = clamp(delta, lossCap, gainCap);
         const afterCaps = delta;
 
-        let vrRule = "NONE";
         if (vrModeInput.checked) {
           if (allDisconnectedInput.checked) {
             delta = playerCount >= 4 ? -0.01 : 0.0;
             vrRule = playerCount >= 4 ? "ALL DISC (-0.01)" : "ALL DISC (0.00)";
           } else if (delta >= -0.0101 && delta < 0.0) {
             delta = 0.0;
-            vrRule = "TINY NEG -> 0";
+            vrRule = vrRule === "NONE" ? "TINY NEG -> 0" : `${vrRule}, TINY NEG -> 0`;
           }
         }
 
@@ -1041,7 +1053,13 @@
           if (i === j) continue;
           const info = contribs[i][j];
           if (!info) continue;
-          const afterMultVal = info.value * total;
+          const oldRating = rows[i].vr;
+          let lowVrFactor = 1.0;
+          if (vrModeInput.checked && oldRating < 150.0 && pairSums[i] < 0.0) {
+            const divider = getLowVrLossDivider(oldRating);
+            if (divider > 1.0) lowVrFactor = 1.0 / divider;
+          }
+          const afterMultVal = info.value * lowVrFactor * total;
           sumRaw += info.value;
           sumMult += afterMultVal;
 
@@ -1102,7 +1120,7 @@
       vrModeInput,
       allDisconnectedInput,
       eventDayInput,
-      itemRainInput,
+      remoteMultiplierInput,
       weekendInput,
       battleBonusInput,
       betaBuildInput
