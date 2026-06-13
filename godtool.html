@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Godtool • v1.3</title>
+<title>Godtool • v1.3.1</title>
 <style>
   :root {
     --bg-main: #101014;
@@ -820,7 +820,7 @@ button.ghost-export-btn {
 <body>
 <header>
   <div class="row">
-    <span class="logo">Godtool (Web) • v1.3</span>
+    <span class="logo">Godtool (Web) • v1.3.1</span>
     <input type="file" id="fileInput" accept=".dat,.ikw,.rkp">
     <button id="downloadBtn" disabled>Download DAT</button>
     <span id="status">No file loaded</span>
@@ -1046,6 +1046,8 @@ const RULES_OFFSET_SP = 0x80;
 const RULES_OFFSET_MP = 0x84;
 const MII_NAME_OFFSET = 0x14;   // inside RKPD block
 const MII_NAME_LEN    = 0x14;   // 0x14 bytes = 10 UTF-16BE chars max
+const CACHED_LICENSE_MII_OFFSET = 0x5684;
+const CACHED_LICENSE_MII_LEN = 0x4A;
 const DWC_DATA_LEN    = 0x3C;
 const FRIEND_MAIN_OFFSET = 0x56D0;
 const FRIEND_SECONDARY_OFFSET = 0x8B50;
@@ -1939,6 +1941,26 @@ function reversedWordsCRC32(offset, length) {
   return crc32(tmp, 0, length);
 }
 
+function isAllZeroRange(offset, length) {
+  if (!content || offset < 0 || offset + length > content.length) return false;
+  for (let i = 0; i < length; i++) {
+    if (content[offset + i] !== 0) return false;
+  }
+  return true;
+}
+
+function computeDwcCrcWord(base) {
+  if (isAllZeroRange(base, DWC_DATA_LEN)) {
+    return 0x00000000;
+  }
+  return reversedWordsCRC32(base, DWC_DATA_LEN) >>> 0;
+}
+
+function writeDwcCrcWord(base) {
+  if (!content || !view || base + DWC_DATA_LEN + 4 > content.length) return;
+  view.setUint32(base + DWC_DATA_LEN, computeDwcCrcWord(base), false);
+}
+
 function computeGlobalCrc() {
   return crc32(content, 0, GLOBAL_CRC_OFFSET);
 }
@@ -2371,6 +2393,68 @@ function getLicenseMiiName(lic) {
 
   const name = chars.join("").trim();
   return name || null;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function bytesHaveData(bytes) {
+  if (!bytes || !bytes.length) return false;
+  for (const b of bytes) {
+    if (b !== 0) return true;
+  }
+  return false;
+}
+
+function getCachedLicenseMiiInfo(lic) {
+  if (!content || !view) {
+    return { present: false, name: "", crcStored: 0, crcComputed: 0, crcOk: false, data: null };
+  }
+
+  const base = (currentFileMode === "rkp" && lic === 0) ? 0 : licBase(lic);
+  const start = base + CACHED_LICENSE_MII_OFFSET;
+  const end = start + CACHED_LICENSE_MII_LEN;
+  const crcOff = end;
+
+  if (base < 0 || crcOff + 2 > content.length) {
+    return { present: false, name: "", crcStored: 0, crcComputed: 0, crcOk: false, data: null };
+  }
+
+  const data = content.slice(start, end);
+  const present = bytesHaveData(data);
+  const crcStored = view.getUint16(crcOff, false) >>> 0;
+  const crcComputed = crc16XModem(data) >>> 0;
+  const name = present ? decodeUtf16BE(data.slice(2, 2 + 20)).trim() : "";
+
+  return {
+    present,
+    name,
+    crcStored,
+    crcComputed,
+    crcOk: crcStored === crcComputed,
+    data
+  };
+}
+
+function cachedLicenseMiiFileName(lic, info) {
+  const name = sanitizeFilePart(info && info.name ? info.name : "Mii") || "Mii";
+  return `cached_license_mii_L${lic + 1}_${name}.mii`;
+}
+
+function exportCachedLicenseMii(lic) {
+  if (!ensureLoaded()) return;
+  const info = getCachedLicenseMiiInfo(lic);
+  if (!info.present || !info.data) {
+    alert("No cached Mii block found for license " + (lic + 1) + ".");
+    return;
+  }
+  exportMiiData(info.data, cachedLicenseMiiFileName(lic, info));
 }
 
 
@@ -3386,8 +3470,7 @@ document.getElementById("recomputeCrcsBtn").onclick = async () => {
     if (!ensureLoaded()) return;
     for (let lic=0; lic<4; lic++) {
       const base = licBase(lic) + DWC_OFFSET;
-      const crc = reversedWordsCRC32(base, DWC_DATA_LEN);
-      view.setUint32(base + DWC_DATA_LEN, crc>>>0, false);
+      writeDwcCrcWord(base);
     }
     writeGlobalCrc();
     hasDownloaded = false;
@@ -4230,6 +4313,21 @@ function renderGlobalFileInfoTab() {
     }
     nasRows.push({ lic, display });
   }
+  const oldMiiRows = [];
+  for (let lic = 0; lic < 4; lic++) {
+    const info = getCachedLicenseMiiInfo(lic);
+    const crcText = info.present
+      ? "CRC " + (info.crcOk ? "OK" : "mismatch") +
+        " (stored 0x" + info.crcStored.toString(16).toUpperCase().padStart(4, "0") +
+        ", computed 0x" + info.crcComputed.toString(16).toUpperCase().padStart(4, "0") + ")"
+      : "No cached Mii block";
+    oldMiiRows.push({
+      lic,
+      present: info.present,
+      name: info.present ? (info.name || "(blank name)") : "None",
+      crcText
+    });
+  }
 
   tabContent.innerHTML = `
     <div class="group-box">
@@ -4262,6 +4360,38 @@ function renderGlobalFileInfoTab() {
           <code>${row.display}</code>
         `).join("")}
       </div>
+    </div>
+
+    <div class="group-box">
+      <div class="group-title">Old Mii names</div>
+      <p style="margin:4px 0 8px; font-size:11px; color: var(--text-muted);">
+        These come from the cached full Mii block stored near the end of each license. It can keep an older Mii after the license Mii has been changed.
+      </p>
+      <table class="ghosts-table">
+        <thead>
+          <tr>
+            <th>License</th>
+            <th>Cached Mii name</th>
+            <th>Status</th>
+            <th>Export</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${oldMiiRows.map(row => `
+            <tr>
+              <td>License ${row.lic + 1}</td>
+              <td>${escapeHtml(row.name)}</td>
+              <td>${escapeHtml(row.crcText)}</td>
+              <td>
+                <button type="button"
+                        class="cached-mii-export-btn"
+                        data-lic="${row.lic}"
+                        ${row.present ? "" : "disabled"}>Export</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
     </div>
   `;
 
@@ -4328,6 +4458,13 @@ function renderGlobalFileInfoTab() {
       renderGlobalFileInfoTab();
     };
   }
+
+  tabContent.querySelectorAll(".cached-mii-export-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const lic = parseInt(btn.dataset.lic || "0", 10);
+      exportCachedLicenseMii(Number.isFinite(lic) ? lic : 0);
+    });
+  });
 }
 
 function renderGlobalTtChampTab() {
@@ -5087,8 +5224,7 @@ function renderDwcTab(lic) {
       content.set(gameIdBytes, base + 0x24);
     }
 
-    const crc = reversedWordsCRC32(base, DWC_DATA_LEN);
-    view.setUint32(base + DWC_DATA_LEN, crc >>> 0, false);
+    writeDwcCrcWord(base);
     alert("DWC data and CRC updated for license " + (lic + 1));
     clearDirtyTab();
     renderDwcTab(lic);
@@ -8696,6 +8832,13 @@ function exportAllSaveMiisZip() {
     files.push({ name: fileName, data: miiData.slice(0, 0x4A) });
   };
 
+  // Cached license Mii blocks (all licenses)
+  for (let lic = 0; lic < 4; lic++) {
+    const info = getCachedLicenseMiiInfo(lic);
+    if (!info.present || !info.data) continue;
+    addMii(info.data, cachedLicenseMiiFileName(lic, info));
+  }
+
   // Friends (all licenses)
   for (let lic = 0; lic < 4; lic++) {
     const base = licBase(lic) + FRIEND_MAIN_OFFSET;
@@ -8836,6 +8979,12 @@ function exportLicenseMiisZip(lic) {
 
     files.push({ name: fileName, data: miiData.slice(0, 0x4A) });
   };
+
+  // Cached license Mii block (selected license)
+  const cachedInfo = getCachedLicenseMiiInfo(idx);
+  if (cachedInfo.present && cachedInfo.data) {
+    addMii(cachedInfo.data, cachedLicenseMiiFileName(idx, cachedInfo));
+  }
 
   // Friends (selected license)
   const base = licBase(idx) + FRIEND_MAIN_OFFSET;
