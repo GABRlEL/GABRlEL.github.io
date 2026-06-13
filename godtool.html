@@ -4915,11 +4915,13 @@ function renderDwcTab(lic) {
   const gameIdText = formatGameIdSalt(gameIdBytes);
   const gameIdFormat = gameIdSaltFormatLabel(gameIdText);
   const pid = view.getUint32(base + 0x1C, false) >>> 0;
-  let friendCode = "";
-  try {
-    friendCode = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic));
-  } catch (e) {
-    friendCode = "(error)";
+  let friendCode = "—";
+  if (pid !== 0) {
+    try {
+      friendCode = pidToFriendCode(pid, getFriendCodeSaltBytesForLicense(lic));
+    } catch (e) {
+      friendCode = "(error)";
+    }
   }
   const friendCodeFieldValue = /^\d{4}-\d{4}-\d{4}$/.test(friendCode) ? friendCode : "";
   let html = `<div class="group-box">
