@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Godtool • v1.3.1</title>
+<title>Godtool • v1.3.2</title>
 <style>
   :root {
     --bg-main: #101014;
@@ -215,6 +215,22 @@ header .group-label {
     line-height: 1.4;
     border-radius: 4px;
     white-space: nowrap;
+  }
+  .calculated-wfc-table-wrap {
+    overflow-x: auto;
+  }
+  .calculated-wfc-copy {
+    padding: 2px 6px;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+  .calculated-wfc-copy code {
+    color: inherit;
+  }
+  .fileinfo-table th,
+  .fileinfo-table td {
+    text-align: left;
+    vertical-align: middle;
   }
   .dwc-fc-field {
     width: 110px;
@@ -820,7 +836,7 @@ button.ghost-export-btn {
 <body>
 <header>
   <div class="row">
-    <span class="logo">Godtool (Web) • v1.3.1</span>
+    <span class="logo">Godtool (Web) • v1.3.2</span>
     <input type="file" id="fileInput" accept=".dat,.ikw,.rkp">
     <button id="downloadBtn" disabled>Download DAT</button>
     <span id="status">No file loaded</span>
@@ -874,23 +890,23 @@ button.ghost-export-btn {
   <div>Credits:</div>
   <div>
     The Custom Mario Kart Wiiki community for providing the rksys.dat docs at:
-    <a href="https://wiki.tockdom.com/wiki/Rksys.dat" target="_blank" rel="noopener">https://wiki.tockdom.com/wiki/Rksys.dat</a>
+    <a href="https://mkwiiki.org/wiki/Rksys.dat" target="_blank" rel="noopener">https://mkwiiki.org/wiki/Rksys.dat</a>
   </div>
   <div>
-    B_squo (<a href="https://wiki.tockdom.com/wiki/User:B_squo" target="_blank" rel="noopener">https://wiki.tockdom.com/wiki/User:B_squo</a>)
+    B_squo (<a href="https://mkwiiki.org/wiki/User:B_squo" target="_blank" rel="noopener">https://mkwiiki.org/wiki/User:B_squo</a>)
     for providing the info regarding the penalty system at:
     <a href="https://mariokartwii.com/showthread.php?tid=2502" target="_blank" rel="noopener">https://mariokartwii.com/showthread.php?tid=2502</a>
   </div>
   <div>
-    Atlas (<a href="https://wiki.tockdom.com/wiki/User:Atlas" target="_blank" rel="noopener">https://wiki.tockdom.com/wiki/User:Atlas</a>)
+    Atlas (<a href="https://mkwiiki.org/wiki/User:Atlas" target="_blank" rel="noopener">https://mkwiiki.org/wiki/User:Atlas</a>)
     for making RKG Viewer
-    (<a href="https://wiki.tockdom.com/wiki/RKG_Viewer" target="_blank" rel="noopener">https://wiki.tockdom.com/wiki/RKG_Viewer</a>)
+    (<a href="https://mkwiiki.org/wiki/RKG_Viewer" target="_blank" rel="noopener">https://mkwiiki.org/wiki/RKG_Viewer</a>)
   </div>
   <div>
     The Retro Rewind community for providing many save files to help with development of the tool.
   </div>
   <div>
-    ChatGPT 5.1 Thinking, 5.2 Thinking, Codex 5.2 & 5.4 High & Extra High, Codex 5.5 Medium for making the tool.
+    ChatGPT 5.1 Thinking, 5.2 Thinking, Codex 5.2 & 5.4 High & Extra High, Codex 5.5 Medium, 5.6 Sol Ultra for making the tool.
   </div>
 </footer>
 
@@ -1819,6 +1835,7 @@ const SUBTABS = [
   ["TT Leaderboards","ttlb"],
   ["Penalty",       "penalty"],
   ["Rules",         "rules"],
+  ["File Info",     "rkpFileInfo"],
   ["Empty",         "empty"],
 ];
 
@@ -2417,7 +2434,7 @@ function getCachedLicenseMiiInfo(lic) {
     return { present: false, name: "", crcStored: 0, crcComputed: 0, crcOk: false, data: null };
   }
 
-  const base = (currentFileMode === "rkp" && lic === 0) ? 0 : licBase(lic);
+  const base = licBase(lic);
   const start = base + CACHED_LICENSE_MII_OFFSET;
   const end = start + CACHED_LICENSE_MII_LEN;
   const crcOff = end;
@@ -3940,6 +3957,7 @@ function buildSubTabs() {
   if (currentMainTab !== "license") return;
   for (const [label, id] of SUBTABS) {
     if (currentFileMode === "rkp" && id === "ghosts") continue;
+    if (currentFileMode !== "rkp" && id === "rkpFileInfo") continue;
     const btn = document.createElement("button");
     btn.className = "tab" + (id === currentSubTab ? " active" : "");
     btn.textContent = label;
@@ -3985,6 +4003,7 @@ function renderCurrentTab() {
     case "ttlb":       renderTimeTrialTab(currentLicense); break;
     case "favStages":  renderFavoriteTab(currentLicense, FAVORITE_STAGES, "Favorite Stages"); break;
     case "penalty":    renderPenaltyTab(currentLicense); break;
+    case "rkpFileInfo":renderRkpFileInfoTab(currentLicense); break;
     case "empty":
       tabContent.textContent = "More coming soon™...";
       break;
@@ -4299,20 +4318,56 @@ function renderGlobalFileInfoTab() {
     versionBytes[2],
     versionBytes[3]
   );
-  const nasRows = [];
+  const wfcRows = [];
   const WIILINK_USERID_MASK = 0x7FFFFFFFFFFn;
   for (let lic = 0; lic < 4; lic++) {
     const base = licBase(lic) + DWC_OFFSET;
-    let display = "N/A / N/A";
-    if (base + 0x18 <= content.length) {
+    const row = {
+      lic,
+      available: false,
+      vanillaNasUserId: "N/A",
+      userId: "N/A",
+      gsbrCode: "N/A",
+      uniqueNickFirstHalf: "N/A",
+      lastName: "N/A",
+      fullUniqueNick: "N/A"
+    };
+    if (base + 0x28 <= content.length) {
       const hi = view.getUint32(base + 0x10, false) >>> 0;
       const lo = view.getUint32(base + 0x14, false) >>> 0;
-      const userid = (BigInt(hi) << 32n) | BigInt(lo);
-      const wiiLinkId = userid & WIILINK_USERID_MASK;
-      display = `${userid.toString()} / ${wiiLinkId.toString()}`;
+      const vanillaNasUserId = (BigInt(hi) << 32n) | BigInt(lo);
+      const userId = vanillaNasUserId & WIILINK_USERID_MASK;
+      const playerId = view.getUint32(base + 0x18, false) >>> 0;
+      const gameIdBytes = content.slice(base + 0x24, base + 0x28);
+      const hasValues = vanillaNasUserId !== 0n ||
+        playerId !== 0 || gameIdBytes.some(byte => byte !== 0);
+
+      if (hasValues) {
+        const gameId = formatGameIdSalt(gameIdBytes);
+        const gsbrCode = gameId + BigInt(playerId).toString(32);
+        const uniqueNickFirstHalf = userId.toString(32);
+        row.available = true;
+        row.vanillaNasUserId = vanillaNasUserId.toString();
+        row.userId = userId.toString();
+        row.gsbrCode = gsbrCode;
+        row.uniqueNickFirstHalf = uniqueNickFirstHalf;
+        row.lastName = "000000000" + gsbrCode;
+        row.fullUniqueNick = uniqueNickFirstHalf + gsbrCode;
+      }
     }
-    nasRows.push({ lic, display });
+    wfcRows.push(row);
   }
+
+  const renderCalculatedWfcValue = (row, field, title) => `
+    <button type="button"
+            class="copy-btn calculated-wfc-copy"
+            data-lic="${row.lic}"
+            data-field="${field}"
+            title="${escapeHtml(title)}"
+            ${row.available ? "" : "disabled"}>
+      <code>${escapeHtml(row[field])}</code>
+    </button>
+  `;
   const oldMiiRows = [];
   for (let lic = 0; lic < 4; lic++) {
     const info = getCachedLicenseMiiInfo(lic);
@@ -4353,21 +4408,42 @@ function renderGlobalFileInfoTab() {
     </div>
 
     <div class="group-box">
-      <div class="group-title">Observed NAS User ID & WiiLink User ID</div>
-      <div class="grid-2col">
-        ${nasRows.map(row => `
-          <label>License ${row.lic + 1}</label>
-          <code>${row.display}</code>
-        `).join("")}
+      <div class="group-title">Calculated WiiLink WFC values</div>
+      <p style="margin:4px 0 8px; font-size:11px; color: var(--text-muted);">
+        Click a calculated value to copy it. Hover over Gsbr Code or Unique Nick First Half for its related login value.
+      </p>
+      <div class="calculated-wfc-table-wrap">
+        <table class="ghosts-table fileinfo-table calculated-wfc-table">
+          <thead>
+            <tr>
+              <th>License</th>
+              <th>Vanilla NAS User ID</th>
+              <th>User ID</th>
+              <th>Gsbr Code</th>
+              <th>Unique Nick First Half</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${wfcRows.map(row => `
+              <tr>
+                <td>License ${row.lic + 1}</td>
+                <td>${renderCalculatedWfcValue(row, "vanillaNasUserId", "Click to copy Vanilla NAS User ID.")}</td>
+                <td>${renderCalculatedWfcValue(row, "userId", "Click to copy User ID.")}</td>
+                <td>${renderCalculatedWfcValue(row, "gsbrCode", `Last Name: ${row.lastName}\nClick to copy Gsbr Code.`)}</td>
+                <td>${renderCalculatedWfcValue(row, "uniqueNickFirstHalf", `Full unique nick: ${row.fullUniqueNick} (+@nds for Email)\nClick to copy Unique Nick First Half.`)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
       </div>
     </div>
 
     <div class="group-box">
-      <div class="group-title">Old Mii names</div>
+      <div class="group-title">Old Miis</div>
       <p style="margin:4px 0 8px; font-size:11px; color: var(--text-muted);">
         These come from the cached full Mii block stored near the end of each license. It can keep an older Mii after the license Mii has been changed.
       </p>
-      <table class="ghosts-table">
+      <table class="ghosts-table fileinfo-table">
         <thead>
           <tr>
             <th>License</th>
@@ -4459,12 +4535,170 @@ function renderGlobalFileInfoTab() {
     };
   }
 
+  const wfcCopyLabels = {
+    vanillaNasUserId: "Vanilla NAS User ID",
+    userId: "User ID",
+    gsbrCode: "Gsbr Code",
+    uniqueNickFirstHalf: "Unique Nick First Half"
+  };
+  tabContent.querySelectorAll(".calculated-wfc-copy").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const lic = parseInt(btn.dataset.lic || "-1", 10);
+      const field = btn.dataset.field || "";
+      const row = wfcRows[lic];
+      if (!row || !row.available || !Object.prototype.hasOwnProperty.call(wfcCopyLabels, field)) return;
+      copyTextToClipboard(row[field], `${wfcCopyLabels[field]} copied.`);
+    });
+  });
+
   tabContent.querySelectorAll(".cached-mii-export-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const lic = parseInt(btn.dataset.lic || "0", 10);
       exportCachedLicenseMii(Number.isFinite(lic) ? lic : 0);
     });
   });
+}
+
+function renderRkpFileInfoTab(lic) {
+  if (!ensureLoaded()) {
+    tabContent.textContent = "Load a .rkp file first.";
+    return;
+  }
+  if (currentFileMode !== "rkp") {
+    tabContent.textContent = "This File Info view is only available in RKP mode.";
+    return;
+  }
+
+  clearDirtyTab(true);
+
+  const base = licBase(lic) + DWC_OFFSET;
+  const row = {
+    lic,
+    available: false,
+    vanillaNasUserId: "N/A",
+    userId: "N/A",
+    gsbrCode: "N/A",
+    uniqueNickFirstHalf: "N/A",
+    lastName: "N/A",
+    fullUniqueNick: "N/A"
+  };
+  if (base + 0x28 <= content.length) {
+    const hi = view.getUint32(base + 0x10, false) >>> 0;
+    const lo = view.getUint32(base + 0x14, false) >>> 0;
+    const vanillaNasUserId = (BigInt(hi) << 32n) | BigInt(lo);
+    const userId = vanillaNasUserId & 0x7FFFFFFFFFFn;
+    const playerId = view.getUint32(base + 0x18, false) >>> 0;
+    const gameIdBytes = content.slice(base + 0x24, base + 0x28);
+    const hasValues = vanillaNasUserId !== 0n ||
+      playerId !== 0 || gameIdBytes.some(byte => byte !== 0);
+
+    if (hasValues) {
+      const gameId = formatGameIdSalt(gameIdBytes);
+      row.available = true;
+      row.vanillaNasUserId = vanillaNasUserId.toString();
+      row.userId = userId.toString();
+      row.gsbrCode = gameId + BigInt(playerId).toString(32);
+      row.uniqueNickFirstHalf = userId.toString(32);
+      row.lastName = "000000000" + row.gsbrCode;
+      row.fullUniqueNick = row.uniqueNickFirstHalf + row.gsbrCode;
+    }
+  }
+
+  const renderValue = (field, title) => `
+    <button type="button"
+            class="copy-btn calculated-wfc-copy"
+            data-field="${field}"
+            title="${escapeHtml(title)}"
+            ${row.available ? "" : "disabled"}>
+      <code>${escapeHtml(row[field])}</code>
+    </button>
+  `;
+
+  const miiInfo = getCachedLicenseMiiInfo(lic);
+  const crcText = miiInfo.present
+    ? "CRC " + (miiInfo.crcOk ? "OK" : "mismatch") +
+      " (stored 0x" + miiInfo.crcStored.toString(16).toUpperCase().padStart(4, "0") +
+      ", computed 0x" + miiInfo.crcComputed.toString(16).toUpperCase().padStart(4, "0") + ")"
+    : "No cached Mii block";
+
+  tabContent.innerHTML = `
+    <div class="group-box">
+      <div class="group-title">Calculated WiiLink WFC values</div>
+      <p style="margin:4px 0 8px; font-size:11px; color: var(--text-muted);">
+        Click a calculated value to copy it. Hover over Gsbr Code or Unique Nick First Half for its related login value.
+      </p>
+      <div class="calculated-wfc-table-wrap">
+        <table class="ghosts-table fileinfo-table calculated-wfc-table">
+          <thead>
+            <tr>
+              <th>License</th>
+              <th>Vanilla NAS User ID</th>
+              <th>User ID</th>
+              <th>Gsbr Code</th>
+              <th>Unique Nick First Half</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>License ${lic + 1}</td>
+              <td>${renderValue("vanillaNasUserId", "Click to copy Vanilla NAS User ID.")}</td>
+              <td>${renderValue("userId", "Click to copy User ID.")}</td>
+              <td>${renderValue("gsbrCode", `Last Name: ${row.lastName}\nClick to copy Gsbr Code.`)}</td>
+              <td>${renderValue("uniqueNickFirstHalf", `Full unique nick: ${row.fullUniqueNick} (+@nds for Email)\nClick to copy Unique Nick First Half.`)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group-box">
+      <div class="group-title">Old Miis</div>
+      <p style="margin:4px 0 8px; font-size:11px; color: var(--text-muted);">
+        This comes from the cached full Mii block stored near the end of the license. It can keep an older Mii after the license Mii has been changed.
+      </p>
+      <table class="ghosts-table fileinfo-table">
+        <thead>
+          <tr>
+            <th>License</th>
+            <th>Cached Mii name</th>
+            <th>Status</th>
+            <th>Export</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>License ${lic + 1}</td>
+            <td>${escapeHtml(miiInfo.present ? (miiInfo.name || "(blank name)") : "None")}</td>
+            <td>${escapeHtml(crcText)}</td>
+            <td>
+              <button type="button"
+                      id="rkpCachedMiiExportBtn"
+                      ${miiInfo.present ? "" : "disabled"}>Export</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const copyLabels = {
+    vanillaNasUserId: "Vanilla NAS User ID",
+    userId: "User ID",
+    gsbrCode: "Gsbr Code",
+    uniqueNickFirstHalf: "Unique Nick First Half"
+  };
+  tabContent.querySelectorAll(".calculated-wfc-copy").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.field || "";
+      if (!row.available || !Object.prototype.hasOwnProperty.call(copyLabels, field)) return;
+      copyTextToClipboard(row[field], `${copyLabels[field]} copied.`);
+    });
+  });
+
+  const exportBtn = document.getElementById("rkpCachedMiiExportBtn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => exportCachedLicenseMii(lic));
+  }
 }
 
 function renderGlobalTtChampTab() {
@@ -5363,7 +5597,8 @@ function markDwcWarnings(currentLic) {
         if (!/^[+-]?\d+$/.test(raw)) return false;
         const n = Number(raw);
         if (!Number.isFinite(n)) return false;
-        if ((n >>> 0) !== 0) return false;
+        // Do not let out-of-range values that wrap to zero count as an empty block.
+        if (n !== 0) return false;
       }
     }
 
@@ -5388,7 +5623,66 @@ function markDwcWarnings(currentLic) {
 
   const getCurrentValue = (off) => getValueForLicense(currentLic, off);
 
+  const getRawCurrentValue = (off) => {
+    const input = tabContent.querySelector(`.dwc-field[data-off="${off}"]`);
+    if (!input) return NaN;
+    const raw = String(input.value).trim();
+    if (!/^[+-]?\d+$/.test(raw)) return NaN;
+    const n = Number(raw);
+    return Number.isFinite(n) && Number.isInteger(n) ? n : NaN;
+  };
+
   const currentEmpty = isDwcEmptyLicense(currentLic);
+
+  const emptyWarningMessage = "This value shouldn't be empty. This indicates that the license has been tampered with, and login issues on servers may occur.";
+  const emptyNumericFields = new Map();
+  for (const [, off] of DWC_FIELDS) {
+    const input = tabContent.querySelector(`.dwc-field[data-off="${off}"]`);
+    const raw = input ? String(input.value).trim() : "";
+    emptyNumericFields.set(off, raw === "");
+  }
+
+  const gameIdInputForEmptyCheck = document.getElementById("dwcGameIdSalt");
+  const gameIdRawForEmptyCheck = gameIdInputForEmptyCheck
+    ? String(gameIdInputForEmptyCheck.value).trim()
+    : "";
+  const gameIdIsEmpty = gameIdRawForEmptyCheck === "";
+
+  if (gameIdIsEmpty) {
+    addDwcWarning(
+      document.getElementById("dwcGameIdSaltWrap"),
+      "warn-red",
+      emptyWarningMessage
+    );
+  }
+  for (const [, off] of DWC_FIELDS) {
+    if (!emptyNumericFields.get(off)) continue;
+    addDwcWarning(getDwcFieldWrapper(off), "warn-red", emptyWarningMessage);
+  }
+
+  const uint32WarningMessage =
+    "This field must be an integer between 0 and 4294967295.";
+  for (const [, off] of DWC_FIELDS) {
+    // These two fields already have the stricter 1..4294967295 warning below.
+    if (off === 0x0C || off === 0x18) continue;
+
+    const input = tabContent.querySelector(`.dwc-field[data-off="${off}"]`);
+    const raw = input ? String(input.value).trim() : "";
+    if (raw === "") continue;
+
+    const value = getRawCurrentValue(off);
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+      addDwcWarning(getDwcFieldWrapper(off), "warn-red", uint32WarningMessage);
+    }
+  }
+
+  if (gameIdRawForEmptyCheck !== "" && !parseGameIdSaltInput(gameIdRawForEmptyCheck)) {
+    addDwcWarning(
+      document.getElementById("dwcGameIdSaltWrap"),
+      "warn-red",
+      "This field must contain exactly 4 ASCII characters or 8 hexadecimal digits representing 4 bytes."
+    );
+  }
 
   if (!currentEmpty) {
     const gameIdWrap = document.getElementById("dwcGameIdSaltWrap");
@@ -5472,6 +5766,17 @@ function markDwcWarnings(currentLic) {
 
   const base = licBase(currentLic) + DWC_OFFSET;
   if (base + 0x20 > content.length) return;
+
+  if (!currentEmpty) {
+    const playerIdRangeWarning =
+      "This value must be between 1 and 4294967295. Values outside this range will likely cause login issues on WiiLink-based online servers.";
+    for (const off of [0x0C, 0x18]) {
+      const id = getRawCurrentValue(off);
+      if (!Number.isInteger(id) || id < 1 || id > 0xFFFFFFFF) {
+        addDwcWarning(getDwcFieldWrapper(off), "warn-red", playerIdRangeWarning);
+      }
+    }
+  }
 
   const pseudo = getCurrentValue(0x0C);
   const auth   = getCurrentValue(0x18);
